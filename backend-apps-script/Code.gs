@@ -31,7 +31,7 @@ function doGet(e) {
   try {
     const action = (e && e.parameter && e.parameter.action) || 'health';
 
-    if (action === 'health') return json({ ok: true, message: 'Madrasah ERP API running', ts: nowIso(), sheetId: getSheetId_() });
+    if (action === 'health') return json({ ok: true, message: 'Madrasah ERP API running', ts: nowIso(), sheetId: getSheetId_(), deploy_marker: 'auto-deploy-test-2026-05-22-01' });
     if (action === 'listTransactions') return json(listTransactions_(e.parameter));
     if (action === 'dashboardSummary') return json(dashboardSummary_(e.parameter));
     if (action === 'listBeneficiaries') return json(listSheetRows_(CONFIG.SHEETS.BENEFICIARIES));
