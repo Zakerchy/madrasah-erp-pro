@@ -26,3 +26,4 @@ A zero-cost, Google-Sheet-connected, Android-first native app plan and implement
 ## Current Status
 - Phase 1-4 implementation completed (see `phase-tracker/IMPLEMENTATION_PHASES.md`)
 - End-to-end testing instructions: `docs/PHASE4_TEST_GUIDE.md`
+- Full automation setup (Bangla): `docs/FULL_AUTOMATION_SETUP_BN.md`

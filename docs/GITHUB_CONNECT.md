@@ -32,3 +32,13 @@ A workflow is already added at:
 - `.github/workflows/local-check.yml`
 
 It runs on push and weekly schedule to validate migration + local smoke flow.
+
+## Full automation workflows
+- Backend auto deploy: `.github/workflows/deploy-apps-script.yml`
+- Android APK auto build: `.github/workflows/android-apk.yml`
+
+Required GitHub Secrets for full automation:
+- `CLASPRC_JSON`
+- `APPS_SCRIPT_SCRIPT_ID`
+- `APPS_SCRIPT_DEPLOYMENT_ID`
+- `API_BASE_URL`
