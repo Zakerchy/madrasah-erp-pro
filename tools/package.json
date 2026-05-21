@@ -1,0 +1,12 @@
+{
+  "name": "madrasah-erp-tools",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "migrate": "node migrate_excel_to_normalized.js"
+  },
+  "dependencies": {
+    "xlsx": "^0.18.5"
+  }
+}

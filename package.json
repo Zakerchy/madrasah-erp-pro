@@ -1,0 +1,12 @@
+{
+  "name": "madrasah-erp-lite",
+  "private": true,
+  "version": "0.2.0",
+  "description": "Madrasah ERP Lite - implementation workspace",
+  "type": "module",
+  "scripts": {
+    "migrate": "node tools/migrate_excel_to_normalized.js",
+    "check:server": "node local-check/server.mjs",
+    "check:smoke": "node local-check/smoke-test.mjs"
+  }
+}

@@ -1,0 +1,2 @@
+id,name,phone,email,role,active,pin_hash,created_at,updated_at
+u_admin_1,Admin,01700000000,admin@example.com,ADMIN,TRUE,PUT_HASH_HERE,2026-05-21T00:00:00Z,2026-05-21T00:00:00Z

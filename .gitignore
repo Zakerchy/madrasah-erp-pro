@@ -1,0 +1,15 @@
+# Flutter
+.dart_tool/
+.packages
+build/
+.flutter-plugins
+.flutter-plugins-dependencies
+
+# Node tools
+node_modules/
+
+# OS
+.DS_Store
+
+# Tool outputs
+tools/output/*.csv
