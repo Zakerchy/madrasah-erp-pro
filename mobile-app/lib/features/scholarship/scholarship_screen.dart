@@ -98,7 +98,10 @@ class _ScholarshipScreenState extends State<ScholarshipScreen> {
       _other.text = '0';
       _remaining.text = '0';
       await _loadAll();
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Scholarship payment saved')));
+      final msg = res['queued'] == true
+          ? 'Offline saved. Scholarship payment will sync automatically later.'
+          : 'Scholarship payment saved';
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
     } else {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('${res['message'] ?? res['error']}')));
     }

@@ -80,7 +80,10 @@ class _SalaryScreenState extends State<SalaryScreen> {
       _staffRole.clear();
       _staffSalary.clear();
       await _loadAll();
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Staff saved')));
+      final msg = res['queued'] == true
+          ? 'Offline saved. Staff will sync automatically later.'
+          : 'Staff saved';
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
     } else {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('${res['message'] ?? res['error']}')));
     }
@@ -116,7 +119,10 @@ class _SalaryScreenState extends State<SalaryScreen> {
       _payableAmount.clear();
       _dueAmount.text = '0';
       await _loadAll();
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Salary payment recorded')));
+      final msg = res['queued'] == true
+          ? 'Offline saved. Salary payment will sync automatically later.'
+          : 'Salary payment recorded';
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
     } else {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('${res['message'] ?? res['error']}')));
     }

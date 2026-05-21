@@ -8,14 +8,21 @@ Run from:
 npm run migrate
 ```
 
-## 2) Start local check server
+## 2) Start admin local web (CSV + Live API mode)
 ```bash
-npm run check:server
+npm run admin:web
 ```
 Open browser:
 - `http://localhost:4123`
 
-## 3) Run smoke test (in another terminal while server is running)
+## 3) Enable Live Google Sheet mode (optional)
+```bash
+API_BASE_URL="https://script.google.com/macros/s/<DEPLOYMENT_ID>/exec" npm run admin:web
+```
+তারপর browser UI থেকে `Live (Google Sheet API)` mode select করুন।
+
+## 4) Run smoke test (local mode)
+(server running থাকা অবস্থায়)
 ```bash
 npm run check:smoke
 ```
@@ -25,5 +32,13 @@ Expected output includes:
 - `Transactions: ...`
 - `Balance: ...`
 
-## 4) Stop server
-Press `Ctrl + C` in server terminal.
+## 5) Run Flutter app as local webapp from PC (Admin use)
+```bash
+cd mobile-app
+flutter pub get
+flutter run -d chrome --dart-define=API_BASE_URL="https://script.google.com/macros/s/<DEPLOYMENT_ID>/exec"
+```
+এতে একই app PC browser এ webapp এর মতো চলবে এবং live update দেখা যাবে।
+
+## 6) Stop server
+Press `Ctrl + C` in terminal.

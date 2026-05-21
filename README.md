@@ -5,7 +5,8 @@ A zero-cost, Google-Sheet-connected, Android-first native app plan and implement
 ## Goals
 - Unified donation, expense, salary, scholarship, and beneficiary management
 - Live sync with Google Sheets using Google Apps Script API
-- Print/share-ready monthly reports
+- Offline-first entry queue with automatic sync retry on reconnect
+- Admin local web view from PC for dashboard/report checks
 - Role-based access with audit trail
 
 ## Project Structure
@@ -14,6 +15,7 @@ A zero-cost, Google-Sheet-connected, Android-first native app plan and implement
 - `sheets/` spreadsheet templates and headers
 - `backend-apps-script/` Google Apps Script backend (REST-like)
 - `mobile-app/` Flutter app scaffold and feature modules
+- `local-check/` local admin web checker (CSV + live API mode)
 - `tools/` Excel migration and normalization scripts
 
 ## First Execution Order
@@ -27,3 +29,8 @@ A zero-cost, Google-Sheet-connected, Android-first native app plan and implement
 - Phase 1-4 implementation completed (see `phase-tracker/IMPLEMENTATION_PHASES.md`)
 - End-to-end testing instructions: `docs/PHASE4_TEST_GUIDE.md`
 - Full automation setup (Bangla): `docs/FULL_AUTOMATION_SETUP_BN.md`
+- Final operations plan (Bangla): `docs/APP_OPERATIONS_PLAN_BN.md`
+- Pro master roadmap: `docs/PRO_ERP_MASTER_PLAN_BN.md`
+- Live sheet linkage audit: `docs/LIVE_SHEET_LINKAGE_AUDIT_BN.md`
+- Local admin commands: `docs/LOCALHOST_COMMANDS.md`
+- APK distribution/update runbook: `docs/APK_DISTRIBUTION_AND_UPDATE_BN.md`

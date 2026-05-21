@@ -14,4 +14,13 @@ class SessionUser {
       phone: (map['phone'] ?? '').toString(),
     );
   }
+
+  Map<String, dynamic> toMap() {
+    return {
+      'id': id,
+      'name': name,
+      'role': role,
+      'phone': phone,
+    };
+  }
 }

@@ -1,0 +1,12 @@
+{
+  "appliedAt": "2026-05-21T15:34:21.242Z",
+  "spreadsheetId": "14TC8APxdseH-UGiHgVNhbEjT2Bzy3EJHBidHoEpGZbI",
+  "addedTabs": 9,
+  "imported": [
+    "fund_transactions",
+    "beneficiaries",
+    "scholarship_payments"
+  ],
+  "adminSeedPhone": "01700000000",
+  "adminSeedPin": "1234"
+}

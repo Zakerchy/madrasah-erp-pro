@@ -4,7 +4,7 @@
  */
 
 const CONFIG = {
-  SHEET_ID: 'PUT_YOUR_GOOGLE_SHEET_ID_HERE',
+  SHEET_ID_FALLBACK: 'PUT_YOUR_GOOGLE_SHEET_ID_HERE',
   SHEETS: {
     USERS: 'users_roles',
     TXN: 'fund_transactions',
@@ -31,7 +31,7 @@ function doGet(e) {
   try {
     const action = (e && e.parameter && e.parameter.action) || 'health';
 
-    if (action === 'health') return json({ ok: true, message: 'Madrasah ERP API running', ts: nowIso() });
+    if (action === 'health') return json({ ok: true, message: 'Madrasah ERP API running', ts: nowIso(), sheetId: getSheetId_() });
     if (action === 'listTransactions') return json(listTransactions_(e.parameter));
     if (action === 'dashboardSummary') return json(dashboardSummary_(e.parameter));
     if (action === 'listBeneficiaries') return json(listSheetRows_(CONFIG.SHEETS.BENEFICIARIES));
@@ -460,10 +460,16 @@ function validateEnum_(value, allowed, fieldName) {
 }
 
 function getSheet_(sheetName) {
-  const ss = SpreadsheetApp.openById(CONFIG.SHEET_ID);
+  const ss = SpreadsheetApp.openById(getSheetId_());
   const sheet = ss.getSheetByName(sheetName);
   if (!sheet) throw new Error('Sheet not found: ' + sheetName);
   return sheet;
+}
+
+function getSheetId_() {
+  const fromProp = PropertiesService.getScriptProperties().getProperty('SHEET_ID');
+  if (fromProp && String(fromProp).trim()) return String(fromProp).trim();
+  return CONFIG.SHEET_ID_FALLBACK;
 }
 
 function uid_(prefix) {

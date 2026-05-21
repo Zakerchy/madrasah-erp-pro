@@ -70,7 +70,10 @@ class _BeneficiariesScreenState extends State<BeneficiariesScreen> {
       _guardianStatus.clear();
       _monthlyAmount.clear();
       await _load();
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Beneficiary saved')));
+      final msg = res['queued'] == true
+          ? 'Offline saved. Beneficiary will sync automatically later.'
+          : 'Beneficiary saved';
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
     } else {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('${res['message'] ?? res['error']}')));
     }

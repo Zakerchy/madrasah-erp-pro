@@ -1,0 +1,13 @@
+{
+  "appliedAt": "2026-05-21T21:10:59.992Z",
+  "spreadsheetId": "1oDjX_FS0F0_4ZjZM0YBS-TLHFRmYwbNRCPKhcTUxr3Y",
+  "sheetTitle": "Madrasah-ERP-Pro",
+  "addedTabs": 0,
+  "importedTabs": [
+    "fund_transactions",
+    "beneficiaries",
+    "scholarship_payments"
+  ],
+  "adminSeedPhone": "01700000000",
+  "adminSeedPin": "1234"
+}

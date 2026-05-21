@@ -34,6 +34,11 @@ class _LoginScreenState extends State<LoginScreen> {
       if (res['ok'] == true) {
         final user = SessionUser.fromMap((res['data'] ?? {}) as Map<String, dynamic>);
         SessionService.setUser(user);
+        await SessionService.saveOfflineCredential(_phone.text.trim(), _pin.text.trim(), user);
+        Navigator.pushNamedAndRemoveUntil(context, '/dashboard', (route) => false);
+      } else if (res['offline'] == true &&
+          SessionService.loginFromOfflineCredential(_phone.text.trim(), _pin.text.trim())) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Offline login successful')));
         Navigator.pushNamedAndRemoveUntil(context, '/dashboard', (route) => false);
       } else {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('${res['message'] ?? res['error'] ?? 'Login failed'}')));

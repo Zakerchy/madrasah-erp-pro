@@ -68,7 +68,10 @@ class _DonationScreenState extends State<DonationScreen> {
         _source.clear();
         _note.clear();
         await _loadRows();
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Donation saved successfully')));
+        final msg = res['queued'] == true
+            ? 'Offline saved. Donation will sync automatically later.'
+            : 'Donation saved successfully';
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
       } else {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed: ${res['message'] ?? res['error']}')));
       }

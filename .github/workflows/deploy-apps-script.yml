@@ -6,6 +6,7 @@ on:
     branches: ["main"]
     paths:
       - "backend-apps-script/**"
+      - "sheets/**"
       - ".github/workflows/deploy-apps-script.yml"
 
 jobs:
@@ -43,6 +44,11 @@ jobs:
           test -n "${{ secrets.CLASPRC_JSON }}" || (echo "Missing CLASPRC_JSON" && exit 1)
           test -n "${{ secrets.APPS_SCRIPT_SCRIPT_ID }}" || (echo "Missing APPS_SCRIPT_SCRIPT_ID" && exit 1)
           test -n "${{ secrets.APPS_SCRIPT_DEPLOYMENT_ID }}" || (echo "Missing APPS_SCRIPT_DEPLOYMENT_ID" && exit 1)
+          test -n "${{ secrets.GOOGLE_SHEET_ID }}" || (echo "Missing GOOGLE_SHEET_ID" && exit 1)
+
+      - name: Inject Google Sheet ID
+        run: |
+          sed -i "s|PUT_YOUR_GOOGLE_SHEET_ID_HERE|${{ secrets.GOOGLE_SHEET_ID }}|g" backend-apps-script/Code.gs
 
       - name: Push source
         run: clasp push --force

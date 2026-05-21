@@ -4,9 +4,9 @@ on:
   workflow_dispatch:
   push:
     branches: ["main"]
-    paths:
-      - "mobile-app/**"
-      - ".github/workflows/android-apk.yml"
+
+permissions:
+  contents: write
 
 jobs:
   build-apk:
@@ -18,21 +18,45 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
           channel: stable
 
+      - name: Ensure Android platform scaffold exists
+        run: |
+          if [ ! -d android ]; then
+            flutter create --platforms=android .
+          fi
+
       - name: Flutter pub get
         run: flutter pub get
 
       - name: Build debug APK
+        env:
+          API_BASE_URL: ${{ secrets.API_BASE_URL }}
         run: |
-          flutter build apk --debug \
-            --dart-define=API_BASE_URL=${{ secrets.API_BASE_URL }}
+          API_URL="${API_BASE_URL:-https://script.google.com/macros/s/PUT_DEPLOYMENT_ID/exec}"
+          flutter build apk --debug --dart-define=API_BASE_URL="$API_URL"
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
           name: madrasah-erp-lite-debug-apk
           path: mobile-app/build/app/outputs/flutter-apk/app-debug.apk
+
+      - name: Publish/Update Latest APK release
+        uses: ncipollo/release-action@v1
+        with:
+          tag: latest-apk
+          name: Latest APK
+          allowUpdates: true
+          removeArtifacts: true
+          artifacts: mobile-app/build/app/outputs/flutter-apk/app-debug.apk
+          artifactErrorsFailBuild: true

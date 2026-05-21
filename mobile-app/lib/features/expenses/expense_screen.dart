@@ -70,7 +70,10 @@ class _ExpenseScreenState extends State<ExpenseScreen> {
         _head.clear();
         _note.clear();
         await _loadRows();
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Expense saved successfully')));
+        final msg = res['queued'] == true
+            ? 'Offline saved. Expense will sync automatically later.'
+            : 'Expense saved successfully';
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
       } else {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed: ${res['message'] ?? res['error']}')));
       }

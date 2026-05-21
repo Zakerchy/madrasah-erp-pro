@@ -9,6 +9,7 @@ const TXN_CSV = path.join(ROOT, 'tools/output/migrated_fund_transactions.csv');
 const BEN_CSV = path.join(ROOT, 'tools/output/migrated_beneficiaries.csv');
 const SCH_CSV = path.join(ROOT, 'tools/output/migrated_scholarship_payments.csv');
 const PORT = Number(process.env.PORT || 4123);
+const API_BASE_URL = (process.env.API_BASE_URL || '').trim();
 
 function parseCsv(csvText) {
   const lines = csvText.trim().split(/\r?\n/);
@@ -60,6 +61,8 @@ function readRows(file) {
 
 function txnSummary(rows, monthKey = '') {
   const filtered = rows.filter((r) => {
+    const status = String(r.status || 'ACTIVE').toUpperCase();
+    if (status === 'VOID') return false;
     if (!monthKey) return true;
     return String(r.txn_date || '').slice(0, 7) === monthKey;
   });
@@ -112,69 +115,136 @@ function page() {
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
-<title>Madrasah ERP Lite Local Check</title>
+<title>Madrasah ERP Admin Local Web</title>
 <style>
 body{font-family:system-ui,Segoe UI,Roboto,sans-serif;background:#f8fafc;margin:0;padding:20px;color:#0f172a}
 .card{background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:14px;margin-bottom:12px}
 button{background:#0f766e;color:#fff;border:0;border-radius:8px;padding:8px 12px;font-weight:700;cursor:pointer}
-input{padding:8px;border:1px solid #cbd5e1;border-radius:8px}
-pre{white-space:pre-wrap;word-break:break-word;background:#0b1020;color:#e2e8f0;padding:12px;border-radius:8px;max-height:320px;overflow:auto}
+input,select{padding:8px;border:1px solid #cbd5e1;border-radius:8px}
+pre{white-space:pre-wrap;word-break:break-word;background:#0b1020;color:#e2e8f0;padding:12px;border-radius:8px;max-height:380px;overflow:auto}
+.meta{font-size:12px;color:#475569}
+.row{display:flex;gap:8px;flex-wrap:wrap}
 </style>
 </head>
 <body>
-  <h2>Madrasah ERP Lite - Localhost Checker</h2>
+  <h2>Madrasah ERP - Admin Local Web</h2>
   <div class="card">
-    <p><b>Purpose:</b> Verify migrated data and summary logic before full deployment.</p>
-    <button onclick="loadHealth()">Health</button>
-    <button onclick="loadSummary()">Dashboard Summary</button>
-    <input id="month" placeholder="YYYY-MM (optional)"/>
-    <button onclick="loadReport()">Monthly Report</button>
+    <div class="meta">Mode নির্বাচন করে Local migrated data অথবা Live Google Sheet API summary দেখতে পারবেন।</div>
+    <div class="meta">Live mode requires: API_BASE_URL env সেট করা।</div>
+    <div class="meta">Configured API: ${API_BASE_URL ? API_BASE_URL : '(not set)'}</div>
   </div>
+
+  <div class="card">
+    <div class="row">
+      <select id="mode">
+        <option value="local">Local (CSV)</option>
+        <option value="live">Live (Google Sheet API)</option>
+      </select>
+      <input id="month" placeholder="YYYY-MM (optional)"/>
+      <button onclick="loadHealth()">Health</button>
+      <button onclick="loadSummary()">Dashboard Summary</button>
+      <button onclick="loadReport()">Monthly Report</button>
+    </div>
+  </div>
+
   <div class="card"><b>Result</b><pre id="out">Click a button...</pre></div>
+
 <script>
 const out = document.getElementById('out');
+function modePrefix(){return document.getElementById('mode').value === 'live' ? '/api/live' : '/api/local'}
 async function j(u){const r=await fetch(u);return await r.json();}
 function p(x){out.textContent=JSON.stringify(x,null,2)}
-async function loadHealth(){p(await j('/api/health'))}
-async function loadSummary(){p(await j('/api/dashboard-summary'))}
-async function loadReport(){const m=document.getElementById('month').value.trim();p(await j('/api/monthly-report'+(m?('?monthKey='+encodeURIComponent(m)):'')))}
+async function loadHealth(){p(await j(modePrefix()+'/health'))}
+async function loadSummary(){p(await j(modePrefix()+'/dashboard-summary'))}
+async function loadReport(){
+  const m=document.getElementById('month').value.trim();
+  p(await j(modePrefix()+'/monthly-report'+(m?('?monthKey='+encodeURIComponent(m)):'')))
+}
 </script>
 </body>
 </html>`;
 }
 
-const server = http.createServer((req, res) => {
+function buildApiUrl(action, query = {}) {
+  if (!API_BASE_URL) return '';
+  const u = new URL(API_BASE_URL);
+  u.searchParams.set('action', action);
+  Object.entries(query).forEach(([k, v]) => {
+    if (v !== undefined && v !== null && String(v) !== '') {
+      u.searchParams.set(k, String(v));
+    }
+  });
+  return u.toString();
+}
+
+async function fetchLive(action, query = {}) {
+  if (!API_BASE_URL) {
+    return { ok: false, message: 'API_BASE_URL not configured for live mode' };
+  }
+
+  const url = buildApiUrl(action, query);
+  try {
+    const res = await fetch(url, { method: 'GET' });
+    const txt = await res.text();
+    try {
+      return JSON.parse(txt);
+    } catch {
+      return { ok: false, message: 'Invalid JSON from live API', raw: txt.slice(0, 500) };
+    }
+  } catch (e) {
+    return { ok: false, message: `Live API request failed: ${e.message || e}` };
+  }
+}
+
+const server = http.createServer(async (req, res) => {
   const parsed = new URL(req.url || '/', `http://${req.headers.host}`);
 
   if (parsed.pathname === '/') {
     return sendHtml(res, page());
   }
 
-  if (parsed.pathname === '/api/health') {
-    return sendJson(res, { ok: true, message: 'local-check server running', ts: new Date().toISOString() });
+  if (parsed.pathname === '/api/local/health') {
+    return sendJson(res, { ok: true, mode: 'local', message: 'local-check server running', ts: new Date().toISOString() });
   }
 
-  if (parsed.pathname === '/api/dashboard-summary') {
+  if (parsed.pathname === '/api/local/dashboard-summary') {
     const txns = readRows(TXN_CSV);
     const ben = readRows(BEN_CSV);
     const sch = readRows(SCH_CSV);
     return sendJson(res, {
       ok: true,
+      mode: 'local',
       data: {
         ...txnSummary(txns),
         meta: {
           transactions: txns.length,
           beneficiaries: ben.length,
           scholarshipRows: sch.length,
-        }
-      }
+        },
+      },
     });
   }
 
-  if (parsed.pathname === '/api/monthly-report') {
+  if (parsed.pathname === '/api/local/monthly-report') {
     const monthKey = parsed.searchParams.get('monthKey') || '';
     const txns = readRows(TXN_CSV);
-    return sendJson(res, { ok: true, data: txnSummary(txns, monthKey) });
+    return sendJson(res, { ok: true, mode: 'local', data: txnSummary(txns, monthKey) });
+  }
+
+  if (parsed.pathname === '/api/live/health') {
+    const data = await fetchLive('health');
+    return sendJson(res, { ...data, mode: 'live' }, data.ok ? 200 : 502);
+  }
+
+  if (parsed.pathname === '/api/live/dashboard-summary') {
+    const data = await fetchLive('dashboardSummary');
+    return sendJson(res, { ...data, mode: 'live' }, data.ok ? 200 : 502);
+  }
+
+  if (parsed.pathname === '/api/live/monthly-report') {
+    const monthKey = parsed.searchParams.get('monthKey') || '';
+    const data = await fetchLive('monthlyReport', { monthKey });
+    return sendJson(res, { ...data, mode: 'live' }, data.ok ? 200 : 502);
   }
 
   res.writeHead(404, { 'Content-Type': 'application/json; charset=utf-8' });
@@ -182,5 +252,8 @@ const server = http.createServer((req, res) => {
 });
 
 server.listen(PORT, () => {
-  console.log(`Local check server running at http://localhost:${PORT}`);
+  console.log(`Admin local web running at http://localhost:${PORT}`);
+  if (!API_BASE_URL) {
+    console.log('Tip: set API_BASE_URL to use live mode with Google Sheet API data');
+  }
 });

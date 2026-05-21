@@ -6,7 +6,23 @@
    - `flutter pub get`
    - `flutter run`
 
+## Offline + Auto Sync
+- Write operations are queued in offline mode when network is unavailable.
+- Auto sync triggers:
+  - app startup
+  - periodic background timer
+  - connectivity reconnect
+- Manual sync is available from the app bar sync icon.
+
+## Run As PC Web App (Admin)
+```bash
+flutter pub get
+flutter run -d chrome --dart-define=API_BASE_URL=https://script.google.com/macros/s/<DEPLOYMENT_ID>/exec
+```
+
 ## Current Status
-- Base navigation and placeholder screens created
-- API service and config placeholders added
-- Module shell ready for implementation
+- Login + role session
+- Dashboard summary cards
+- Donation/Expense/Salary/Scholarship/Beneficiaries modules
+- Reports screen
+- Offline queue + auto sync orchestrator
