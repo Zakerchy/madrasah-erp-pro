@@ -29,20 +29,29 @@ const CONFIG = {
 
 function doGet(e) {
   try {
-    const action = (e && e.parameter && e.parameter.action) || 'health';
+    const params = (e && e.parameter) || {};
+    const action = params.action || 'health';
 
-    if (action === 'health') return json({ ok: true, message: 'Madrasah ERP API running', ts: nowIso(), sheetId: getSheetId_(), deploy_marker: 'auto-deploy-test-2026-05-22-01' });
-    if (action === 'listTransactions') return json(listTransactions_(e.parameter));
-    if (action === 'dashboardSummary') return json(dashboardSummary_(e.parameter));
-    if (action === 'listBeneficiaries') return json(listSheetRows_(CONFIG.SHEETS.BENEFICIARIES));
-    if (action === 'listStaff') return json(listSheetRows_(CONFIG.SHEETS.STAFF));
-    if (action === 'listSalaryPayments') return json(listSalaryPayments_(e.parameter));
-    if (action === 'listScholarshipByMonth') return json(listScholarshipByMonth_(e.parameter));
-    if (action === 'monthlyReport') return json(monthlyReport_(e.parameter));
+    if (action === 'health') {
+      return json({
+        ok: true,
+        message: 'Madrasah ERP API running',
+        ts: nowIso(),
+        sheetId: getSheetId_(),
+      });
+    }
+
+    if (action === 'listTransactions') return json(listTransactions_(params));
+    if (action === 'dashboardSummary') return json(dashboardSummary_(params));
+    if (action === 'listBeneficiaries') return json(listBeneficiaries_(params));
+    if (action === 'listStaff') return json(listStaff_(params));
+    if (action === 'listSalaryPayments') return json(listSalaryPayments_(params));
+    if (action === 'listScholarshipByMonth') return json(listScholarshipByMonth_(params));
+    if (action === 'monthlyReport') return json(monthlyReport_(params));
 
     // Setup helper: generate hash from query pin for users_roles.pin_hash
     if (action === 'hashPin') {
-      const pin = (e.parameter && e.parameter.pin) || '';
+      const pin = params.pin || '';
       if (!pin) return json({ ok: false, message: 'pin required' });
       return json({ ok: true, pin_hash: pinHash_(pin) });
     }
@@ -241,6 +250,12 @@ function saveScholarshipPayment_(payload) {
 }
 
 function dashboardSummary_(params) {
+  params = params || {};
+  assertRole_(params.user_role, ['ADMIN', 'ACCOUNTANT', 'FIELD_USER', 'VIEWER']);
+  const role = String(params.user_role || '');
+  const userId = String(params.user_id || '');
+  requireUserIdIfFieldRole_(role, userId);
+
   const txns = listSheetRows_(CONFIG.SHEETS.TXN).data || [];
   const from = params.from || '';
   const to = params.to || '';
@@ -249,12 +264,16 @@ function dashboardSummary_(params) {
     if (!t.txn_date) return false;
     if (from && t.txn_date < from) return false;
     if (to && t.txn_date > to) return false;
-    return t.status !== 'VOID';
+    return String(t.status || 'ACTIVE') !== 'VOID';
   });
+
+  const scoped = role === 'FIELD_USER'
+    ? filtered.filter((r) => String(r.created_by || '') === userId)
+    : filtered;
 
   const summary = { totalIn: 0, totalOut: 0, balance: 0, byFund: {} };
 
-  filtered.forEach((t) => {
+  scoped.forEach((t) => {
     const amt = Number(t.amount || 0);
     const fund = t.fund_type || 'UNKNOWN';
     if (!summary.byFund[fund]) summary.byFund[fund] = { in: 0, out: 0, balance: 0 };
@@ -277,24 +296,43 @@ function dashboardSummary_(params) {
 }
 
 function monthlyReport_(params) {
+  params = params || {};
+  assertRole_(params.user_role, ['ADMIN', 'ACCOUNTANT', 'FIELD_USER', 'VIEWER']);
+  const role = String(params.user_role || '');
+  const userId = String(params.user_id || '');
+  requireUserIdIfFieldRole_(role, userId);
+
   const monthKey = params.monthKey;
   if (!monthKey) return { ok: false, message: 'monthKey required' };
 
   const txns = listSheetRows_(CONFIG.SHEETS.TXN).data || [];
-  const monthly = txns.filter((t) => String(t.txn_date || '').slice(0, 7) === monthKey && t.status !== 'VOID');
+  const monthly = txns.filter((t) => String(t.txn_date || '').slice(0, 7) === monthKey && String(t.status || 'ACTIVE') !== 'VOID');
+
+  const scoped = role === 'FIELD_USER'
+    ? monthly.filter((r) => String(r.created_by || '') === userId)
+    : monthly;
 
   let totalIn = 0;
   let totalOut = 0;
-  monthly.forEach((t) => {
+  scoped.forEach((t) => {
     const amt = Number(t.amount || 0);
     if (t.direction === 'IN') totalIn += amt;
     else totalOut += amt;
   });
 
-  return { ok: true, data: { monthKey, totalIn, totalOut, balance: totalIn - totalOut, rows: monthly } };
+  const rows = role === 'VIEWER' ? [] : scoped;
+  return { ok: true, data: { monthKey, totalIn, totalOut, balance: totalIn - totalOut, rows } };
 }
 
 function listTransactions_(params) {
+  params = params || {};
+  assertRole_(params.user_role, ['ADMIN', 'ACCOUNTANT', 'FIELD_USER', 'VIEWER']);
+  const role = String(params.user_role || '');
+  const userId = String(params.user_id || '');
+  requireUserIdIfFieldRole_(role, userId);
+
+  if (role === 'VIEWER') return { ok: true, data: [] };
+
   const rows = listSheetRows_(CONFIG.SHEETS.TXN).data || [];
   const fundType = params.fundType || '';
   const direction = params.direction || '';
@@ -306,14 +344,31 @@ function listTransactions_(params) {
     if (direction && r.direction !== direction) return false;
     if (from && r.txn_date < from) return false;
     if (to && r.txn_date > to) return false;
-    return String(r.status || 'ACTIVE') !== 'VOID';
+    if (String(r.status || 'ACTIVE') === 'VOID') return false;
+    if (role === 'FIELD_USER' && String(r.created_by || '') !== userId) return false;
+    return true;
   });
 
   filtered.sort((a, b) => String(b.txn_date || '').localeCompare(String(a.txn_date || '')));
   return { ok: true, data: filtered };
 }
 
+function listBeneficiaries_(params) {
+  params = params || {};
+  assertRole_(params.user_role, ['ADMIN', 'ACCOUNTANT', 'VIEWER']);
+  return listSheetRows_(CONFIG.SHEETS.BENEFICIARIES);
+}
+
+function listStaff_(params) {
+  params = params || {};
+  assertRole_(params.user_role, ['ADMIN', 'ACCOUNTANT', 'VIEWER']);
+  return listSheetRows_(CONFIG.SHEETS.STAFF);
+}
+
 function listSalaryPayments_(params) {
+  params = params || {};
+  assertRole_(params.user_role, ['ADMIN', 'ACCOUNTANT', 'VIEWER']);
+
   const rows = listSheetRows_(CONFIG.SHEETS.SALARY).data || [];
   const monthKey = params.monthKey || '';
   const staffId = params.staffId || '';
@@ -329,6 +384,9 @@ function listSalaryPayments_(params) {
 }
 
 function listScholarshipByMonth_(params) {
+  params = params || {};
+  assertRole_(params.user_role, ['ADMIN', 'ACCOUNTANT', 'VIEWER']);
+
   const rows = listSheetRows_(CONFIG.SHEETS.SCHOLAR_PAY).data || [];
   const monthKey = params.monthKey || '';
   const beneficiaryId = params.beneficiaryId || '';
@@ -435,6 +493,12 @@ function assertRole_(currentRole, allowedRoles) {
   validateEnum_(currentRole, CONFIG.ENUMS.ROLE, 'user_role');
   if (allowedRoles.indexOf(currentRole) === -1) {
     throw new Error('Permission denied for role: ' + currentRole);
+  }
+}
+
+function requireUserIdIfFieldRole_(role, userId) {
+  if (role === 'FIELD_USER' && !userId) {
+    throw new Error('user_id is required for FIELD_USER scope');
   }
 }
 

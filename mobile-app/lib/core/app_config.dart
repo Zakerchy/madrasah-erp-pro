@@ -5,7 +5,8 @@ class AppConfig {
   // flutter build apk --dart-define=API_BASE_URL=https://script.google.com/macros/s/DEPLOYMENT/exec
   static const String apiBaseUrl = String.fromEnvironment(
     'API_BASE_URL',
-    defaultValue: 'https://script.google.com/macros/s/PUT_DEPLOYMENT_ID/exec',
+    defaultValue:
+        'https://script.google.com/macros/s/AKfycbzdFMBIbvNlFthecYbR9XlEe7BhRaWaMuomWWPfwsiB3kG0CmjuagH3_rszNmr7WJc7/exec',
   );
 
   static const bool enableDebugLogs = bool.fromEnvironment('ENABLE_DEBUG_LOGS', defaultValue: true);
