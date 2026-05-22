@@ -689,9 +689,9 @@ class ApiService {
       'updated_at': DateTime.now().toIso8601String(),
     };
 
-    if (row['txn_date']!.isEmpty) return {'ok': false, 'message': 'txn_date required'};
-    if (row['direction']!.isEmpty) return {'ok': false, 'message': 'direction required'};
-    if (row['fund_type']!.isEmpty) return {'ok': false, 'message': 'fund_type required'};
+    if ((row['txn_date'] ?? '').toString().isEmpty) return {'ok': false, 'message': 'txn_date required'};
+    if ((row['direction'] ?? '').toString().isEmpty) return {'ok': false, 'message': 'direction required'};
+    if ((row['fund_type'] ?? '').toString().isEmpty) return {'ok': false, 'message': 'fund_type required'};
     if (_num(row['amount']) <= 0) return {'ok': false, 'message': 'amount must be > 0'};
 
     await _appendByHeaders(_txnSheet, row);
@@ -757,7 +757,7 @@ class ApiService {
       'notes': (payload['notes'] ?? '').toString(),
     };
 
-    if (row['staff_id']!.isEmpty || row['month_key']!.isEmpty) {
+    if ((row['staff_id'] ?? '').toString().isEmpty || (row['month_key'] ?? '').toString().isEmpty) {
       return {'ok': false, 'message': 'staff_id and month_key required'};
     }
 
@@ -797,7 +797,7 @@ class ApiService {
       'notes': (payload['notes'] ?? '').toString(),
     };
 
-    if (row['month_key']!.isEmpty || row['beneficiary_id']!.isEmpty) {
+    if ((row['month_key'] ?? '').toString().isEmpty || (row['beneficiary_id'] ?? '').toString().isEmpty) {
       return {'ok': false, 'message': 'month_key and beneficiary_id required'};
     }
 
