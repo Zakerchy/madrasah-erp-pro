@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:google_sign_in/google_sign_in.dart';
 
 import '../../shared/models/session_user.dart';
 import '../../shared/services/api_service.dart';
@@ -15,32 +14,36 @@ class LoginScreen extends StatefulWidget {
 
 class _LoginScreenState extends State<LoginScreen> {
   final _api = ApiService();
+  final _email = TextEditingController();
   bool _loading = false;
 
-  Future<GoogleSignInAccount?> _pickGoogleAccount() async {
-    await GoogleAuthService.signOut();
-    return GoogleAuthService.signInInteractive();
+  String get _normalizedEmail => _email.text.trim().toLowerCase();
+
+  @override
+  void initState() {
+    super.initState();
+    _email.text = 'zakerchy@gmail.com';
   }
 
-  Future<void> _loginWithGoogle() async {
+  @override
+  void dispose() {
+    _email.dispose();
+    super.dispose();
+  }
+
+  Future<void> _loginWithEmail() async {
     setState(() => _loading = true);
 
     try {
-      final account = await _pickGoogleAccount();
-
-      if (!mounted) return;
-      if (account == null) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Google sign-in cancelled')));
+      final email = _normalizedEmail;
+      if (email.isEmpty || !email.contains('@')) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please enter a valid Gmail')));
         setState(() => _loading = false);
         return;
       }
 
-      final email = account.email.trim().toLowerCase();
-      final googleId = account.id.trim();
-
-      final res = await _api.post('login', {
-        'email': email,
-      });
+      final res = await _api.post('login', {'email': email});
 
       if (!mounted) return;
 
@@ -49,12 +52,12 @@ class _LoginScreenState extends State<LoginScreen> {
         SessionService.setUser(user);
         await SessionService.saveOfflineCredential(
           email: email,
-          googleId: googleId,
+          googleId: '',
           user: user,
         );
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Welcome ${user.name}')));
         Navigator.pushNamedAndRemoveUntil(context, '/dashboard', (route) => false);
-      } else if (res['offline'] == true && SessionService.loginFromOfflineCredential(email: email, googleId: googleId)) {
+      } else if (res['offline'] == true && SessionService.loginFromOfflineCredential(email: email, googleId: '')) {
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Offline login successful')));
         Navigator.pushNamedAndRemoveUntil(context, '/dashboard', (route) => false);
       } else {
@@ -73,15 +76,15 @@ class _LoginScreenState extends State<LoginScreen> {
   Future<void> _openSignupRequest() async {
     setState(() => _loading = true);
     try {
-      final account = await _pickGoogleAccount();
-      if (!mounted) return;
-      if (account == null) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Google sign-in cancelled')));
+      final email = _normalizedEmail;
+      if (email.isEmpty || !email.contains('@')) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Enter Gmail first, then request sign up')));
         setState(() => _loading = false);
         return;
       }
 
-      final nameCtrl = TextEditingController(text: account.displayName ?? '');
+      final nameCtrl = TextEditingController();
       final phoneCtrl = TextEditingController();
       String requestedRole = 'VIEWER';
 
@@ -96,7 +99,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Text('Gmail: ${account.email}', style: const TextStyle(fontSize: 12)),
+                      Text('Gmail: $email', style: const TextStyle(fontSize: 12)),
                       const SizedBox(height: 8),
                       TextField(
                         controller: nameCtrl,
@@ -140,8 +143,8 @@ class _LoginScreenState extends State<LoginScreen> {
 
       final res = await _api.post('signupRequest', {
         'payload': {
-          'email': account.email.trim().toLowerCase(),
-          'name': nameCtrl.text.trim().isEmpty ? (account.displayName ?? 'New User') : nameCtrl.text.trim(),
+          'email': email,
+          'name': nameCtrl.text.trim().isEmpty ? 'New User' : nameCtrl.text.trim(),
           'phone': phoneCtrl.text.trim(),
           'requested_role': requestedRole,
         }
@@ -161,10 +164,10 @@ class _LoginScreenState extends State<LoginScreen> {
   Future<void> _useTemporaryToken() async {
     setState(() => _loading = true);
     try {
-      final account = await _pickGoogleAccount();
-      if (!mounted) return;
-      if (account == null) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Google sign-in cancelled')));
+      final email = _normalizedEmail;
+      if (email.isEmpty || !email.contains('@')) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Enter Gmail first')));
         setState(() => _loading = false);
         return;
       }
@@ -178,7 +181,7 @@ class _LoginScreenState extends State<LoginScreen> {
             content: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Text('Gmail: ${account.email}', style: const TextStyle(fontSize: 12)),
+                Text('Gmail: $email', style: const TextStyle(fontSize: 12)),
                 const SizedBox(height: 8),
                 TextField(
                   controller: tokenCtrl,
@@ -210,7 +213,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
       final resetRes = await _api.post('consumeTempResetToken', {
         'payload': {
-          'email': account.email.trim().toLowerCase(),
+          'email': email,
           'token': token,
         }
       });
@@ -224,14 +227,14 @@ class _LoginScreenState extends State<LoginScreen> {
         return;
       }
 
-      final loginRes = await _api.post('login', {'email': account.email.trim().toLowerCase()});
+      final loginRes = await _api.post('login', {'email': email});
       if (!mounted) return;
       if (loginRes['ok'] == true) {
         final user = SessionUser.fromMap((loginRes['data'] ?? {}) as Map<String, dynamic>);
         SessionService.setUser(user);
         await SessionService.saveOfflineCredential(
-          email: account.email.trim().toLowerCase(),
-          googleId: account.id.trim(),
+          email: email,
+          googleId: '',
           user: user,
         );
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Access reset successful. Logged in.')));
@@ -240,6 +243,47 @@ class _LoginScreenState extends State<LoginScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('${loginRes['message'] ?? loginRes['error'] ?? 'Login failed after reset'}')),
         );
+      }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+    }
+    if (mounted) setState(() => _loading = false);
+  }
+
+  Future<void> _verifyGoogleSync() async {
+    setState(() => _loading = true);
+    try {
+      final email = _normalizedEmail;
+      if (email.isEmpty || !email.contains('@')) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Enter Gmail first')));
+        setState(() => _loading = false);
+        return;
+      }
+
+      final account = await GoogleAuthService.signInInteractive();
+      if (!mounted) return;
+      if (account == null) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Google verification cancelled')));
+        setState(() => _loading = false);
+        return;
+      }
+
+      final accountEmail = account.email.trim().toLowerCase();
+      if (accountEmail != email) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Google account mismatch. Use $email for sync verify.')),
+        );
+        setState(() => _loading = false);
+        return;
+      }
+
+      final client = await GoogleAuthService.authClient(trySilentSignIn: false);
+      if (client == null) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Google sync verification failed')));
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Google sync verified successfully')));
       }
     } catch (e) {
       if (!mounted) return;
@@ -264,18 +308,37 @@ class _LoginScreenState extends State<LoginScreen> {
                   const Text('Madrasah ERP Lite', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
                   const SizedBox(height: 8),
                   const Text(
-                    'Use your approved Gmail account for role-based login and sync authorization.',
+                    'First: login by Gmail only. Later: verify the same Gmail to activate Google sync.',
                     textAlign: TextAlign.center,
                   ),
                   const SizedBox(height: 16),
+                  TextField(
+                    controller: _email,
+                    keyboardType: TextInputType.emailAddress,
+                    decoration: const InputDecoration(
+                      labelText: 'Gmail',
+                      hintText: 'example@gmail.com',
+                      prefixIcon: Icon(Icons.alternate_email),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
                   SizedBox(
                     width: double.infinity,
                     child: FilledButton.icon(
-                      onPressed: _loading ? null : _loginWithGoogle,
+                      onPressed: _loading ? null : _loginWithEmail,
                       icon: _loading
                           ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
-                          : const Icon(Icons.account_circle),
-                      label: Text(_loading ? 'Signing in...' : 'Sign in with Google'),
+                          : const Icon(Icons.login),
+                      label: Text(_loading ? 'Signing in...' : 'Sign In (Gmail)'),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton.icon(
+                      onPressed: _loading ? null : _verifyGoogleSync,
+                      icon: const Icon(Icons.verified_user),
+                      label: const Text('Verify Google Sync (Later)'),
                     ),
                   ),
                   const SizedBox(height: 8),
@@ -298,7 +361,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                   const SizedBox(height: 8),
                   const Text(
-                    'Login needs approved Gmail (status: APPROVED). New users must submit sign-up request first.',
+                    'Admin already set in sheet can login by email. If users sheet empty, bootstrap admin Gmail can login first.',
                     style: TextStyle(fontSize: 12),
                     textAlign: TextAlign.center,
                   ),

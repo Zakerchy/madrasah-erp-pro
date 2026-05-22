@@ -194,75 +194,97 @@ class ApiService {
   }
 
   Future<Map<String, dynamic>> _login(Map<String, dynamic> payload) async {
-    await _ensureUsersSheetColumns();
     final email = (payload['email'] ?? '').toString().trim().toLowerCase();
     if (email.isEmpty) return {'ok': false, 'message': 'email required'};
+    try {
+      await _ensureUsersSheetColumns();
+      var users = await _readRows(_usersSheet);
 
-    var users = await _readRows(_usersSheet);
-
-    // First-time bootstrap: if users sheet is empty, allow configured bootstrap admin Gmail.
-    if (users.isEmpty && email == AppConfig.bootstrapAdminEmail.trim().toLowerCase()) {
-      final boot = await _upsertById(_usersSheet, {
-        'id': 'u_admin_bootstrap',
-        'name': AppConfig.bootstrapAdminName,
-        'phone': '',
-        'email': email,
-        'role': 'ADMIN',
-        'active': 'TRUE',
-        'approval_status': 'APPROVED',
-        'requested_role': 'ADMIN',
-        'pin_hash': '',
-        'reset_token_hash': '',
-        'reset_token_expires_at': '',
-      });
-      if (boot['ok'] == true) {
-        users = await _readRows(_usersSheet);
+      // First-time bootstrap: if users sheet is empty, allow configured bootstrap admin Gmail.
+      if (users.isEmpty && email == AppConfig.bootstrapAdminEmail.trim().toLowerCase()) {
+        final boot = await _upsertById(_usersSheet, {
+          'id': 'u_admin_bootstrap',
+          'name': AppConfig.bootstrapAdminName,
+          'phone': '',
+          'email': email,
+          'role': 'ADMIN',
+          'active': 'TRUE',
+          'approval_status': 'APPROVED',
+          'requested_role': 'ADMIN',
+          'pin_hash': '',
+          'reset_token_hash': '',
+          'reset_token_expires_at': '',
+        });
+        if (boot['ok'] == true) {
+          users = await _readRows(_usersSheet);
+        }
       }
-    }
 
-    final user = users.firstWhere(
-      (u) =>
-          (u['email'] ?? '').toString().trim().toLowerCase() == email &&
-          _isActive(u['active']) &&
-          _approvalStatusOf(u) == 'APPROVED',
-      orElse: () => <String, dynamic>{},
-    );
-
-    if (user.isEmpty) {
-      final anyState = users.firstWhere(
-        (u) => (u['email'] ?? '').toString().trim().toLowerCase() == email,
+      final user = users.firstWhere(
+        (u) =>
+            (u['email'] ?? '').toString().trim().toLowerCase() == email &&
+            _isActive(u['active']) &&
+            _approvalStatusOf(u) == 'APPROVED',
         orElse: () => <String, dynamic>{},
       );
-      if (anyState.isEmpty) {
-        final hint = users.isEmpty
-            ? 'No users found. Sign in with bootstrap admin Gmail: ${AppConfig.bootstrapAdminEmail}'
-            : 'No approved account found for this Gmail';
-        return {'ok': false, 'message': hint};
-      }
-      final state = _approvalStatusOf(anyState);
-      if (state == 'PENDING') {
-        return {'ok': false, 'message': 'Your sign-up request is pending admin approval'};
-      }
-      if (state == 'REJECTED') {
-        return {'ok': false, 'message': 'Your account request was rejected by admin'};
-      }
-      if (state == 'BLOCKED') {
-        return {'ok': false, 'message': 'Your account is blocked. Contact admin'};
-      }
-      return {'ok': false, 'message': 'This Gmail is inactive or not approved'};
-    }
 
-    return {
-      'ok': true,
-      'data': {
-        'id': (user['id'] ?? '').toString(),
-        'name': (user['name'] ?? '').toString(),
-        'role': (user['role'] ?? 'VIEWER').toString(),
-        'phone': (user['phone'] ?? '').toString(),
-        'email': (user['email'] ?? '').toString(),
-        'approval_status': _approvalStatusOf(user),
-      },
-    };
+      if (user.isEmpty) {
+        final anyState = users.firstWhere(
+          (u) => (u['email'] ?? '').toString().trim().toLowerCase() == email,
+          orElse: () => <String, dynamic>{},
+        );
+        if (anyState.isEmpty) {
+          final hint = users.isEmpty
+              ? 'No users found. Sign in with bootstrap admin Gmail: ${AppConfig.bootstrapAdminEmail}'
+              : 'No approved account found for this Gmail';
+          return {'ok': false, 'message': hint};
+        }
+        final state = _approvalStatusOf(anyState);
+        if (state == 'PENDING') {
+          return {'ok': false, 'message': 'Your sign-up request is pending admin approval'};
+        }
+        if (state == 'REJECTED') {
+          return {'ok': false, 'message': 'Your account request was rejected by admin'};
+        }
+        if (state == 'BLOCKED') {
+          return {'ok': false, 'message': 'Your account is blocked. Contact admin'};
+        }
+        return {'ok': false, 'message': 'This Gmail is inactive or not approved'};
+      }
+
+      return {
+        'ok': true,
+        'data': {
+          'id': (user['id'] ?? '').toString(),
+          'name': (user['name'] ?? '').toString(),
+          'role': (user['role'] ?? 'VIEWER').toString(),
+          'phone': (user['phone'] ?? '').toString(),
+          'email': (user['email'] ?? '').toString(),
+          'approval_status': _approvalStatusOf(user),
+        },
+      };
+    } catch (_) {
+      final isBootstrapAdmin = email == AppConfig.bootstrapAdminEmail.trim().toLowerCase();
+      if (isBootstrapAdmin) {
+        return {
+          'ok': true,
+          'sync_pending': true,
+          'message': 'Logged in as bootstrap admin (sync not verified yet)',
+          'data': {
+            'id': 'u_admin_bootstrap_local',
+            'name': AppConfig.bootstrapAdminName,
+            'role': 'ADMIN',
+            'phone': '',
+            'email': email,
+            'approval_status': 'APPROVED',
+          },
+        };
+      }
+      return {
+        'ok': false,
+        'message': 'Google sync not verified yet. Please use "Verify Google Sync" once, then sign in.',
+      };
+    }
   }
 
   Future<Map<String, dynamic>> _listTransactions(Map<String, String> query) async {
