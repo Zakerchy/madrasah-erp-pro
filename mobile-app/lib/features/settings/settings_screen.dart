@@ -18,6 +18,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   final _email = TextEditingController();
   final _phone = TextEditingController();
   String _role = 'VIEWER';
+  String _approvalStatus = 'APPROVED';
   bool _active = true;
 
   bool _saving = false;
@@ -30,6 +31,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
   void initState() {
     super.initState();
     _loadUsers();
+  }
+
+  @override
+  void dispose() {
+    _name.dispose();
+    _email.dispose();
+    _phone.dispose();
+    super.dispose();
   }
 
   Future<void> _loadUsers() async {
@@ -72,6 +81,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       'phone': phone,
       'role': _role,
       'active': _active ? 'TRUE' : 'FALSE',
+      'approval_status': _approvalStatus,
       'pin_hash': '',
     };
 
@@ -88,6 +98,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       _email.clear();
       _phone.clear();
       _role = 'VIEWER';
+      _approvalStatus = 'APPROVED';
       _active = true;
       await _loadUsers();
 
@@ -112,6 +123,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       'phone': (user['phone'] ?? '').toString(),
       'role': (user['role'] ?? 'VIEWER').toString(),
       'active': (user['active'] ?? 'TRUE').toString().toUpperCase() == 'TRUE' ? 'FALSE' : 'TRUE',
+      'approval_status': (user['approval_status'] ?? 'APPROVED').toString(),
       'pin_hash': '',
     };
 
@@ -130,6 +142,94 @@ class _SettingsScreenState extends State<SettingsScreen> {
         SnackBar(content: Text('${res['message'] ?? res['error'] ?? 'Update failed'}')),
       );
     }
+  }
+
+  Future<void> _setApprovalStatus(Map<String, dynamic> user, String status) async {
+    setState(() => _saving = true);
+    final res = await _api.post('setUserApprovalStatus', {
+      'user_role': SessionService.role,
+      'payload': {
+        'id': (user['id'] ?? '').toString(),
+        'approval_status': status,
+      },
+    });
+    if (!mounted) return;
+    setState(() => _saving = false);
+    if (res['ok'] == true) {
+      await _loadUsers();
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Status updated to $status')));
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('${res['message'] ?? res['error'] ?? 'Status update failed'}')),
+      );
+    }
+  }
+
+  Future<void> _generateTempToken(Map<String, dynamic> user) async {
+    setState(() => _saving = true);
+    final res = await _api.post('generateTempResetToken', {
+      'user_role': SessionService.role,
+      'payload': {
+        'id': (user['id'] ?? '').toString(),
+        'expires_in_minutes': 30,
+      },
+    });
+    if (!mounted) return;
+    setState(() => _saving = false);
+    if (res['ok'] == true) {
+      final data = Map<String, dynamic>.from(res['data'] as Map? ?? {});
+      final token = (data['token'] ?? '').toString();
+      final expires = (data['expires_at'] ?? '').toString();
+      await showDialog<void>(
+        context: context,
+        builder: (context) {
+          return AlertDialog(
+            title: const Text('Temporary Reset Token'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('User: ${(user['name'] ?? '').toString()}'),
+                const SizedBox(height: 8),
+                SelectableText('Token: $token', style: const TextStyle(fontWeight: FontWeight.bold)),
+                const SizedBox(height: 4),
+                Text('Expires: $expires'),
+                const SizedBox(height: 8),
+                const Text('Share this token securely. It can be used once before expiry.', style: TextStyle(fontSize: 12)),
+              ],
+            ),
+            actions: [
+              FilledButton(onPressed: () => Navigator.pop(context), child: const Text('OK')),
+            ],
+          );
+        },
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('${res['message'] ?? res['error'] ?? 'Token generate failed'}')),
+      );
+    }
+  }
+
+  Color _statusColor(String status) {
+    switch (status) {
+      case 'APPROVED':
+        return Colors.green;
+      case 'PENDING':
+        return Colors.orange;
+      case 'REJECTED':
+        return Colors.red;
+      case 'BLOCKED':
+        return Colors.blueGrey;
+      default:
+        return Colors.grey;
+    }
+  }
+
+  String _statusOf(Map<String, dynamic> u) {
+    final raw = (u['approval_status'] ?? '').toString().trim().toUpperCase();
+    if (raw.isNotEmpty) return raw;
+    return (u['active'] ?? '').toString().toUpperCase() == 'TRUE' ? 'APPROVED' : 'PENDING';
   }
 
   Future<void> _checkHealth() async {
@@ -167,6 +267,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
             decoration: const InputDecoration(labelText: 'Role'),
           ),
           const SizedBox(height: 8),
+          DropdownButtonFormField<String>(
+            value: _approvalStatus,
+            items: const [
+              DropdownMenuItem(value: 'APPROVED', child: Text('APPROVED')),
+              DropdownMenuItem(value: 'PENDING', child: Text('PENDING')),
+              DropdownMenuItem(value: 'REJECTED', child: Text('REJECTED')),
+              DropdownMenuItem(value: 'BLOCKED', child: Text('BLOCKED')),
+            ],
+            onChanged: (v) => setState(() => _approvalStatus = v ?? 'APPROVED'),
+            decoration: const InputDecoration(labelText: 'Approval Status'),
+          ),
+          const SizedBox(height: 8),
           SwitchListTile(
             value: _active,
             onChanged: (v) => setState(() => _active = v),
@@ -201,13 +313,61 @@ class _SettingsScreenState extends State<SettingsScreen> {
               (u) => Card(
                 child: ListTile(
                   title: Text('${u['name'] ?? ''} (${u['role'] ?? ''})'),
-                  subtitle: Text('${u['email'] ?? ''} • ${u['phone'] ?? ''}'),
-                  trailing: TextButton(
-                    onPressed: _saving ? null : () => _toggleActive(u),
-                    child: Text(
-                      (u['active'] ?? 'FALSE').toString().toUpperCase() == 'TRUE' ? 'Deactivate' : 'Activate',
-                    ),
+                  subtitle: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('${u['email'] ?? ''} • ${u['phone'] ?? ''}'),
+                      const SizedBox(height: 4),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 6,
+                        children: [
+                          Chip(
+                            label: Text(_statusOf(u)),
+                            backgroundColor: _statusColor(_statusOf(u)).withOpacity(0.15),
+                            side: BorderSide(color: _statusColor(_statusOf(u))),
+                          ),
+                          Chip(
+                            label: Text((u['active'] ?? 'FALSE').toString().toUpperCase() == 'TRUE' ? 'ACTIVE' : 'INACTIVE'),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: [
+                          OutlinedButton(
+                            onPressed: _saving ? null : () => _setApprovalStatus(u, 'APPROVED'),
+                            child: const Text('Approve'),
+                          ),
+                          OutlinedButton(
+                            onPressed: _saving ? null : () => _setApprovalStatus(u, 'PENDING'),
+                            child: const Text('Pending'),
+                          ),
+                          OutlinedButton(
+                            onPressed: _saving ? null : () => _setApprovalStatus(u, 'REJECTED'),
+                            child: const Text('Reject'),
+                          ),
+                          OutlinedButton(
+                            onPressed: _saving ? null : () => _setApprovalStatus(u, 'BLOCKED'),
+                            child: const Text('Block'),
+                          ),
+                          FilledButton.tonal(
+                            onPressed: _saving ? null : () => _generateTempToken(u),
+                            child: const Text('Temp Reset Token'),
+                          ),
+                          TextButton(
+                            onPressed: _saving ? null : () => _toggleActive(u),
+                            child: Text(
+                              (u['active'] ?? 'FALSE').toString().toUpperCase() == 'TRUE' ? 'Deactivate' : 'Activate',
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
                   ),
+                  isThreeLine: true,
                 ),
               ),
             ),

@@ -4,6 +4,7 @@ class SessionUser {
   final String role;
   final String phone;
   final String email;
+  final String approvalStatus;
 
   const SessionUser({
     required this.id,
@@ -11,6 +12,7 @@ class SessionUser {
     required this.role,
     required this.phone,
     required this.email,
+    required this.approvalStatus,
   });
 
   factory SessionUser.fromMap(Map<String, dynamic> map) {
@@ -20,6 +22,7 @@ class SessionUser {
       role: (map['role'] ?? '').toString(),
       phone: (map['phone'] ?? '').toString(),
       email: (map['email'] ?? '').toString(),
+      approvalStatus: (map['approval_status'] ?? 'APPROVED').toString(),
     );
   }
 
@@ -30,6 +33,7 @@ class SessionUser {
       'role': role,
       'phone': phone,
       'email': email,
+      'approval_status': approvalStatus,
     };
   }
 }

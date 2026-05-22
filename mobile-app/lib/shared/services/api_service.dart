@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:math';
 
 import 'package:crypto/crypto.dart';
 import 'package:googleapis/sheets/v4.dart' as gsheet;
@@ -17,6 +18,8 @@ class ApiService {
     'recordSalaryPayment',
     'saveScholarshipPayment',
     'upsertUser',
+    'setUserApprovalStatus',
+    'signupRequest',
   };
 
   static const String _usersSheet = 'users_roles';
@@ -25,6 +28,13 @@ class ApiService {
   static const String _staffSheet = 'salary_staff';
   static const String _salarySheet = 'salary_payments';
   static const String _scholarPaySheet = 'scholarship_payments';
+  static const Set<String> _approvalStates = {
+    'PENDING',
+    'APPROVED',
+    'REJECTED',
+    'BLOCKED',
+  };
+  bool _usersColumnsEnsured = false;
 
   Future<Map<String, dynamic>> get(String action, {Map<String, String>? query}) async {
     final authQuery = _authQuery();
@@ -151,6 +161,16 @@ class ApiService {
       case 'upsertUser':
         _assertRole(payload['user_role'], const ['ADMIN']);
         return _upsertUser(Map<String, dynamic>.from(payload['payload'] as Map? ?? {}));
+      case 'setUserApprovalStatus':
+        _assertRole(payload['user_role'], const ['ADMIN']);
+        return _setUserApprovalStatus(Map<String, dynamic>.from(payload['payload'] as Map? ?? {}));
+      case 'generateTempResetToken':
+        _assertRole(payload['user_role'], const ['ADMIN']);
+        return _generateTempResetToken(Map<String, dynamic>.from(payload['payload'] as Map? ?? {}));
+      case 'signupRequest':
+        return _signupRequest(Map<String, dynamic>.from(payload['payload'] as Map? ?? {}));
+      case 'consumeTempResetToken':
+        return _consumeTempResetToken(Map<String, dynamic>.from(payload['payload'] as Map? ?? {}));
 
       case 'upsertBeneficiary':
         _assertRole(payload['user_role'], const ['ADMIN', 'ACCOUNTANT']);
@@ -174,19 +194,62 @@ class ApiService {
   }
 
   Future<Map<String, dynamic>> _login(Map<String, dynamic> payload) async {
+    await _ensureUsersSheetColumns();
     final email = (payload['email'] ?? '').toString().trim().toLowerCase();
     if (email.isEmpty) return {'ok': false, 'message': 'email required'};
 
-    final users = await _readRows(_usersSheet);
+    var users = await _readRows(_usersSheet);
+
+    // First-time bootstrap: if users sheet is empty, allow configured bootstrap admin Gmail.
+    if (users.isEmpty && email == AppConfig.bootstrapAdminEmail.trim().toLowerCase()) {
+      final boot = await _upsertById(_usersSheet, {
+        'id': 'u_admin_bootstrap',
+        'name': AppConfig.bootstrapAdminName,
+        'phone': '',
+        'email': email,
+        'role': 'ADMIN',
+        'active': 'TRUE',
+        'approval_status': 'APPROVED',
+        'requested_role': 'ADMIN',
+        'pin_hash': '',
+        'reset_token_hash': '',
+        'reset_token_expires_at': '',
+      });
+      if (boot['ok'] == true) {
+        users = await _readRows(_usersSheet);
+      }
+    }
+
     final user = users.firstWhere(
       (u) =>
           (u['email'] ?? '').toString().trim().toLowerCase() == email &&
-          (u['active'] ?? '').toString().toUpperCase() == 'TRUE',
+          _isActive(u['active']) &&
+          _approvalStatusOf(u) == 'APPROVED',
       orElse: () => <String, dynamic>{},
     );
 
     if (user.isEmpty) {
-      return {'ok': false, 'message': 'This Gmail is not approved or inactive'};
+      final anyState = users.firstWhere(
+        (u) => (u['email'] ?? '').toString().trim().toLowerCase() == email,
+        orElse: () => <String, dynamic>{},
+      );
+      if (anyState.isEmpty) {
+        final hint = users.isEmpty
+            ? 'No users found. Sign in with bootstrap admin Gmail: ${AppConfig.bootstrapAdminEmail}'
+            : 'No approved account found for this Gmail';
+        return {'ok': false, 'message': hint};
+      }
+      final state = _approvalStatusOf(anyState);
+      if (state == 'PENDING') {
+        return {'ok': false, 'message': 'Your sign-up request is pending admin approval'};
+      }
+      if (state == 'REJECTED') {
+        return {'ok': false, 'message': 'Your account request was rejected by admin'};
+      }
+      if (state == 'BLOCKED') {
+        return {'ok': false, 'message': 'Your account is blocked. Contact admin'};
+      }
+      return {'ok': false, 'message': 'This Gmail is inactive or not approved'};
     }
 
     return {
@@ -197,6 +260,7 @@ class ApiService {
         'role': (user['role'] ?? 'VIEWER').toString(),
         'phone': (user['phone'] ?? '').toString(),
         'email': (user['email'] ?? '').toString(),
+        'approval_status': _approvalStatusOf(user),
       },
     };
   }
@@ -310,16 +374,20 @@ class ApiService {
 
   Future<Map<String, dynamic>> _listUsers(Map<String, String> query) async {
     _assertRole(query['user_role'], const ['ADMIN']);
+    await _ensureUsersSheetColumns();
     final rows = await _readRows(_usersSheet);
     final sanitized = rows.map((u) {
       final row = Map<String, dynamic>.from(u);
       row.remove('pin_hash');
+      row.remove('reset_token_hash');
+      row.remove('reset_token_expires_at');
       return row;
     }).toList();
     return {'ok': true, 'data': sanitized};
   }
 
   Future<Map<String, dynamic>> _upsertUser(Map<String, dynamic> payload) async {
+    await _ensureUsersSheetColumns();
     final email = (payload['email'] ?? '').toString().trim().toLowerCase();
     final name = (payload['name'] ?? '').toString().trim();
     final role = (payload['role'] ?? 'VIEWER').toString().trim();
@@ -342,6 +410,7 @@ class ApiService {
       'email': email,
       'role': role,
       'active': ((payload['active'] ?? 'TRUE').toString().toUpperCase() == 'FALSE') ? 'FALSE' : 'TRUE',
+      'approval_status': _normalizeApprovalStatus(payload['approval_status']) ?? 'APPROVED',
       'pin_hash': (payload['pin_hash'] ?? '').toString(),
     };
 
@@ -352,6 +421,215 @@ class ApiService {
       res['data'] = data;
     }
     return res;
+  }
+
+  Future<Map<String, dynamic>> _setUserApprovalStatus(Map<String, dynamic> payload) async {
+    await _ensureUsersSheetColumns();
+    final id = (payload['id'] ?? '').toString().trim();
+    final nextState = _normalizeApprovalStatus(payload['approval_status']);
+    if (id.isEmpty || nextState == null) {
+      return {'ok': false, 'message': 'id and valid approval_status required'};
+    }
+
+    final table = await _readTable(_usersSheet);
+    final idIndex = table.headers.indexOf('id');
+    if (idIndex == -1) return {'ok': false, 'message': 'No id column in users_roles'};
+
+    List<dynamic>? match;
+    for (final row in table.rawRows) {
+      final rowId = idIndex < row.length ? row[idIndex].toString() : '';
+      if (rowId == id) {
+        match = row;
+        break;
+      }
+    }
+    if (match == null) return {'ok': false, 'message': 'User not found'};
+
+    final current = _rowToObj(table.headers, match);
+    final active = nextState == 'APPROVED' ? 'TRUE' : (nextState == 'BLOCKED' ? 'FALSE' : (current['active'] ?? 'FALSE').toString());
+    return _upsertById(_usersSheet, {
+      'id': id,
+      'name': (current['name'] ?? '').toString(),
+      'phone': (current['phone'] ?? '').toString(),
+      'email': (current['email'] ?? '').toString().trim().toLowerCase(),
+      'role': (current['role'] ?? 'VIEWER').toString(),
+      'active': active,
+      'approval_status': nextState,
+      'pin_hash': (current['pin_hash'] ?? '').toString(),
+      'reset_token_hash': '',
+      'reset_token_expires_at': '',
+    });
+  }
+
+  Future<Map<String, dynamic>> _signupRequest(Map<String, dynamic> payload) async {
+    await _ensureUsersSheetColumns();
+    final email = (payload['email'] ?? '').toString().trim().toLowerCase();
+    final name = (payload['name'] ?? '').toString().trim();
+    final phone = (payload['phone'] ?? '').toString().trim();
+    final requestedRole = (payload['requested_role'] ?? 'VIEWER').toString().trim();
+
+    if (email.isEmpty || name.isEmpty) {
+      return {'ok': false, 'message': 'name and email required'};
+    }
+
+    final table = await _readTable(_usersSheet);
+    final rows = table.rawRows.map((r) => _rowToObj(table.headers, r)).toList();
+    final existing = rows.firstWhere(
+      (u) => (u['email'] ?? '').toString().trim().toLowerCase() == email,
+      orElse: () => <String, dynamic>{},
+    );
+
+    if (existing.isNotEmpty) {
+      final status = _approvalStatusOf(existing);
+      if (status == 'APPROVED' && _isActive(existing['active'])) {
+        return {'ok': false, 'message': 'This Gmail is already approved. Please sign in.'};
+      }
+      if (status == 'PENDING') {
+        return {'ok': true, 'message': 'Your sign-up request is already pending', 'data': {'status': 'PENDING'}};
+      }
+      final id = (existing['id'] ?? '').toString().trim();
+      if (id.isNotEmpty) {
+        final updated = await _upsertById(_usersSheet, {
+          'id': id,
+          'name': name,
+          'phone': phone,
+          'email': email,
+          'role': (existing['role'] ?? 'VIEWER').toString(),
+          'active': 'FALSE',
+          'approval_status': 'PENDING',
+          'requested_role': requestedRole,
+          'reset_token_hash': '',
+          'reset_token_expires_at': '',
+        });
+        if (updated['ok'] == true) {
+          return {'ok': true, 'message': 'Sign-up request submitted. Wait for admin approval.', 'data': {'status': 'PENDING'}};
+        }
+        return updated;
+      }
+    }
+
+    final createId = 'u_${DateTime.now().millisecondsSinceEpoch}';
+    final created = await _upsertById(_usersSheet, {
+      'id': createId,
+      'name': name,
+      'phone': phone,
+      'email': email,
+      'role': 'VIEWER',
+      'active': 'FALSE',
+      'approval_status': 'PENDING',
+      'requested_role': requestedRole,
+      'pin_hash': '',
+      'reset_token_hash': '',
+      'reset_token_expires_at': '',
+    });
+    if (created['ok'] == true) {
+      return {'ok': true, 'message': 'Sign-up request submitted. Wait for admin approval.', 'data': {'status': 'PENDING'}};
+    }
+    return created;
+  }
+
+  Future<Map<String, dynamic>> _generateTempResetToken(Map<String, dynamic> payload) async {
+    await _ensureUsersSheetColumns();
+    final id = (payload['id'] ?? '').toString().trim();
+    final minutes = int.tryParse((payload['expires_in_minutes'] ?? '30').toString()) ?? 30;
+    if (id.isEmpty) return {'ok': false, 'message': 'id required'};
+
+    final table = await _readTable(_usersSheet);
+    final idIndex = table.headers.indexOf('id');
+    if (idIndex == -1) return {'ok': false, 'message': 'No id column in users_roles'};
+
+    List<dynamic>? match;
+    for (final row in table.rawRows) {
+      final rowId = idIndex < row.length ? row[idIndex].toString() : '';
+      if (rowId == id) {
+        match = row;
+        break;
+      }
+    }
+    if (match == null) return {'ok': false, 'message': 'User not found'};
+
+    final current = _rowToObj(table.headers, match);
+    final token = _makeResetToken();
+    final expiresAt = DateTime.now().add(Duration(minutes: minutes)).toUtc().toIso8601String();
+    final updated = await _upsertById(_usersSheet, {
+      'id': id,
+      'name': (current['name'] ?? '').toString(),
+      'phone': (current['phone'] ?? '').toString(),
+      'email': (current['email'] ?? '').toString().trim().toLowerCase(),
+      'role': (current['role'] ?? 'VIEWER').toString(),
+      'active': (current['active'] ?? 'TRUE').toString(),
+      'approval_status': _approvalStatusOf(current),
+      'pin_hash': (current['pin_hash'] ?? '').toString(),
+      'reset_token_hash': _sha256(token),
+      'reset_token_expires_at': expiresAt,
+    });
+
+    if (updated['ok'] == true) {
+      return {
+        'ok': true,
+        'message': 'Temporary token generated',
+        'data': {
+          'token': token,
+          'expires_at': expiresAt,
+        }
+      };
+    }
+    return updated;
+  }
+
+  Future<Map<String, dynamic>> _consumeTempResetToken(Map<String, dynamic> payload) async {
+    await _ensureUsersSheetColumns();
+    final email = (payload['email'] ?? '').toString().trim().toLowerCase();
+    final token = (payload['token'] ?? '').toString().trim();
+    if (email.isEmpty || token.isEmpty) {
+      return {'ok': false, 'message': 'email and token required'};
+    }
+
+    final table = await _readTable(_usersSheet);
+    final rows = table.rawRows.map((r) => _rowToObj(table.headers, r)).toList();
+    final user = rows.firstWhere(
+      (u) => (u['email'] ?? '').toString().trim().toLowerCase() == email,
+      orElse: () => <String, dynamic>{},
+    );
+    if (user.isEmpty) return {'ok': false, 'message': 'No account found for this Gmail'};
+
+    final storedHash = (user['reset_token_hash'] ?? '').toString();
+    final storedExp = (user['reset_token_expires_at'] ?? '').toString();
+    if (storedHash.isEmpty || storedExp.isEmpty) {
+      return {'ok': false, 'message': 'No temporary token found. Ask admin for a new one.'};
+    }
+
+    final exp = DateTime.tryParse(storedExp)?.toUtc();
+    if (exp == null || DateTime.now().toUtc().isAfter(exp)) {
+      return {'ok': false, 'message': 'Temporary token expired. Ask admin for a new one.'};
+    }
+
+    if (_sha256(token) != storedHash) {
+      return {'ok': false, 'message': 'Invalid temporary token'};
+    }
+
+    final id = (user['id'] ?? '').toString();
+    final updated = await _upsertById(_usersSheet, {
+      'id': id,
+      'name': (user['name'] ?? '').toString(),
+      'phone': (user['phone'] ?? '').toString(),
+      'email': (user['email'] ?? '').toString().trim().toLowerCase(),
+      'role': (user['role'] ?? 'VIEWER').toString(),
+      'active': 'TRUE',
+      'approval_status': 'APPROVED',
+      'pin_hash': (user['pin_hash'] ?? '').toString(),
+      'reset_token_hash': '',
+      'reset_token_expires_at': '',
+    });
+    if (updated['ok'] != true) return updated;
+
+    return {
+      'ok': true,
+      'message': 'Account reset successful. You can sign in now.',
+      'data': {
+        'id': id,
+      },
+    };
   }
 
   Future<Map<String, dynamic>> _listStaff(Map<String, String> query) async {
@@ -643,6 +921,72 @@ class ApiService {
     return sha256.convert(bytes).toString();
   }
 
+  String _makeResetToken({int length = 8}) {
+    const charset = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+    final rand = Random.secure();
+    return List.generate(length, (_) => charset[rand.nextInt(charset.length)]).join();
+  }
+
+  bool _isActive(dynamic value) {
+    return (value ?? '').toString().trim().toUpperCase() == 'TRUE';
+  }
+
+  String _approvalStatusOf(Map<String, dynamic> row) {
+    final raw = (row['approval_status'] ?? '').toString().trim().toUpperCase();
+    if (_approvalStates.contains(raw)) return raw;
+    // Backward compatibility for old rows without approval_status
+    return _isActive(row['active']) ? 'APPROVED' : 'PENDING';
+  }
+
+  String? _normalizeApprovalStatus(dynamic input) {
+    final v = (input ?? '').toString().trim().toUpperCase();
+    if (_approvalStates.contains(v)) return v;
+    return null;
+  }
+
+  Future<void> _ensureUsersSheetColumns() async {
+    if (_usersColumnsEnsured) return;
+
+    final table = await _readTable(_usersSheet);
+    if (table.headers.isEmpty) return;
+
+    const required = [
+      'approval_status',
+      'requested_role',
+      'reset_token_hash',
+      'reset_token_expires_at',
+    ];
+
+    final existing = table.headers.toSet();
+    final missing = required.where((c) => !existing.contains(c)).toList();
+    if (missing.isEmpty) {
+      _usersColumnsEnsured = true;
+      return;
+    }
+
+    final api = await _sheetsApi();
+    final newHeaders = [...table.headers, ...missing];
+    final endCol = _columnLetter(newHeaders.length);
+    await api.spreadsheets.values.update(
+      gsheet.ValueRange(values: [newHeaders]),
+      AppConfig.googleSheetId,
+      '$_usersSheet!A1:${endCol}1',
+      valueInputOption: 'RAW',
+    );
+    _usersColumnsEnsured = true;
+  }
+
+  String _columnLetter(int n) {
+    var x = n;
+    var out = '';
+    while (x > 0) {
+      final rem = (x - 1) % 26;
+      out = String.fromCharCode(65 + rem) + out;
+      x = (x - 1) ~/ 26;
+    }
+    return out;
+  }
+
   String _todayIso() {
     final d = DateTime.now();
     final m = d.month.toString().padLeft(2, '0');
@@ -804,6 +1148,8 @@ class ApiService {
             final envelope = Map<String, dynamic>.from(p['payload'] as Map? ?? {});
             final row = Map<String, dynamic>.from(envelope['payload'] as Map? ?? {});
             row.remove('pin_hash');
+            row.remove('reset_token_hash');
+            row.remove('reset_token_expires_at');
             return row;
           })
           .toList();

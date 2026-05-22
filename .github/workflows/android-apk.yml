@@ -35,28 +35,12 @@ jobs:
             flutter create --platforms=android .
           fi
 
-      - name: Resolve API URL
-        env:
-          API_BASE_URL: ${{ secrets.API_BASE_URL }}
-        run: |
-          FALLBACK_URL="https://script.google.com/macros/s/AKfycbzdFMBIbvNlFthecYbR9XlEe7BhRaWaMuomWWPfwsiB3kG0CmjuagH3_rszNmr7WJc7/exec"
-          if [ -n "$API_BASE_URL" ]; then
-            RESOLVED_API_URL="$API_BASE_URL"
-          else
-            RESOLVED_API_URL="$FALLBACK_URL"
-          fi
-
-          echo "$RESOLVED_API_URL" | grep -q "script.google.com/macros/s/" || (echo "Resolved API URL invalid" && exit 1)
-          echo "$RESOLVED_API_URL" | grep -q "/exec" || (echo "Resolved API URL must end with /exec" && exit 1)
-
-          echo "RESOLVED_API_URL=$RESOLVED_API_URL" >> "$GITHUB_ENV"
-
       - name: Flutter pub get
         run: flutter pub get
 
       - name: Build debug APK
         run: |
-          flutter build apk --debug --dart-define=API_BASE_URL="$RESOLVED_API_URL"
+          flutter build apk --debug
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
