@@ -1,12 +1,12 @@
 class AppConfig {
   static const String appName = 'Madrasah ERP Lite';
 
-  // Runtime-overridable API URL for CI and release builds:
-  // flutter build apk --dart-define=API_BASE_URL=https://script.google.com/macros/s/DEPLOYMENT/exec
-  static const String apiBaseUrl = String.fromEnvironment(
-    'API_BASE_URL',
-    defaultValue:
-        'https://script.google.com/macros/s/AKfycbzdFMBIbvNlFthecYbR9XlEe7BhRaWaMuomWWPfwsiB3kG0CmjuagH3_rszNmr7WJc7/exec',
+  // Google Sheet used as operational data store.
+  // Optional runtime override:
+  // flutter run --dart-define=GOOGLE_SHEET_ID=your_sheet_id
+  static const String googleSheetId = String.fromEnvironment(
+    'GOOGLE_SHEET_ID',
+    defaultValue: '1oDjX_FS0F0_4ZjZM0YBS-TLHFRmYwbNRCPKhcTUxr3Y',
   );
 
   static const bool enableDebugLogs = bool.fromEnvironment('ENABLE_DEBUG_LOGS', defaultValue: true);

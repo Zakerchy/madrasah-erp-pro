@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:google_sign_in/google_sign_in.dart';
 
 import '../../shared/models/session_user.dart';
 import '../../shared/services/api_service.dart';
+import '../../shared/services/google_auth_service.dart';
 import '../../shared/services/session_service.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -14,22 +14,14 @@ class LoginScreen extends StatefulWidget {
 
 class _LoginScreenState extends State<LoginScreen> {
   final _api = ApiService();
-
-  final GoogleSignIn _googleSignIn = GoogleSignIn(
-    scopes: const [
-      'email',
-      'https://www.googleapis.com/auth/spreadsheets',
-    ],
-  );
-
   bool _loading = false;
 
   Future<void> _loginWithGoogle() async {
     setState(() => _loading = true);
 
     try {
-      await _googleSignIn.signOut();
-      final account = await _googleSignIn.signIn();
+      await GoogleAuthService.signOut();
+      final account = await GoogleAuthService.signInInteractive();
 
       if (!mounted) return;
       if (account == null) {
