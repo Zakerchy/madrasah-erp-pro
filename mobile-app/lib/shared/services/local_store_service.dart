@@ -7,7 +7,7 @@ class LocalStoreService {
   static const String _pendingQueueKey = 'pending_post_queue_v1';
   static const String _getCacheKey = 'get_cache_v1';
   static const String _sessionUserKey = 'session_user_v1';
-  static const String _offlineCredentialKey = 'offline_credentials_v1';
+  static const String _offlineCredentialKey = 'offline_credentials_v2';
 
   static SharedPreferences? _prefs;
 
@@ -77,14 +77,14 @@ class LocalStoreService {
   }
 
   static Future<void> saveOfflineCredential({
-    required String phone,
-    required String pin,
+    required String email,
+    required String googleId,
     required Map<String, dynamic> user,
   }) async {
     await init();
     final payload = {
-      'phone': phone,
-      'pin': pin,
+      'email': email,
+      'google_id': googleId,
       'user': user,
       'saved_at': DateTime.now().toIso8601String(),
     };

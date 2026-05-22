@@ -24,22 +24,30 @@ class SessionService {
     LocalStoreService.saveSessionUser(next.toMap());
   }
 
-  static Future<void> saveOfflineCredential(String phone, String pin, SessionUser next) async {
+  static Future<void> saveOfflineCredential({
+    required String email,
+    required String googleId,
+    required SessionUser user,
+  }) async {
     await LocalStoreService.saveOfflineCredential(
-      phone: phone,
-      pin: pin,
-      user: next.toMap(),
+      email: email,
+      googleId: googleId,
+      user: user.toMap(),
     );
   }
 
-  static bool loginFromOfflineCredential(String phone, String pin) {
+  static bool loginFromOfflineCredential({
+    required String email,
+    required String googleId,
+  }) {
     final creds = LocalStoreService.readOfflineCredential();
     if (creds == null) return false;
 
-    final cPhone = (creds['phone'] ?? '').toString().trim();
-    final cPin = (creds['pin'] ?? '').toString().trim();
+    final cEmail = (creds['email'] ?? '').toString().trim().toLowerCase();
+    final cGoogleId = (creds['google_id'] ?? '').toString().trim();
     final uMap = Map<String, dynamic>.from(creds['user'] as Map? ?? {});
-    if (cPhone != phone.trim() || cPin != pin.trim() || uMap.isEmpty) return false;
+
+    if (cEmail != email.trim().toLowerCase() || cGoogleId != googleId.trim() || uMap.isEmpty) return false;
 
     setUser(SessionUser.fromMap(uMap));
     return true;

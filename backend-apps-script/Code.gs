@@ -106,20 +106,18 @@ function doPost(e) {
 }
 
 function login_(payload) {
-  validateRequired_(payload, ['phone', 'pin']);
+  validateRequired_(payload, ['email']);
+
+  const email = String(payload.email || '').trim().toLowerCase();
   const users = listSheetRows_(CONFIG.SHEETS.USERS).data || [];
-  const user = users.find((u) => String(u.phone) === String(payload.phone) && String(u.active).toUpperCase() === 'TRUE');
 
-  if (!user) return { ok: false, message: 'User not found or inactive' };
+  const user = users.find((u) => {
+    const uEmail = String(u.email || '').trim().toLowerCase();
+    const active = String(u.active || '').toUpperCase() === 'TRUE';
+    return uEmail === email && active;
+  });
 
-  const givenPin = String(payload.pin || '');
-  const stored = String(user.pin_hash || '');
-  const hashed = pinHash_(givenPin);
-
-  // Backward compatibility:
-  // If existing data has plain pin in pin_hash cell, login still works.
-  const matched = stored && (stored === hashed || stored === givenPin);
-  if (!matched) return { ok: false, message: 'Invalid PIN' };
+  if (!user) return { ok: false, message: 'This Gmail is not approved or inactive' };
 
   return {
     ok: true,
@@ -127,7 +125,8 @@ function login_(payload) {
       id: user.id,
       name: user.name,
       role: user.role,
-      phone: user.phone,
+      phone: user.phone || '',
+      email: user.email || '',
     },
   };
 }

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 
 import '../../shared/models/session_user.dart';
 import '../../shared/services/api_service.dart';
@@ -13,35 +14,56 @@ class LoginScreen extends StatefulWidget {
 
 class _LoginScreenState extends State<LoginScreen> {
   final _api = ApiService();
-  final _phone = TextEditingController();
-  final _pin = TextEditingController();
+
+  final GoogleSignIn _googleSignIn = GoogleSignIn(
+    scopes: const [
+      'email',
+      'https://www.googleapis.com/auth/spreadsheets',
+    ],
+  );
+
   bool _loading = false;
 
-  Future<void> _login() async {
-    if (_phone.text.trim().isEmpty || _pin.text.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Phone and PIN are required')));
-      return;
-    }
-
+  Future<void> _loginWithGoogle() async {
     setState(() => _loading = true);
+
     try {
+      await _googleSignIn.signOut();
+      final account = await _googleSignIn.signIn();
+
+      if (!mounted) return;
+      if (account == null) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Google sign-in cancelled')));
+        setState(() => _loading = false);
+        return;
+      }
+
+      final email = account.email.trim().toLowerCase();
+      final googleId = account.id.trim();
+
       final res = await _api.post('login', {
-        'phone': _phone.text.trim(),
-        'pin': _pin.text.trim(),
+        'email': email,
       });
 
       if (!mounted) return;
+
       if (res['ok'] == true) {
         final user = SessionUser.fromMap((res['data'] ?? {}) as Map<String, dynamic>);
         SessionService.setUser(user);
-        await SessionService.saveOfflineCredential(_phone.text.trim(), _pin.text.trim(), user);
+        await SessionService.saveOfflineCredential(
+          email: email,
+          googleId: googleId,
+          user: user,
+        );
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Welcome ${user.name}')));
         Navigator.pushNamedAndRemoveUntil(context, '/dashboard', (route) => false);
-      } else if (res['offline'] == true &&
-          SessionService.loginFromOfflineCredential(_phone.text.trim(), _pin.text.trim())) {
+      } else if (res['offline'] == true && SessionService.loginFromOfflineCredential(email: email, googleId: googleId)) {
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Offline login successful')));
         Navigator.pushNamedAndRemoveUntil(context, '/dashboard', (route) => false);
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('${res['message'] ?? res['error'] ?? 'Login failed'}')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('${res['message'] ?? res['error'] ?? 'Login failed'}')),
+        );
       }
     } catch (e) {
       if (!mounted) return;
@@ -65,20 +87,27 @@ class _LoginScreenState extends State<LoginScreen> {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   const Text('Madrasah ERP Lite', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-                  const SizedBox(height: 16),
-                  TextField(controller: _phone, keyboardType: TextInputType.phone, decoration: const InputDecoration(labelText: 'Phone')),
-                  const SizedBox(height: 12),
-                  TextField(controller: _pin, obscureText: true, decoration: const InputDecoration(labelText: 'PIN')),
+                  const SizedBox(height: 8),
+                  const Text(
+                    'Use your approved Gmail account for role-based login and sync authorization.',
+                    textAlign: TextAlign.center,
+                  ),
                   const SizedBox(height: 16),
                   SizedBox(
                     width: double.infinity,
                     child: FilledButton.icon(
-                      onPressed: _loading ? null : _login,
+                      onPressed: _loading ? null : _loginWithGoogle,
                       icon: _loading
                           ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
-                          : const Icon(Icons.login),
-                      label: Text(_loading ? 'Logging in...' : 'Login'),
+                          : const Icon(Icons.account_circle),
+                      label: Text(_loading ? 'Signing in...' : 'Sign in with Google'),
                     ),
+                  ),
+                  const SizedBox(height: 8),
+                  const Text(
+                    'Only Gmail accounts listed in users_roles (active=TRUE) can login.',
+                    style: TextStyle(fontSize: 12),
+                    textAlign: TextAlign.center,
                   ),
                 ],
               ),
