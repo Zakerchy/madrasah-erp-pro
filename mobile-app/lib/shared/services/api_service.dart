@@ -16,6 +16,7 @@ class ApiService {
     'upsertStaff',
     'recordSalaryPayment',
     'saveScholarshipPayment',
+    'upsertUser',
   };
 
   static const String _usersSheet = 'users_roles';
@@ -115,6 +116,9 @@ class ApiService {
       case 'dashboardSummary':
         return _dashboardSummary(query);
 
+      case 'listUsers':
+        return _listUsers(query);
+
       case 'listBeneficiaries':
         return _listBeneficiaries(query);
 
@@ -143,6 +147,10 @@ class ApiService {
       case 'createTransaction':
         _assertRole(payload['user_role'], const ['ADMIN', 'ACCOUNTANT', 'FIELD_USER']);
         return _createTransaction(Map<String, dynamic>.from(payload['payload'] as Map? ?? {}));
+
+      case 'upsertUser':
+        _assertRole(payload['user_role'], const ['ADMIN']);
+        return _upsertUser(Map<String, dynamic>.from(payload['payload'] as Map? ?? {}));
 
       case 'upsertBeneficiary':
         _assertRole(payload['user_role'], const ['ADMIN', 'ACCOUNTANT']);
@@ -298,6 +306,52 @@ class ApiService {
     _assertRole(query['user_role'], const ['ADMIN', 'ACCOUNTANT', 'VIEWER']);
     final rows = await _readRows(_beneficiariesSheet, normalizeLegacy: true);
     return {'ok': true, 'data': rows};
+  }
+
+  Future<Map<String, dynamic>> _listUsers(Map<String, String> query) async {
+    _assertRole(query['user_role'], const ['ADMIN']);
+    final rows = await _readRows(_usersSheet);
+    final sanitized = rows.map((u) {
+      final row = Map<String, dynamic>.from(u);
+      row.remove('pin_hash');
+      return row;
+    }).toList();
+    return {'ok': true, 'data': sanitized};
+  }
+
+  Future<Map<String, dynamic>> _upsertUser(Map<String, dynamic> payload) async {
+    final email = (payload['email'] ?? '').toString().trim().toLowerCase();
+    final name = (payload['name'] ?? '').toString().trim();
+    final role = (payload['role'] ?? 'VIEWER').toString().trim();
+    final allowedRoles = {'ADMIN', 'ACCOUNTANT', 'FIELD_USER', 'VIEWER'};
+
+    if (email.isEmpty || name.isEmpty) {
+      return {'ok': false, 'message': 'name and email required'};
+    }
+    if (!allowedRoles.contains(role)) {
+      return {'ok': false, 'message': 'invalid role'};
+    }
+
+    final id = (payload['id'] ?? '').toString().trim();
+    final createId = id.isNotEmpty ? id : 'u_${DateTime.now().millisecondsSinceEpoch}';
+
+    final userPayload = {
+      'id': createId,
+      'name': name,
+      'phone': (payload['phone'] ?? '').toString().trim(),
+      'email': email,
+      'role': role,
+      'active': ((payload['active'] ?? 'TRUE').toString().toUpperCase() == 'FALSE') ? 'FALSE' : 'TRUE',
+      'pin_hash': (payload['pin_hash'] ?? '').toString(),
+    };
+
+    final res = await _upsertById(_usersSheet, userPayload);
+    if (res['ok'] == true && res['data'] is Map) {
+      final data = Map<String, dynamic>.from(res['data'] as Map);
+      data.remove('pin_hash');
+      res['data'] = data;
+    }
+    return res;
   }
 
   Future<Map<String, dynamic>> _listStaff(Map<String, String> query) async {
@@ -742,6 +796,18 @@ class ApiService {
           'rows': txns,
         },
       };
+    }
+
+    if (action == 'listUsers') {
+      final list = _queuedActionPayloads('upsertUser')
+          .map((p) {
+            final envelope = Map<String, dynamic>.from(p['payload'] as Map? ?? {});
+            final row = Map<String, dynamic>.from(envelope['payload'] as Map? ?? {});
+            row.remove('pin_hash');
+            return row;
+          })
+          .toList();
+      return {'ok': true, 'data': list};
     }
 
     if (action == 'listBeneficiaries') {
