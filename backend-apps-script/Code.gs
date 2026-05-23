@@ -27,36 +27,11 @@ const CONFIG = {
   },
 };
 
+// Route both GET and POST through a single handler so the Flutter app
+// can use HTTP POST for all requests (simpler client code).
 function doGet(e) {
   try {
-    const params = (e && e.parameter) || {};
-    const action = params.action || 'health';
-
-    if (action === 'health') {
-      return json({
-        ok: true,
-        message: 'Madrasah ERP API running',
-        ts: nowIso(),
-        sheetId: getSheetId_(),
-      });
-    }
-
-    if (action === 'listTransactions') return json(listTransactions_(params));
-    if (action === 'dashboardSummary') return json(dashboardSummary_(params));
-    if (action === 'listBeneficiaries') return json(listBeneficiaries_(params));
-    if (action === 'listStaff') return json(listStaff_(params));
-    if (action === 'listSalaryPayments') return json(listSalaryPayments_(params));
-    if (action === 'listScholarshipByMonth') return json(listScholarshipByMonth_(params));
-    if (action === 'monthlyReport') return json(monthlyReport_(params));
-
-    // Setup helper: generate hash from query pin for users_roles.pin_hash
-    if (action === 'hashPin') {
-      const pin = params.pin || '';
-      if (!pin) return json({ ok: false, message: 'pin required' });
-      return json({ ok: true, pin_hash: pinHash_(pin) });
-    }
-
-    return json({ ok: false, message: 'Unknown action' });
+    return handleRequest_((e && e.parameter) || {});
   } catch (err) {
     return json({ ok: false, error: String(err) });
   }
@@ -65,41 +40,76 @@ function doGet(e) {
 function doPost(e) {
   try {
     const body = JSON.parse((e && e.postData && e.postData.contents) || '{}');
-    const action = body.action;
+    return handleRequest_(body);
+  } catch (err) {
+    return json({ ok: false, error: String(err) });
+  }
+}
 
-    if (action === 'login') return json(login_(body));
+function handleRequest_(params) {
+  params = params || {};
+  const action = params.action || 'health';
+
+  try {
+    if (action === 'health') {
+      return json({
+        ok: true,
+        message: 'Madrasah ERP API চালু আছে',
+        ts: nowIso(),
+        sheetId: getSheetId_(),
+      });
+    }
+
+    // Helper: generate PIN hash for admin to fill in users_roles sheet
+    if (action === 'hashPin') {
+      const pin = params.pin || '';
+      if (!pin) return json({ ok: false, message: 'pin required' });
+      return json({ ok: true, pin_hash: pinHash_(pin) });
+    }
+
+    // Read actions (also allowed via POST body)
+    if (action === 'dashboardSummary') return json(dashboardSummary_(params));
+    if (action === 'listTransactions') return json(listTransactions_(params));
+    if (action === 'listBeneficiaries') return json(listBeneficiaries_(params));
+    if (action === 'listStaff') return json(listStaff_(params));
+    if (action === 'listSalaryPayments') return json(listSalaryPayments_(params));
+    if (action === 'listScholarshipByMonth') return json(listScholarshipByMonth_(params));
+    if (action === 'monthlyReport') return json(monthlyReport_(params));
+
+    // Write actions
+    if (action === 'login') return json(login_(params));
 
     if (action === 'createTransaction') {
-      assertRole_(body.user_role, ['ADMIN', 'ACCOUNTANT', 'FIELD_USER']);
-      return json(createTransaction_(body.payload));
+      assertRole_(params.user_role, ['ADMIN', 'ACCOUNTANT', 'FIELD_USER']);
+      return json(createTransaction_(params.payload));
     }
 
     if (action === 'updateTransaction') {
-      assertRole_(body.user_role, ['ADMIN', 'ACCOUNTANT']);
-      return json(updateTransaction_(body.id, body.payload));
+      assertRole_(params.user_role, ['ADMIN', 'ACCOUNTANT']);
+      return json(updateTransaction_(params.id, params.payload));
     }
 
     if (action === 'upsertBeneficiary') {
-      assertRole_(body.user_role, ['ADMIN', 'ACCOUNTANT']);
-      return json(upsertById_(CONFIG.SHEETS.BENEFICIARIES, body.payload));
+      assertRole_(params.user_role, ['ADMIN', 'ACCOUNTANT']);
+      return json(upsertById_(CONFIG.SHEETS.BENEFICIARIES, params.payload));
     }
 
     if (action === 'upsertStaff') {
-      assertRole_(body.user_role, ['ADMIN', 'ACCOUNTANT']);
-      return json(upsertById_(CONFIG.SHEETS.STAFF, body.payload));
+      assertRole_(params.user_role, ['ADMIN', 'ACCOUNTANT']);
+      return json(upsertById_(CONFIG.SHEETS.STAFF, params.payload));
     }
 
     if (action === 'recordSalaryPayment') {
-      assertRole_(body.user_role, ['ADMIN', 'ACCOUNTANT']);
-      return json(recordSalaryPayment_(body.payload));
+      assertRole_(params.user_role, ['ADMIN', 'ACCOUNTANT']);
+      return json(recordSalaryPayment_(params.payload));
     }
 
     if (action === 'saveScholarshipPayment') {
-      assertRole_(body.user_role, ['ADMIN', 'ACCOUNTANT']);
-      return json(saveScholarshipPayment_(body.payload));
+      assertRole_(params.user_role, ['ADMIN', 'ACCOUNTANT']);
+      return json(saveScholarshipPayment_(params.payload));
     }
 
-    return json({ ok: false, message: 'Unknown action' });
+    return json({ ok: false, message: 'Unknown action: ' + action });
   } catch (err) {
     return json({ ok: false, error: String(err) });
   }
@@ -109,24 +119,56 @@ function login_(payload) {
   validateRequired_(payload, ['email']);
 
   const email = String(payload.email || '').trim().toLowerCase();
+  const pinHash = String(payload.pin_hash || '').trim();
   const users = listSheetRows_(CONFIG.SHEETS.USERS).data || [];
 
-  const user = users.find((u) => {
-    const uEmail = String(u.email || '').trim().toLowerCase();
-    const active = String(u.active || '').toUpperCase() === 'TRUE';
-    return uEmail === email && active;
-  });
+  // Bootstrap: if sheet is empty, create first admin from hardcoded email
+  const bootstrapEmail = 'zakerchy@gmail.com';
+  if (users.length === 0 && email === bootstrapEmail) {
+    const boot = {
+      id: 'u_admin_bootstrap',
+      name: 'Admin',
+      phone: '',
+      email: bootstrapEmail,
+      role: 'ADMIN',
+      active: 'TRUE',
+      approval_status: 'APPROVED',
+      pin_hash: '',
+      created_at: nowIso(),
+      updated_at: nowIso(),
+    };
+    appendRow_(CONFIG.SHEETS.USERS, boot);
+    return { ok: true, data: { id: boot.id, name: boot.name, role: boot.role, phone: '', email: boot.email, approval_status: 'APPROVED' } };
+  }
 
-  if (!user) return { ok: false, message: 'This Gmail is not approved or inactive' };
+  const anyUser = users.find(u => String(u.email || '').trim().toLowerCase() === email);
+  if (!anyUser) {
+    return { ok: false, message: 'এই ইমেইলে কোনো অ্যাকাউন্ট নেই' };
+  }
+
+  const status = String(anyUser.approval_status || 'APPROVED').toUpperCase();
+  if (status === 'PENDING') return { ok: false, message: 'অনুমোদনের অপেক্ষায় আছেন। Admin-এর সাথে যোগাযোগ করুন।' };
+  if (status === 'REJECTED') return { ok: false, message: 'অ্যাকাউন্ট রিজেক্ট করা হয়েছে।' };
+  if (status === 'BLOCKED') return { ok: false, message: 'অ্যাকাউন্ট ব্লক করা হয়েছে।' };
+
+  const active = String(anyUser.active || '').toUpperCase() === 'TRUE';
+  if (!active) return { ok: false, message: 'অ্যাকাউন্ট নিষ্ক্রিয় করা হয়েছে।' };
+
+  // PIN verification: if stored pin_hash is set, client must provide matching hash
+  const storedPinHash = String(anyUser.pin_hash || '').trim();
+  if (storedPinHash && pinHash && storedPinHash !== pinHash) {
+    return { ok: false, message: 'পিন ভুল। আবার চেষ্টা করুন।' };
+  }
 
   return {
     ok: true,
     data: {
-      id: user.id,
-      name: user.name,
-      role: user.role,
-      phone: user.phone || '',
-      email: user.email || '',
+      id: anyUser.id,
+      name: anyUser.name,
+      role: anyUser.role || 'VIEWER',
+      phone: anyUser.phone || '',
+      email: anyUser.email || '',
+      approval_status: status,
     },
   };
 }
@@ -291,6 +333,14 @@ function dashboardSummary_(params) {
   });
 
   summary.balance = summary.totalIn - summary.totalOut;
+
+  // Separation calculations (mirrors Excel dashboard top rows)
+  const zakatIn = (summary.byFund['JAKAT'] || { in: 0 }).in;
+  const scholarshipIn = (summary.byFund['SCHOLARSHIP'] || { in: 0 }).in;
+  summary.totalFound = summary.totalIn;
+  summary.balanceExclZakat = summary.totalIn - zakatIn;
+  summary.balanceExclZakatScholarship = summary.balanceExclZakat - scholarshipIn;
+
   return { ok: true, data: summary };
 }
 

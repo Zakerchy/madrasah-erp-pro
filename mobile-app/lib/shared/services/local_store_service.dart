@@ -82,13 +82,13 @@ class LocalStoreService {
 
   static Future<void> saveOfflineCredential({
     required String email,
-    required String googleId,
+    required String pinHash,
     required Map<String, dynamic> user,
   }) async {
     await init();
     final payload = {
       'email': email,
-      'google_id': googleId,
+      'pin_hash': pinHash,
       'user': user,
       'saved_at': DateTime.now().toIso8601String(),
     };

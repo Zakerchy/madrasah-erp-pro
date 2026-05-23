@@ -1,25 +1,21 @@
 class AppConfig {
-  static const String appName = 'Madrasah ERP Lite';
+  static const String appName = 'মাদ্রাসা ERP';
 
-  // Google Sheet used as operational data store.
-  // Optional runtime override:
-  // flutter run --dart-define=GOOGLE_SHEET_ID=your_sheet_id
-  static const String googleSheetId = String.fromEnvironment(
-    'GOOGLE_SHEET_ID',
-    defaultValue: '1oDjX_FS0F0_4ZjZM0YBS-TLHFRmYwbNRCPKhcTUxr3Y',
+  // Google Apps Script Web App URL (deploy once, paste here)
+  // flutter run --dart-define=APPS_SCRIPT_URL=https://script.google.com/macros/s/YOUR_ID/exec
+  static const String appsScriptUrl = String.fromEnvironment(
+    'APPS_SCRIPT_URL',
+    defaultValue: 'https://script.google.com/macros/s/AKfycbwPLACEHOLDER/exec',
   );
 
-  // First-login bootstrap admin (only used when users_roles has no data row).
-  // Optional override:
-  // flutter run --dart-define=BOOTSTRAP_ADMIN_EMAIL=you@gmail.com
+  // Bootstrap admin email (first login when users sheet is empty)
   static const String bootstrapAdminEmail = String.fromEnvironment(
     'BOOTSTRAP_ADMIN_EMAIL',
     defaultValue: 'zakerchy@gmail.com',
   );
-  static const String bootstrapAdminName = String.fromEnvironment(
-    'BOOTSTRAP_ADMIN_NAME',
-    defaultValue: 'Admin',
-  );
 
-  static const bool enableDebugLogs = bool.fromEnvironment('ENABLE_DEBUG_LOGS', defaultValue: true);
+  static const bool enableDebugLogs = bool.fromEnvironment(
+    'ENABLE_DEBUG_LOGS',
+    defaultValue: true,
+  );
 }

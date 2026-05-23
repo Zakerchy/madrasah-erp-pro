@@ -26,28 +26,30 @@ class SessionService {
 
   static Future<void> saveOfflineCredential({
     required String email,
-    required String googleId,
+    required String pinHash,
     required SessionUser user,
   }) async {
     await LocalStoreService.saveOfflineCredential(
       email: email,
-      googleId: googleId,
+      pinHash: pinHash,
       user: user.toMap(),
     );
   }
 
   static bool loginFromOfflineCredential({
     required String email,
-    required String googleId,
+    required String pinHash,
   }) {
     final creds = LocalStoreService.readOfflineCredential();
     if (creds == null) return false;
 
     final cEmail = (creds['email'] ?? '').toString().trim().toLowerCase();
-    final cGoogleId = (creds['google_id'] ?? '').toString().trim();
+    final cPinHash = (creds['pin_hash'] ?? '').toString().trim();
     final uMap = Map<String, dynamic>.from(creds['user'] as Map? ?? {});
 
-    if (cEmail != email.trim().toLowerCase() || cGoogleId != googleId.trim() || uMap.isEmpty) return false;
+    if (cEmail != email.trim().toLowerCase() || uMap.isEmpty) return false;
+    // Allow offline login if PIN matches or no PIN was set
+    if (cPinHash.isNotEmpty && pinHash.isNotEmpty && cPinHash != pinHash) return false;
 
     setUser(SessionUser.fromMap(uMap));
     return true;
