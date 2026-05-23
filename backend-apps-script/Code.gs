@@ -4,7 +4,7 @@
  */
 
 const CONFIG = {
-  SHEET_ID_FALLBACK: 'PUT_YOUR_GOOGLE_SHEET_ID_HERE',
+  SHEET_ID_FALLBACK: '1oDjX_FS0F0_4ZjZM0YBS-TLHFRmYwbNRCPKhcTUxr3Y',
   SHEETS: {
     USERS: 'users_roles',
     TXN: 'fund_transactions',
@@ -611,6 +611,6 @@ function json(obj) {
 
 // One-time setup: call this once from Apps Script editor to set Sheet ID property
 function setupSheetId() {
-  PropertiesService.getScriptProperties().setProperty('SHEET_ID', 'PUT_YOUR_GOOGLE_SHEET_ID_HERE');
+  PropertiesService.getScriptProperties().setProperty('SHEET_ID', '1oDjX_FS0F0_4ZjZM0YBS-TLHFRmYwbNRCPKhcTUxr3Y');
   Logger.log('SHEET_ID set: ' + PropertiesService.getScriptProperties().getProperty('SHEET_ID'));
 }
