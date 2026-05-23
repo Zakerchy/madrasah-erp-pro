@@ -124,7 +124,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       'role': (user['role'] ?? 'VIEWER').toString(),
       'active': (user['active'] ?? 'TRUE').toString().toUpperCase() == 'TRUE' ? 'FALSE' : 'TRUE',
       'approval_status': (user['approval_status'] ?? 'APPROVED').toString(),
-      'pin_hash': '',
+      'pin_hash': (user['pin_hash'] ?? '').toString(),
     };
 
     final res = await _api.post('upsertUser', {

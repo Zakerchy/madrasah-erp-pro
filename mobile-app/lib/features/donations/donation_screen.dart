@@ -43,6 +43,28 @@ class _DonationScreenState extends State<DonationScreen> {
     if (mounted) setState(() => _loadingList = false);
   }
 
+  DateTime? _parseIsoDate(String value) {
+    final trimmed = value.trim();
+    if (!RegExp(r'^\d{4}-\d{2}-\d{2}$').hasMatch(trimmed)) return null;
+    final dt = DateTime.tryParse(trimmed);
+    if (dt == null) return null;
+    final normalized = '${dt.year.toString().padLeft(4, '0')}-${dt.month.toString().padLeft(2, '0')}-${dt.day.toString().padLeft(2, '0')}';
+    return normalized == trimmed ? dt : null;
+  }
+
+  Future<void> _pickDate() async {
+    final initial = _parseIsoDate(_date.text) ?? DateTime.now();
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: initial,
+      firstDate: DateTime(2000),
+      lastDate: DateTime(2100),
+    );
+    if (picked == null) return;
+    _date.text = '${picked.year.toString().padLeft(4, '0')}-${picked.month.toString().padLeft(2, '0')}-${picked.day.toString().padLeft(2, '0')}';
+    if (mounted) setState(() {});
+  }
+
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
 
@@ -96,8 +118,22 @@ class _DonationScreenState extends State<DonationScreen> {
               children: [
                 TextFormField(
                   controller: _date,
-                  decoration: const InputDecoration(labelText: 'Date (YYYY-MM-DD)'),
-                  validator: (v) => (v == null || v.trim().isEmpty) ? 'Date required' : null,
+                  readOnly: true,
+                  decoration: InputDecoration(
+                    labelText: 'Date (YYYY-MM-DD)',
+                    suffixIcon: IconButton(
+                      tooltip: 'Select date',
+                      onPressed: _pickDate,
+                      icon: const Icon(Icons.calendar_month),
+                    ),
+                  ),
+                  onTap: _pickDate,
+                  validator: (v) {
+                    final value = (v ?? '').trim();
+                    if (value.isEmpty) return 'Date required';
+                    if (_parseIsoDate(value) == null) return 'Use valid date format YYYY-MM-DD';
+                    return null;
+                  },
                 ),
                 const SizedBox(height: 12),
                 DropdownButtonFormField<String>(

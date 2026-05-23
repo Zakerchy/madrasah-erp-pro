@@ -8,6 +8,7 @@ class LocalStoreService {
   static const String _getCacheKey = 'get_cache_v1';
   static const String _sessionUserKey = 'session_user_v1';
   static const String _offlineCredentialKey = 'offline_credentials_v2';
+  static const Duration _getCacheTtl = Duration(minutes: 15);
 
   static SharedPreferences? _prefs;
 
@@ -26,15 +27,18 @@ class LocalStoreService {
   static Future<void> cacheGetResponse(String cacheKey, Map<String, dynamic> value) async {
     await init();
     final bucket = _getCacheMap();
-    bucket[cacheKey] = value;
+    bucket[cacheKey] = {
+      'cached_at_ms': DateTime.now().millisecondsSinceEpoch,
+      'value': value,
+    };
     await _prefs!.setString(_getCacheKey, jsonEncode(bucket));
   }
 
   static Map<String, dynamic>? readCachedGetResponse(String cacheKey) {
     final bucket = _getCacheMap();
     final raw = bucket[cacheKey];
-    if (raw is Map<String, dynamic>) return raw;
-    if (raw is Map) return Map<String, dynamic>.from(raw);
+    if (raw is Map<String, dynamic>) return _parseCachedGet(raw, bucket, cacheKey);
+    if (raw is Map) return _parseCachedGet(Map<String, dynamic>.from(raw), bucket, cacheKey);
     return null;
   }
 
@@ -114,5 +118,26 @@ class LocalStoreService {
     if (decoded is Map<String, dynamic>) return decoded;
     if (decoded is Map) return Map<String, dynamic>.from(decoded);
     return {};
+  }
+
+  static Map<String, dynamic>? _parseCachedGet(
+    Map<String, dynamic> raw,
+    Map<String, dynamic> bucket,
+    String cacheKey,
+  ) {
+    if (raw.containsKey('cached_at_ms') && raw['value'] is Map) {
+      final savedAtMs = int.tryParse((raw['cached_at_ms'] ?? '').toString()) ?? 0;
+      final nowMs = DateTime.now().millisecondsSinceEpoch;
+      final expired = savedAtMs <= 0 || (nowMs - savedAtMs) > _getCacheTtl.inMilliseconds;
+      if (expired) {
+        bucket.remove(cacheKey);
+        _prefs?.setString(_getCacheKey, jsonEncode(bucket));
+        return null;
+      }
+      return Map<String, dynamic>.from(raw['value'] as Map);
+    }
+
+    // Backward compatibility for old cache structure.
+    return raw;
   }
 }

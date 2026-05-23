@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 
 import '../../shared/models/dashboard_summary.dart';
 import '../../shared/services/api_service.dart';
-import '../../shared/services/google_auth_service.dart';
 import '../../shared/services/session_service.dart';
 import '../../shared/widgets/base_scaffold.dart';
 
@@ -16,9 +15,9 @@ class DashboardScreen extends StatefulWidget {
 class _DashboardScreenState extends State<DashboardScreen> {
   final _api = ApiService();
   bool _loading = true;
-  bool _authRequired = false;
   String? _error;
   DashboardSummary? _summary;
+  DateTime? _lastBackPressedAt;
 
   @override
   void initState() {
@@ -30,15 +29,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
     setState(() {
       _loading = true;
       _error = null;
-      _authRequired = false;
     });
 
     try {
       final res = await _api.get('dashboardSummary');
       if (res['ok'] == true) {
-        _summary = DashboardSummary.fromMap((res['data'] ?? {}) as Map<String, dynamic>);
+        _summary = DashboardSummary.fromMap(
+            (res['data'] ?? {}) as Map<String, dynamic>);
       } else {
-        _authRequired = res['auth_required'] == true;
         _error = (res['message'] ?? res['error'] ?? 'Failed').toString();
       }
     } catch (e) {
@@ -48,48 +46,23 @@ class _DashboardScreenState extends State<DashboardScreen> {
     if (mounted) setState(() => _loading = false);
   }
 
-  Future<void> _verifySyncAndReload() async {
-    final expected = (SessionService.user?.email ?? '').trim().toLowerCase();
-    if (expected.isEmpty) return;
-
-    setState(() => _loading = true);
-    try {
-      final account = await GoogleAuthService.signInInteractive();
-      if (!mounted) return;
-      if (account == null) {
-        setState(() => _loading = false);
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Google verification cancelled')));
-        return;
-      }
-      final email = account.email.trim().toLowerCase();
-      if (email != expected) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Mismatch: please verify with $expected')),
-        );
-        setState(() => _loading = false);
-        return;
-      }
-
-      final client = await GoogleAuthService.authClient(trySilentSignIn: false);
-      if (!mounted) return;
-      if (client == null) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Google sync verify failed')));
-        setState(() => _loading = false);
-        return;
-      }
-
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Google sync verified')));
-      await _load();
-    } catch (e) {
-      if (!mounted) return;
-      setState(() => _loading = false);
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+  Future<bool> _onWillPop() async {
+    final now = DateTime.now();
+    if (_lastBackPressedAt == null ||
+        now.difference(_lastBackPressedAt!) > const Duration(seconds: 2)) {
+      _lastBackPressedAt = now;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Press back again to exit dashboard')),
+      );
+      return false;
     }
+    return true;
   }
 
   Future<void> _openQuickEntry({required bool income}) async {
     final formKey = GlobalKey<FormState>();
-    final date = TextEditingController(text: DateTime.now().toIso8601String().split('T').first);
+    final date = TextEditingController(
+        text: DateTime.now().toIso8601String().split('T').first);
     final amount = TextEditingController();
     final source = TextEditingController();
     final note = TextEditingController();
@@ -110,25 +83,35 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     children: [
                       TextFormField(
                         controller: date,
-                        decoration: const InputDecoration(labelText: 'Date (YYYY-MM-DD)'),
-                        validator: (v) => (v == null || v.trim().isEmpty) ? 'Required' : null,
+                        decoration: const InputDecoration(
+                            labelText: 'Date (YYYY-MM-DD)'),
+                        validator: (v) =>
+                            (v == null || v.trim().isEmpty) ? 'Required' : null,
                       ),
                       const SizedBox(height: 8),
                       DropdownButtonFormField<String>(
                         value: fundType,
                         items: const [
-                          DropdownMenuItem(value: 'CONSTRUCTION', child: Text('CONSTRUCTION')),
-                          DropdownMenuItem(value: 'JAKAT', child: Text('JAKAT')),
-                          DropdownMenuItem(value: 'SCHOLARSHIP', child: Text('SCHOLARSHIP')),
-                          DropdownMenuItem(value: 'GENERAL', child: Text('GENERAL')),
+                          DropdownMenuItem(
+                              value: 'CONSTRUCTION',
+                              child: Text('CONSTRUCTION')),
+                          DropdownMenuItem(
+                              value: 'JAKAT', child: Text('JAKAT')),
+                          DropdownMenuItem(
+                              value: 'SCHOLARSHIP', child: Text('SCHOLARSHIP')),
+                          DropdownMenuItem(
+                              value: 'GENERAL', child: Text('GENERAL')),
                         ],
-                        onChanged: (v) => setStateDialog(() => fundType = v ?? 'GENERAL'),
-                        decoration: const InputDecoration(labelText: 'Fund Type'),
+                        onChanged: (v) =>
+                            setStateDialog(() => fundType = v ?? 'GENERAL'),
+                        decoration:
+                            const InputDecoration(labelText: 'Fund Type'),
                       ),
                       const SizedBox(height: 8),
                       TextFormField(
                         controller: amount,
-                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                        keyboardType: const TextInputType.numberWithOptions(
+                            decimal: true),
                         decoration: const InputDecoration(labelText: 'Amount'),
                         validator: (v) {
                           final n = double.tryParse((v ?? '').trim()) ?? 0;
@@ -138,8 +121,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       const SizedBox(height: 8),
                       TextFormField(
                         controller: source,
-                        decoration: InputDecoration(labelText: income ? 'Donor' : 'Vendor'),
-                        validator: (v) => (v == null || v.trim().isEmpty) ? 'Required' : null,
+                        decoration: InputDecoration(
+                            labelText: income ? 'Donor' : 'Vendor'),
+                        validator: (v) =>
+                            (v == null || v.trim().isEmpty) ? 'Required' : null,
                       ),
                       const SizedBox(height: 8),
                       TextFormField(
@@ -153,10 +138,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 ),
               ),
               actions: [
-                TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+                TextButton(
+                    onPressed: () => Navigator.pop(context, false),
+                    child: const Text('Cancel')),
                 FilledButton(
                   onPressed: () {
-                    if (formKey.currentState!.validate()) Navigator.pop(context, true);
+                    if (formKey.currentState!.validate())
+                      Navigator.pop(context, true);
                   },
                   child: const Text('Save'),
                 ),
@@ -185,7 +173,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('${res['message'] ?? (res['ok'] == true ? 'Saved' : 'Failed')}')),
+      SnackBar(
+          content: Text(
+              '${res['message'] ?? (res['ok'] == true ? 'Saved' : 'Failed')}')),
     );
     if (res['ok'] == true) await _load();
   }
@@ -199,25 +189,26 @@ class _DashboardScreenState extends State<DashboardScreen> {
         _openQuickEntry(income: false);
         return;
       case 'salary':
-        Navigator.pushReplacementNamed(context, '/salary');
+        Navigator.pushNamed(context, '/salary');
         return;
       case 'scholarship':
-        Navigator.pushReplacementNamed(context, '/scholarship');
+        Navigator.pushNamed(context, '/scholarship');
         return;
       case 'beneficiaries':
-        Navigator.pushReplacementNamed(context, '/beneficiaries');
+        Navigator.pushNamed(context, '/beneficiaries');
         return;
       case 'reports':
-        Navigator.pushReplacementNamed(context, '/reports');
+        Navigator.pushNamed(context, '/reports');
         return;
       case 'settings':
-        Navigator.pushReplacementNamed(context, '/settings');
+        Navigator.pushNamed(context, '/settings');
         return;
     }
   }
 
   FundSummary _fund(String key) {
-    return _summary?.byFund[key] ?? FundSummary(incoming: 0, outgoing: 0, balance: 0);
+    return _summary?.byFund[key] ??
+        FundSummary(incoming: 0, outgoing: 0, balance: 0);
   }
 
   String _format(double n) => '৳${n.toStringAsFixed(0)}';
@@ -227,7 +218,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
     if (SessionService.user == null) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) {
-          Navigator.pushNamedAndRemoveUntil(context, '/login', (route) => false);
+          Navigator.pushNamedAndRemoveUntil(
+              context, '/login', (route) => false);
         }
       });
     }
@@ -237,100 +229,137 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final scholarship = _fund('SCHOLARSHIP');
     final general = _fund('GENERAL');
 
-    return BaseScaffold(
-      title: 'Dashboard',
-      actions: [
-        IconButton(onPressed: _load, icon: const Icon(Icons.refresh)),
-        PopupMenuButton<String>(
-          onSelected: _handleAction,
-          itemBuilder: (context) => [
-            const PopupMenuItem(value: 'donation', child: Text('Quick Donation Entry')),
-            const PopupMenuItem(value: 'expense', child: Text('Quick Expense Entry')),
-            const PopupMenuDivider(),
-            const PopupMenuItem(value: 'salary', child: Text('Open Salary')),
-            const PopupMenuItem(value: 'scholarship', child: Text('Open Scholarship')),
-            const PopupMenuItem(value: 'beneficiaries', child: Text('Open Beneficiaries')),
-            const PopupMenuItem(value: 'reports', child: Text('Open Reports')),
-            if (SessionService.role == 'ADMIN') const PopupMenuItem(value: 'settings', child: Text('Open Settings')),
-          ],
-        ),
-      ],
-      body: _loading
-          ? const Center(child: CircularProgressIndicator())
-          : _error != null
-              ? Center(
-                  child: Padding(
-                    padding: const EdgeInsets.all(20),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(_error!, textAlign: TextAlign.center),
-                        const SizedBox(height: 12),
-                        if (_authRequired)
-                          FilledButton.icon(
-                            onPressed: _verifySyncAndReload,
-                            icon: const Icon(Icons.verified_user),
-                            label: const Text('Verify Google Sync'),
-                          )
-                        else
+    return WillPopScope(
+      onWillPop: _onWillPop,
+      child: BaseScaffold(
+        title: 'Dashboard',
+        actions: [
+          IconButton(onPressed: _load, icon: const Icon(Icons.refresh)),
+          PopupMenuButton<String>(
+            onSelected: _handleAction,
+            itemBuilder: (context) => [
+              const PopupMenuItem(
+                  value: 'donation', child: Text('Quick Donation Entry')),
+              const PopupMenuItem(
+                  value: 'expense', child: Text('Quick Expense Entry')),
+              const PopupMenuDivider(),
+              const PopupMenuItem(value: 'salary', child: Text('Open Salary')),
+              const PopupMenuItem(
+                  value: 'scholarship', child: Text('Open Scholarship')),
+              const PopupMenuItem(
+                  value: 'beneficiaries', child: Text('Open Beneficiaries')),
+              const PopupMenuItem(
+                  value: 'reports', child: Text('Open Reports')),
+              if (SessionService.role == 'ADMIN')
+                const PopupMenuItem(
+                    value: 'settings', child: Text('Open Settings')),
+            ],
+          ),
+        ],
+        body: _loading
+            ? const Center(child: CircularProgressIndicator())
+            : _error != null
+                ? Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(20),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(_error!, textAlign: TextAlign.center),
+                          const SizedBox(height: 12),
                           OutlinedButton.icon(
                             onPressed: _load,
                             icon: const Icon(Icons.refresh),
                             label: const Text('Retry'),
                           ),
-                      ],
+                        ],
+                      ),
                     ),
+                  )
+                : ListView(
+                    padding: const EdgeInsets.all(16),
+                    children: [
+                      Card(
+                        child: Padding(
+                          padding: const EdgeInsets.all(14),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                  'Assalamu Alaikum, ${SessionService.userName}',
+                                  style: const TextStyle(
+                                      fontWeight: FontWeight.w700)),
+                              const SizedBox(height: 4),
+                              Text(
+                                  'Role: ${SessionService.role} • Gmail: ${SessionService.user?.email ?? ''}',
+                                  style:
+                                      TextStyle(color: Colors.grey.shade700)),
+                            ],
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      GridView.count(
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        crossAxisCount: 2,
+                        mainAxisSpacing: 10,
+                        crossAxisSpacing: 10,
+                        childAspectRatio: 1.8,
+                        children: [
+                          _MetricTile(
+                              title: 'Total Fund',
+                              value: _format(_summary?.balance ?? 0),
+                              color: Colors.teal),
+                          _MetricTile(
+                              title: 'Total Jakat Fund',
+                              value: _format(jakat.incoming),
+                              color: Colors.indigo),
+                          _MetricTile(
+                              title: 'Jakat Expenses',
+                              value: _format(jakat.outgoing),
+                              color: Colors.redAccent),
+                          _MetricTile(
+                              title: 'Overall Expense',
+                              value: _format(_summary?.totalOut ?? 0),
+                              color: Colors.orange),
+                          _MetricTile(
+                              title: 'Construction Balance',
+                              value: _format(construction.balance),
+                              color: Colors.blue),
+                          _MetricTile(
+                              title: 'Scholarship Balance',
+                              value: _format(scholarship.balance),
+                              color: Colors.purple),
+                          _MetricTile(
+                              title: 'General Balance',
+                              value: _format(general.balance),
+                              color: Colors.green),
+                          _MetricTile(
+                              title: 'Total Collection',
+                              value: _format(_summary?.totalIn ?? 0),
+                              color: Colors.brown),
+                        ],
+                      ),
+                      const SizedBox(height: 14),
+                      const Text('Fund Flow Details',
+                          style: TextStyle(fontWeight: FontWeight.bold)),
+                      const SizedBox(height: 8),
+                      ...(_summary?.byFund.entries ?? []).map(
+                        (e) => Card(
+                          child: ListTile(
+                            title: Text(e.key),
+                            subtitle: Text(
+                                'In: ${_format(e.value.incoming)} | Out: ${_format(e.value.outgoing)}'),
+                            trailing: Text(_format(e.value.balance),
+                                style: const TextStyle(
+                                    fontWeight: FontWeight.bold)),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
-                )
-              : ListView(
-                  padding: const EdgeInsets.all(16),
-                  children: [
-                    Card(
-                      child: Padding(
-                        padding: const EdgeInsets.all(14),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text('Assalamu Alaikum, ${SessionService.userName}', style: const TextStyle(fontWeight: FontWeight.w700)),
-                            const SizedBox(height: 4),
-                            Text('Role: ${SessionService.role} • Gmail: ${SessionService.user?.email ?? ''}', style: TextStyle(color: Colors.grey.shade700)),
-                          ],
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 10),
-                    GridView.count(
-                      shrinkWrap: true,
-                      physics: const NeverScrollableScrollPhysics(),
-                      crossAxisCount: 2,
-                      mainAxisSpacing: 10,
-                      crossAxisSpacing: 10,
-                      childAspectRatio: 1.8,
-                      children: [
-                        _MetricTile(title: 'Total Fund', value: _format(_summary?.balance ?? 0), color: Colors.teal),
-                        _MetricTile(title: 'Total Jakat Fund', value: _format(jakat.incoming), color: Colors.indigo),
-                        _MetricTile(title: 'Jakat Expenses', value: _format(jakat.outgoing), color: Colors.redAccent),
-                        _MetricTile(title: 'Overall Expense', value: _format(_summary?.totalOut ?? 0), color: Colors.orange),
-                        _MetricTile(title: 'Construction Balance', value: _format(construction.balance), color: Colors.blue),
-                        _MetricTile(title: 'Scholarship Balance', value: _format(scholarship.balance), color: Colors.purple),
-                        _MetricTile(title: 'General Balance', value: _format(general.balance), color: Colors.green),
-                        _MetricTile(title: 'Total Collection', value: _format(_summary?.totalIn ?? 0), color: Colors.brown),
-                      ],
-                    ),
-                    const SizedBox(height: 14),
-                    const Text('Fund Flow Details', style: TextStyle(fontWeight: FontWeight.bold)),
-                    const SizedBox(height: 8),
-                    ...(_summary?.byFund.entries ?? []).map(
-                      (e) => Card(
-                        child: ListTile(
-                          title: Text(e.key),
-                          subtitle: Text('In: ${_format(e.value.incoming)} | Out: ${_format(e.value.outgoing)}'),
-                          trailing: Text(_format(e.value.balance), style: const TextStyle(fontWeight: FontWeight.bold)),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
+      ),
     );
   }
 }
@@ -340,7 +369,8 @@ class _MetricTile extends StatelessWidget {
   final String value;
   final Color color;
 
-  const _MetricTile({required this.title, required this.value, required this.color});
+  const _MetricTile(
+      {required this.title, required this.value, required this.color});
 
   @override
   Widget build(BuildContext context) {
@@ -355,12 +385,16 @@ class _MetricTile extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Text(title, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 12, color: color.withOpacity(0.95))),
+          Text(title,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(fontSize: 12, color: color.withOpacity(0.95))),
           const SizedBox(height: 5),
-          Text(value, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+          Text(value,
+              style:
+                  const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
         ],
       ),
     );
   }
 }
-

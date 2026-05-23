@@ -36,7 +36,8 @@ class ApiService {
   };
   bool _usersColumnsEnsured = false;
 
-  Future<Map<String, dynamic>> get(String action, {Map<String, String>? query}) async {
+  Future<Map<String, dynamic>> get(String action,
+      {Map<String, String>? query}) async {
     final authQuery = _authQuery();
     final scopedQuery = {...authQuery, ...?query};
     final cacheKey = _cacheKey(action, scopedQuery);
@@ -49,13 +50,7 @@ class ApiService {
       return res;
     } catch (e) {
       final err = e.toString();
-      if (err.contains('Google authorization required')) {
-        return {
-          'ok': false,
-          'auth_required': true,
-          'message': 'Sync access is not verified for this Gmail. Please verify Google Sync first.',
-        };
-      }
+      final authError = err.contains('Google authorization required');
 
       final cached = LocalStoreService.readCachedGetResponse(cacheKey);
       if (cached != null) {
@@ -80,7 +75,9 @@ class ApiService {
       return {
         'ok': false,
         'offline': true,
-        'message': 'No internet and no cached data available',
+        'message': authError
+            ? 'Google Sheets access missing for this Gmail. Use a Gmail that is shared on the sheet.'
+            : 'No internet and no cached data available',
       };
     }
   }
@@ -94,13 +91,7 @@ class ApiService {
       return await _handlePost(action, payload);
     } catch (e) {
       final err = e.toString();
-      if (err.contains('Google authorization required')) {
-        return {
-          'ok': false,
-          'auth_required': true,
-          'message': 'Google Sync verification required for this Gmail',
-        };
-      }
+      final authError = err.contains('Google authorization required');
 
       if (allowQueue && _queueableActions.contains(action)) {
         await LocalStoreService.appendPendingPost({
@@ -118,12 +109,15 @@ class ApiService {
       return {
         'ok': false,
         'offline': true,
-        'message': 'Request failed in offline mode',
+        'message': authError
+            ? 'Google Sheets access missing for this Gmail. Use a Gmail that is shared on the sheet.'
+            : 'Request failed in offline mode',
       };
     }
   }
 
-  Future<Map<String, dynamic>> _handleGet(String action, Map<String, String> query) async {
+  Future<Map<String, dynamic>> _handleGet(
+      String action, Map<String, String> query) async {
     switch (action) {
       case 'health':
         return {
@@ -167,44 +161,56 @@ class ApiService {
     }
   }
 
-  Future<Map<String, dynamic>> _handlePost(String action, Map<String, dynamic> payload) async {
+  Future<Map<String, dynamic>> _handlePost(
+      String action, Map<String, dynamic> payload) async {
     switch (action) {
       case 'login':
         return _login(payload);
 
       case 'createTransaction':
-        _assertRole(payload['user_role'], const ['ADMIN', 'ACCOUNTANT', 'FIELD_USER']);
-        return _createTransaction(Map<String, dynamic>.from(payload['payload'] as Map? ?? {}));
+        _assertRole(
+            payload['user_role'], const ['ADMIN', 'ACCOUNTANT', 'FIELD_USER']);
+        return _createTransaction(
+            Map<String, dynamic>.from(payload['payload'] as Map? ?? {}));
 
       case 'upsertUser':
         _assertRole(payload['user_role'], const ['ADMIN']);
-        return _upsertUser(Map<String, dynamic>.from(payload['payload'] as Map? ?? {}));
+        return _upsertUser(
+            Map<String, dynamic>.from(payload['payload'] as Map? ?? {}));
       case 'setUserApprovalStatus':
         _assertRole(payload['user_role'], const ['ADMIN']);
-        return _setUserApprovalStatus(Map<String, dynamic>.from(payload['payload'] as Map? ?? {}));
+        return _setUserApprovalStatus(
+            Map<String, dynamic>.from(payload['payload'] as Map? ?? {}));
       case 'generateTempResetToken':
         _assertRole(payload['user_role'], const ['ADMIN']);
-        return _generateTempResetToken(Map<String, dynamic>.from(payload['payload'] as Map? ?? {}));
+        return _generateTempResetToken(
+            Map<String, dynamic>.from(payload['payload'] as Map? ?? {}));
       case 'signupRequest':
-        return _signupRequest(Map<String, dynamic>.from(payload['payload'] as Map? ?? {}));
+        return _signupRequest(
+            Map<String, dynamic>.from(payload['payload'] as Map? ?? {}));
       case 'consumeTempResetToken':
-        return _consumeTempResetToken(Map<String, dynamic>.from(payload['payload'] as Map? ?? {}));
+        return _consumeTempResetToken(
+            Map<String, dynamic>.from(payload['payload'] as Map? ?? {}));
 
       case 'upsertBeneficiary':
         _assertRole(payload['user_role'], const ['ADMIN', 'ACCOUNTANT']);
-        return _upsertById(_beneficiariesSheet, Map<String, dynamic>.from(payload['payload'] as Map? ?? {}));
+        return _upsertById(_beneficiariesSheet,
+            Map<String, dynamic>.from(payload['payload'] as Map? ?? {}));
 
       case 'upsertStaff':
         _assertRole(payload['user_role'], const ['ADMIN', 'ACCOUNTANT']);
-        return _upsertById(_staffSheet, Map<String, dynamic>.from(payload['payload'] as Map? ?? {}));
+        return _upsertById(_staffSheet,
+            Map<String, dynamic>.from(payload['payload'] as Map? ?? {}));
 
       case 'recordSalaryPayment':
         _assertRole(payload['user_role'], const ['ADMIN', 'ACCOUNTANT']);
-        return _recordSalaryPayment(Map<String, dynamic>.from(payload['payload'] as Map? ?? {}));
+        return _recordSalaryPayment(
+            Map<String, dynamic>.from(payload['payload'] as Map? ?? {}));
 
       case 'saveScholarshipPayment':
         _assertRole(payload['user_role'], const ['ADMIN', 'ACCOUNTANT']);
-        return _saveScholarshipPayment(Map<String, dynamic>.from(payload['payload'] as Map? ?? {}));
+        return _saveScholarshipPayment(
+            Map<String, dynamic>.from(payload['payload'] as Map? ?? {}));
 
       default:
         return {'ok': false, 'message': 'Unknown action'};
@@ -219,7 +225,8 @@ class ApiService {
       var users = await _readRows(_usersSheet);
 
       // First-time bootstrap: if users sheet is empty, allow configured bootstrap admin Gmail.
-      if (users.isEmpty && email == AppConfig.bootstrapAdminEmail.trim().toLowerCase()) {
+      if (users.isEmpty &&
+          email == AppConfig.bootstrapAdminEmail.trim().toLowerCase()) {
         final boot = await _upsertById(_usersSheet, {
           'id': 'u_admin_bootstrap',
           'name': AppConfig.bootstrapAdminName,
@@ -259,15 +266,27 @@ class ApiService {
         }
         final state = _approvalStatusOf(anyState);
         if (state == 'PENDING') {
-          return {'ok': false, 'message': 'Your sign-up request is pending admin approval'};
+          return {
+            'ok': false,
+            'message': 'Your sign-up request is pending admin approval'
+          };
         }
         if (state == 'REJECTED') {
-          return {'ok': false, 'message': 'Your account request was rejected by admin'};
+          return {
+            'ok': false,
+            'message': 'Your account request was rejected by admin'
+          };
         }
         if (state == 'BLOCKED') {
-          return {'ok': false, 'message': 'Your account is blocked. Contact admin'};
+          return {
+            'ok': false,
+            'message': 'Your account is blocked. Contact admin'
+          };
         }
-        return {'ok': false, 'message': 'This Gmail is inactive or not approved'};
+        return {
+          'ok': false,
+          'message': 'This Gmail is inactive or not approved'
+        };
       }
 
       return {
@@ -282,12 +301,13 @@ class ApiService {
         },
       };
     } catch (_) {
-      final isBootstrapAdmin = email == AppConfig.bootstrapAdminEmail.trim().toLowerCase();
+      final isBootstrapAdmin =
+          email == AppConfig.bootstrapAdminEmail.trim().toLowerCase();
       if (isBootstrapAdmin) {
         return {
           'ok': true,
           'sync_pending': true,
-          'message': 'Logged in as bootstrap admin (sync not verified yet)',
+          'message': 'Logged in as bootstrap admin (sheet connection pending)',
           'data': {
             'id': 'u_admin_bootstrap_local',
             'name': AppConfig.bootstrapAdminName,
@@ -300,13 +320,16 @@ class ApiService {
       }
       return {
         'ok': false,
-        'message': 'Google sync not verified yet. Please use "Verify Google Sync" once, then sign in.',
+        'message':
+            'Google Sheets access failed. Sign in with a Gmail that has access to this sheet.',
       };
     }
   }
 
-  Future<Map<String, dynamic>> _listTransactions(Map<String, String> query) async {
-    _assertRole(query['user_role'], const ['ADMIN', 'ACCOUNTANT', 'FIELD_USER', 'VIEWER']);
+  Future<Map<String, dynamic>> _listTransactions(
+      Map<String, String> query) async {
+    _assertRole(query['user_role'],
+        const ['ADMIN', 'ACCOUNTANT', 'FIELD_USER', 'VIEWER']);
     final role = (query['user_role'] ?? '').trim();
     final userId = (query['user_id'] ?? '').trim();
 
@@ -319,25 +342,34 @@ class ApiService {
     final to = (query['to'] ?? '').trim();
 
     final filtered = rows.where((r) {
-      if (fundType.isNotEmpty && (r['fund_type'] ?? '').toString() != fundType) return false;
-      if (direction.isNotEmpty && (r['direction'] ?? '').toString() != direction) return false;
+      if (fundType.isNotEmpty && (r['fund_type'] ?? '').toString() != fundType)
+        return false;
+      if (direction.isNotEmpty &&
+          (r['direction'] ?? '').toString() != direction) return false;
       final txnDate = (r['txn_date'] ?? '').toString();
       if (from.isNotEmpty && txnDate.compareTo(from) < 0) return false;
       if (to.isNotEmpty && txnDate.compareTo(to) > 0) return false;
-      if ((r['status'] ?? 'ACTIVE').toString().toUpperCase() == 'VOID') return false;
-      if (role == 'FIELD_USER' && (r['created_by'] ?? '').toString() != userId) return false;
+      if ((r['status'] ?? 'ACTIVE').toString().toUpperCase() == 'VOID')
+        return false;
+      if (role == 'FIELD_USER' && (r['created_by'] ?? '').toString() != userId)
+        return false;
       return true;
     }).toList();
 
-    filtered.sort((a, b) => (b['txn_date'] ?? '').toString().compareTo((a['txn_date'] ?? '').toString()));
+    filtered.sort((a, b) => (b['txn_date'] ?? '')
+        .toString()
+        .compareTo((a['txn_date'] ?? '').toString()));
     return {'ok': true, 'data': filtered};
   }
 
-  Future<Map<String, dynamic>> _dashboardSummary(Map<String, String> query) async {
+  Future<Map<String, dynamic>> _dashboardSummary(
+      Map<String, String> query) async {
     final txRes = await _listTransactions(query);
     if (txRes['ok'] != true) return txRes;
 
-    final txns = ((txRes['data'] as List?) ?? []).map((e) => Map<String, dynamic>.from(e as Map)).toList();
+    final txns = ((txRes['data'] as List?) ?? [])
+        .map((e) => Map<String, dynamic>.from(e as Map))
+        .toList();
 
     final summary = <String, dynamic>{
       'totalIn': 0.0,
@@ -377,8 +409,12 @@ class ApiService {
     final txRes = await _listTransactions(query);
     if (txRes['ok'] != true) return txRes;
 
-    final txns = ((txRes['data'] as List?) ?? []).map((e) => Map<String, dynamic>.from(e as Map)).toList();
-    final monthly = txns.where((t) => (t['txn_date'] ?? '').toString().startsWith(monthKey)).toList();
+    final txns = ((txRes['data'] as List?) ?? [])
+        .map((e) => Map<String, dynamic>.from(e as Map))
+        .toList();
+    final monthly = txns
+        .where((t) => (t['txn_date'] ?? '').toString().startsWith(monthKey))
+        .toList();
 
     var totalIn = 0.0;
     var totalOut = 0.0;
@@ -406,7 +442,8 @@ class ApiService {
     };
   }
 
-  Future<Map<String, dynamic>> _listBeneficiaries(Map<String, String> query) async {
+  Future<Map<String, dynamic>> _listBeneficiaries(
+      Map<String, String> query) async {
     _assertRole(query['user_role'], const ['ADMIN', 'ACCOUNTANT', 'VIEWER']);
     final rows = await _readRows(_beneficiariesSheet, normalizeLegacy: true);
     return {'ok': true, 'data': rows};
@@ -441,7 +478,8 @@ class ApiService {
     }
 
     final id = (payload['id'] ?? '').toString().trim();
-    final createId = id.isNotEmpty ? id : 'u_${DateTime.now().millisecondsSinceEpoch}';
+    final createId =
+        id.isNotEmpty ? id : 'u_${DateTime.now().millisecondsSinceEpoch}';
 
     final userPayload = {
       'id': createId,
@@ -449,8 +487,12 @@ class ApiService {
       'phone': (payload['phone'] ?? '').toString().trim(),
       'email': email,
       'role': role,
-      'active': ((payload['active'] ?? 'TRUE').toString().toUpperCase() == 'FALSE') ? 'FALSE' : 'TRUE',
-      'approval_status': _normalizeApprovalStatus(payload['approval_status']) ?? 'APPROVED',
+      'active':
+          ((payload['active'] ?? 'TRUE').toString().toUpperCase() == 'FALSE')
+              ? 'FALSE'
+              : 'TRUE',
+      'approval_status':
+          _normalizeApprovalStatus(payload['approval_status']) ?? 'APPROVED',
       'pin_hash': (payload['pin_hash'] ?? '').toString(),
     };
 
@@ -463,7 +505,8 @@ class ApiService {
     return res;
   }
 
-  Future<Map<String, dynamic>> _setUserApprovalStatus(Map<String, dynamic> payload) async {
+  Future<Map<String, dynamic>> _setUserApprovalStatus(
+      Map<String, dynamic> payload) async {
     await _ensureUsersSheetColumns();
     final id = (payload['id'] ?? '').toString().trim();
     final nextState = _normalizeApprovalStatus(payload['approval_status']);
@@ -473,7 +516,8 @@ class ApiService {
 
     final table = await _readTable(_usersSheet);
     final idIndex = table.headers.indexOf('id');
-    if (idIndex == -1) return {'ok': false, 'message': 'No id column in users_roles'};
+    if (idIndex == -1)
+      return {'ok': false, 'message': 'No id column in users_roles'};
 
     List<dynamic>? match;
     for (final row in table.rawRows) {
@@ -486,7 +530,11 @@ class ApiService {
     if (match == null) return {'ok': false, 'message': 'User not found'};
 
     final current = _rowToObj(table.headers, match);
-    final active = nextState == 'APPROVED' ? 'TRUE' : (nextState == 'BLOCKED' ? 'FALSE' : (current['active'] ?? 'FALSE').toString());
+    final active = nextState == 'APPROVED'
+        ? 'TRUE'
+        : (nextState == 'BLOCKED'
+            ? 'FALSE'
+            : (current['active'] ?? 'FALSE').toString());
     return _upsertById(_usersSheet, {
       'id': id,
       'name': (current['name'] ?? '').toString(),
@@ -501,12 +549,14 @@ class ApiService {
     });
   }
 
-  Future<Map<String, dynamic>> _signupRequest(Map<String, dynamic> payload) async {
+  Future<Map<String, dynamic>> _signupRequest(
+      Map<String, dynamic> payload) async {
     await _ensureUsersSheetColumns();
     final email = (payload['email'] ?? '').toString().trim().toLowerCase();
     final name = (payload['name'] ?? '').toString().trim();
     final phone = (payload['phone'] ?? '').toString().trim();
-    final requestedRole = (payload['requested_role'] ?? 'VIEWER').toString().trim();
+    final requestedRole =
+        (payload['requested_role'] ?? 'VIEWER').toString().trim();
 
     if (email.isEmpty || name.isEmpty) {
       return {'ok': false, 'message': 'name and email required'};
@@ -522,10 +572,17 @@ class ApiService {
     if (existing.isNotEmpty) {
       final status = _approvalStatusOf(existing);
       if (status == 'APPROVED' && _isActive(existing['active'])) {
-        return {'ok': false, 'message': 'This Gmail is already approved. Please sign in.'};
+        return {
+          'ok': false,
+          'message': 'This Gmail is already approved. Please sign in.'
+        };
       }
       if (status == 'PENDING') {
-        return {'ok': true, 'message': 'Your sign-up request is already pending', 'data': {'status': 'PENDING'}};
+        return {
+          'ok': true,
+          'message': 'Your sign-up request is already pending',
+          'data': {'status': 'PENDING'}
+        };
       }
       final id = (existing['id'] ?? '').toString().trim();
       if (id.isNotEmpty) {
@@ -542,7 +599,11 @@ class ApiService {
           'reset_token_expires_at': '',
         });
         if (updated['ok'] == true) {
-          return {'ok': true, 'message': 'Sign-up request submitted. Wait for admin approval.', 'data': {'status': 'PENDING'}};
+          return {
+            'ok': true,
+            'message': 'Sign-up request submitted. Wait for admin approval.',
+            'data': {'status': 'PENDING'}
+          };
         }
         return updated;
       }
@@ -563,20 +624,27 @@ class ApiService {
       'reset_token_expires_at': '',
     });
     if (created['ok'] == true) {
-      return {'ok': true, 'message': 'Sign-up request submitted. Wait for admin approval.', 'data': {'status': 'PENDING'}};
+      return {
+        'ok': true,
+        'message': 'Sign-up request submitted. Wait for admin approval.',
+        'data': {'status': 'PENDING'}
+      };
     }
     return created;
   }
 
-  Future<Map<String, dynamic>> _generateTempResetToken(Map<String, dynamic> payload) async {
+  Future<Map<String, dynamic>> _generateTempResetToken(
+      Map<String, dynamic> payload) async {
     await _ensureUsersSheetColumns();
     final id = (payload['id'] ?? '').toString().trim();
-    final minutes = int.tryParse((payload['expires_in_minutes'] ?? '30').toString()) ?? 30;
+    final minutes =
+        int.tryParse((payload['expires_in_minutes'] ?? '30').toString()) ?? 30;
     if (id.isEmpty) return {'ok': false, 'message': 'id required'};
 
     final table = await _readTable(_usersSheet);
     final idIndex = table.headers.indexOf('id');
-    if (idIndex == -1) return {'ok': false, 'message': 'No id column in users_roles'};
+    if (idIndex == -1)
+      return {'ok': false, 'message': 'No id column in users_roles'};
 
     List<dynamic>? match;
     for (final row in table.rawRows) {
@@ -590,7 +658,10 @@ class ApiService {
 
     final current = _rowToObj(table.headers, match);
     final token = _makeResetToken();
-    final expiresAt = DateTime.now().add(Duration(minutes: minutes)).toUtc().toIso8601String();
+    final expiresAt = DateTime.now()
+        .add(Duration(minutes: minutes))
+        .toUtc()
+        .toIso8601String();
     final updated = await _upsertById(_usersSheet, {
       'id': id,
       'name': (current['name'] ?? '').toString(),
@@ -617,7 +688,8 @@ class ApiService {
     return updated;
   }
 
-  Future<Map<String, dynamic>> _consumeTempResetToken(Map<String, dynamic> payload) async {
+  Future<Map<String, dynamic>> _consumeTempResetToken(
+      Map<String, dynamic> payload) async {
     await _ensureUsersSheetColumns();
     final email = (payload['email'] ?? '').toString().trim().toLowerCase();
     final token = (payload['token'] ?? '').toString().trim();
@@ -631,17 +703,24 @@ class ApiService {
       (u) => (u['email'] ?? '').toString().trim().toLowerCase() == email,
       orElse: () => <String, dynamic>{},
     );
-    if (user.isEmpty) return {'ok': false, 'message': 'No account found for this Gmail'};
+    if (user.isEmpty)
+      return {'ok': false, 'message': 'No account found for this Gmail'};
 
     final storedHash = (user['reset_token_hash'] ?? '').toString();
     final storedExp = (user['reset_token_expires_at'] ?? '').toString();
     if (storedHash.isEmpty || storedExp.isEmpty) {
-      return {'ok': false, 'message': 'No temporary token found. Ask admin for a new one.'};
+      return {
+        'ok': false,
+        'message': 'No temporary token found. Ask admin for a new one.'
+      };
     }
 
     final exp = DateTime.tryParse(storedExp)?.toUtc();
     if (exp == null || DateTime.now().toUtc().isAfter(exp)) {
-      return {'ok': false, 'message': 'Temporary token expired. Ask admin for a new one.'};
+      return {
+        'ok': false,
+        'message': 'Temporary token expired. Ask admin for a new one.'
+      };
     }
 
     if (_sha256(token) != storedHash) {
@@ -678,41 +757,53 @@ class ApiService {
     return {'ok': true, 'data': rows};
   }
 
-  Future<Map<String, dynamic>> _listSalaryPayments(Map<String, String> query) async {
+  Future<Map<String, dynamic>> _listSalaryPayments(
+      Map<String, String> query) async {
     _assertRole(query['user_role'], const ['ADMIN', 'ACCOUNTANT', 'VIEWER']);
     final monthKey = (query['monthKey'] ?? '').trim();
     final staffId = (query['staffId'] ?? '').trim();
 
     final rows = await _readRows(_salarySheet);
     final filtered = rows.where((r) {
-      if (monthKey.isNotEmpty && (r['month_key'] ?? '').toString() != monthKey) return false;
-      if (staffId.isNotEmpty && (r['staff_id'] ?? '').toString() != staffId) return false;
+      if (monthKey.isNotEmpty && (r['month_key'] ?? '').toString() != monthKey)
+        return false;
+      if (staffId.isNotEmpty && (r['staff_id'] ?? '').toString() != staffId)
+        return false;
       return true;
     }).toList();
 
-    filtered.sort((a, b) => (b['payment_date'] ?? '').toString().compareTo((a['payment_date'] ?? '').toString()));
+    filtered.sort((a, b) => (b['payment_date'] ?? '')
+        .toString()
+        .compareTo((a['payment_date'] ?? '').toString()));
     return {'ok': true, 'data': filtered};
   }
 
-  Future<Map<String, dynamic>> _listScholarshipByMonth(Map<String, String> query) async {
+  Future<Map<String, dynamic>> _listScholarshipByMonth(
+      Map<String, String> query) async {
     _assertRole(query['user_role'], const ['ADMIN', 'ACCOUNTANT', 'VIEWER']);
     final monthKey = (query['monthKey'] ?? '').trim();
     final beneficiaryId = (query['beneficiaryId'] ?? '').trim();
 
     final rows = await _readRows(_scholarPaySheet, normalizeLegacy: true);
     final filtered = rows.where((r) {
-      if (monthKey.isNotEmpty && (r['month_key'] ?? '').toString() != monthKey) return false;
-      if (beneficiaryId.isNotEmpty && (r['beneficiary_id'] ?? '').toString() != beneficiaryId) return false;
+      if (monthKey.isNotEmpty && (r['month_key'] ?? '').toString() != monthKey)
+        return false;
+      if (beneficiaryId.isNotEmpty &&
+          (r['beneficiary_id'] ?? '').toString() != beneficiaryId) return false;
       return true;
     }).toList();
 
-    filtered.sort((a, b) => (b['payment_date'] ?? '').toString().compareTo((a['payment_date'] ?? '').toString()));
+    filtered.sort((a, b) => (b['payment_date'] ?? '')
+        .toString()
+        .compareTo((a['payment_date'] ?? '').toString()));
     return {'ok': true, 'data': filtered};
   }
 
-  Future<Map<String, dynamic>> _createTransaction(Map<String, dynamic> payload) async {
+  Future<Map<String, dynamic>> _createTransaction(
+      Map<String, dynamic> payload) async {
     final row = {
-      'id': (payload['id'] ?? 'txn_${DateTime.now().millisecondsSinceEpoch}').toString(),
+      'id': (payload['id'] ?? 'txn_${DateTime.now().millisecondsSinceEpoch}')
+          .toString(),
       'txn_date': (payload['txn_date'] ?? '').toString(),
       'direction': (payload['direction'] ?? '').toString(),
       'fund_type': (payload['fund_type'] ?? '').toString(),
@@ -729,22 +820,28 @@ class ApiService {
       'updated_at': DateTime.now().toIso8601String(),
     };
 
-    if ((row['txn_date'] ?? '').toString().isEmpty) return {'ok': false, 'message': 'txn_date required'};
-    if ((row['direction'] ?? '').toString().isEmpty) return {'ok': false, 'message': 'direction required'};
-    if ((row['fund_type'] ?? '').toString().isEmpty) return {'ok': false, 'message': 'fund_type required'};
-    if (_num(row['amount']) <= 0) return {'ok': false, 'message': 'amount must be > 0'};
+    if ((row['txn_date'] ?? '').toString().isEmpty)
+      return {'ok': false, 'message': 'txn_date required'};
+    if ((row['direction'] ?? '').toString().isEmpty)
+      return {'ok': false, 'message': 'direction required'};
+    if ((row['fund_type'] ?? '').toString().isEmpty)
+      return {'ok': false, 'message': 'fund_type required'};
+    if (_num(row['amount']) <= 0)
+      return {'ok': false, 'message': 'amount must be > 0'};
 
     await _appendByHeaders(_txnSheet, row);
     return {'ok': true, 'data': row};
   }
 
-  Future<Map<String, dynamic>> _upsertById(String sheetName, Map<String, dynamic> payload) async {
+  Future<Map<String, dynamic>> _upsertById(
+      String sheetName, Map<String, dynamic> payload) async {
     final id = (payload['id'] ?? '').toString().trim();
     if (id.isEmpty) return {'ok': false, 'message': 'id required'};
 
     final table = await _readTable(sheetName);
     final idIndex = table.headers.indexOf('id');
-    if (idIndex == -1) return {'ok': false, 'message': 'No id column in $sheetName'};
+    if (idIndex == -1)
+      return {'ok': false, 'message': 'No id column in $sheetName'};
 
     int matchedRow = -1;
     List<dynamic> matched = [];
@@ -783,9 +880,11 @@ class ApiService {
     return {'ok': true, 'mode': 'update', 'data': after};
   }
 
-  Future<Map<String, dynamic>> _recordSalaryPayment(Map<String, dynamic> payload) async {
+  Future<Map<String, dynamic>> _recordSalaryPayment(
+      Map<String, dynamic> payload) async {
     final row = {
-      'id': (payload['id'] ?? 'salpay_${DateTime.now().millisecondsSinceEpoch}').toString(),
+      'id': (payload['id'] ?? 'salpay_${DateTime.now().millisecondsSinceEpoch}')
+          .toString(),
       'staff_id': (payload['staff_id'] ?? '').toString(),
       'month_key': (payload['month_key'] ?? '').toString(),
       'payable_amount': _num(payload['payable_amount']),
@@ -797,7 +896,8 @@ class ApiService {
       'notes': (payload['notes'] ?? '').toString(),
     };
 
-    if ((row['staff_id'] ?? '').toString().isEmpty || (row['month_key'] ?? '').toString().isEmpty) {
+    if ((row['staff_id'] ?? '').toString().isEmpty ||
+        (row['month_key'] ?? '').toString().isEmpty) {
       return {'ok': false, 'message': 'staff_id and month_key required'};
     }
 
@@ -808,7 +908,8 @@ class ApiService {
       'direction': 'OUT',
       'fund_type': (payload['fund_type'] ?? 'GENERAL').toString(),
       'amount': row['paid_amount'],
-      'source_or_vendor': (payload['staff_name'] ?? 'Salary Payment').toString(),
+      'source_or_vendor':
+          (payload['staff_name'] ?? 'Salary Payment').toString(),
       'category': 'SALARY',
       'notes': row['notes'],
       'related_entity_type': 'SALARY',
@@ -819,9 +920,11 @@ class ApiService {
     return {'ok': true, 'salary': row, 'transaction': txn['data']};
   }
 
-  Future<Map<String, dynamic>> _saveScholarshipPayment(Map<String, dynamic> payload) async {
+  Future<Map<String, dynamic>> _saveScholarshipPayment(
+      Map<String, dynamic> payload) async {
     final row = {
-      'id': (payload['id'] ?? 'schpay_${DateTime.now().millisecondsSinceEpoch}').toString(),
+      'id': (payload['id'] ?? 'schpay_${DateTime.now().millisecondsSinceEpoch}')
+          .toString(),
       'month_key': (payload['month_key'] ?? '').toString(),
       'beneficiary_id': (payload['beneficiary_id'] ?? '').toString(),
       'school_fee': _num(payload['school_fee']),
@@ -837,7 +940,8 @@ class ApiService {
       'notes': (payload['notes'] ?? '').toString(),
     };
 
-    if ((row['month_key'] ?? '').toString().isEmpty || (row['beneficiary_id'] ?? '').toString().isEmpty) {
+    if ((row['month_key'] ?? '').toString().isEmpty ||
+        (row['beneficiary_id'] ?? '').toString().isEmpty) {
       return {'ok': false, 'message': 'month_key and beneficiary_id required'};
     }
 
@@ -848,7 +952,8 @@ class ApiService {
       'direction': 'OUT',
       'fund_type': (payload['fund_type'] ?? 'SCHOLARSHIP').toString(),
       'amount': row['total_paid'],
-      'source_or_vendor': (payload['beneficiary_name'] ?? 'Scholarship Payment').toString(),
+      'source_or_vendor':
+          (payload['beneficiary_name'] ?? 'Scholarship Payment').toString(),
       'category': 'SCHOLARSHIP_PAYMENT',
       'notes': row['notes'],
       'related_entity_type': 'SCHOLARSHIP_PAYMENT',
@@ -859,7 +964,8 @@ class ApiService {
     return {'ok': true, 'scholarshipPayment': row, 'transaction': txn['data']};
   }
 
-  Future<List<Map<String, dynamic>>> _readRows(String sheetName, {bool normalizeLegacy = false}) async {
+  Future<List<Map<String, dynamic>>> _readRows(String sheetName,
+      {bool normalizeLegacy = false}) async {
     final table = await _readTable(sheetName);
     final rows = table.rawRows.map((r) => _rowToObj(table.headers, r)).toList();
 
@@ -910,7 +1016,8 @@ class ApiService {
     return out;
   }
 
-  Future<void> _appendByHeaders(String sheetName, Map<String, dynamic> obj) async {
+  Future<void> _appendByHeaders(
+      String sheetName, Map<String, dynamic> obj) async {
     final table = await _readTable(sheetName);
     if (table.headers.isEmpty) {
       throw Exception('Sheet $sheetName has no header row');
@@ -944,7 +1051,8 @@ class ApiService {
 
   String _cacheKey(String action, Map<String, String>? query) {
     if (query == null || query.isEmpty) return action;
-    final entries = query.entries.toList()..sort((a, b) => a.key.compareTo(b.key));
+    final entries = query.entries.toList()
+      ..sort((a, b) => a.key.compareTo(b.key));
     final queryPart = entries.map((e) => '${e.key}=${e.value}').join('&');
     return '$action?$queryPart';
   }
@@ -964,7 +1072,8 @@ class ApiService {
   String _makeResetToken({int length = 8}) {
     const charset = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
     final rand = Random.secure();
-    return List.generate(length, (_) => charset[rand.nextInt(charset.length)]).join();
+    return List.generate(length, (_) => charset[rand.nextInt(charset.length)])
+        .join();
   }
 
   bool _isActive(dynamic value) {
@@ -1052,10 +1161,15 @@ class ApiService {
     final dirSet = {'IN', 'OUT'};
     final fundSet = {'CONSTRUCTION', 'JAKAT', 'SCHOLARSHIP', 'GENERAL'};
 
-    if (dirSet.contains(txnDate) && fundSet.contains(direction) && _num(fundType) > 0 && _isDateLike(id)) {
+    if (dirSet.contains(txnDate) &&
+        fundSet.contains(direction) &&
+        _num(fundType) > 0 &&
+        _isDateLike(id)) {
       return {
         ...r,
-        'id': (r['id'] ?? '').toString().startsWith('txn_') ? r['id'] : 'legacy_${id}_${direction}_${fundType}',
+        'id': (r['id'] ?? '').toString().startsWith('txn_')
+            ? r['id']
+            : 'legacy_${id}_${direction}_${fundType}',
         'txn_date': id,
         'direction': txnDate,
         'fund_type': direction,
@@ -1063,13 +1177,17 @@ class ApiService {
         'source_or_vendor': (r['amount'] ?? '').toString(),
         'category': (r['source_or_vendor'] ?? '').toString(),
         'notes': (r['category'] ?? '').toString(),
-        'status': (r['status'] ?? 'ACTIVE').toString().isEmpty ? 'ACTIVE' : r['status'].toString(),
+        'status': (r['status'] ?? 'ACTIVE').toString().isEmpty
+            ? 'ACTIVE'
+            : r['status'].toString(),
       };
     }
 
     return {
       ...r,
-      'status': (r['status'] ?? 'ACTIVE').toString().isEmpty ? 'ACTIVE' : r['status'].toString(),
+      'status': (r['status'] ?? 'ACTIVE').toString().isEmpty
+          ? 'ACTIVE'
+          : r['status'].toString(),
       'amount': _num(r['amount']),
     };
   }
@@ -1079,7 +1197,10 @@ class ApiService {
     final nameBn = (r['name_bn'] ?? '').toString();
     final age = (r['age'] ?? '').toString();
 
-    if (serialNo.isNotEmpty && nameBn.isNotEmpty && age.isNotEmpty && double.tryParse(nameBn) != null) {
+    if (serialNo.isNotEmpty &&
+        nameBn.isNotEmpty &&
+        age.isNotEmpty &&
+        double.tryParse(nameBn) != null) {
       return {
         ...r,
         'id': (r['id'] ?? '').toString(),
@@ -1091,7 +1212,9 @@ class ApiService {
         'primary_need': (r['class_name'] ?? '').toString(),
         'monthly_need': (r['primary_need'] ?? '').toString(),
         'monthly_need_amount': _num(r['monthly_need']),
-        'active': (r['monthly_need_amount'] ?? 'TRUE').toString().isEmpty ? 'TRUE' : r['monthly_need_amount'].toString(),
+        'active': (r['monthly_need_amount'] ?? 'TRUE').toString().isEmpty
+            ? 'TRUE'
+            : r['monthly_need_amount'].toString(),
       };
     }
 
@@ -1107,7 +1230,10 @@ class ApiService {
     final beneficiary = (r['month_key'] ?? '').toString();
     final schoolFee = _num(r['beneficiary_id']);
 
-    if (monthKey.startsWith('20') && beneficiary.isNotEmpty && schoolFee >= 0 && (r['payment_status'] ?? '').toString().isEmpty) {
+    if (monthKey.startsWith('20') &&
+        beneficiary.isNotEmpty &&
+        schoolFee >= 0 &&
+        (r['payment_status'] ?? '').toString().isEmpty) {
       return {
         ...r,
         'id': 'legacy_${monthKey}_${beneficiary}',
@@ -1140,7 +1266,8 @@ class ApiService {
     };
   }
 
-  Map<String, dynamic>? _offlineFallback(String action, Map<String, String> query) {
+  Map<String, dynamic>? _offlineFallback(
+      String action, Map<String, String> query) {
     if (action == 'dashboardSummary') {
       return {
         'ok': true,
@@ -1158,7 +1285,9 @@ class ApiService {
     if (action == 'monthlyReport') {
       final monthKey = (query['monthKey'] ?? '').trim();
       final txns = _queuedTransactions(query)
-          .where((r) => monthKey.isEmpty || (r['txn_date'] ?? '').toString().startsWith(monthKey))
+          .where((r) =>
+              monthKey.isEmpty ||
+              (r['txn_date'] ?? '').toString().startsWith(monthKey))
           .toList();
       var totalIn = 0.0;
       var totalOut = 0.0;
@@ -1183,46 +1312,39 @@ class ApiService {
     }
 
     if (action == 'listUsers') {
-      final list = _queuedActionPayloads('upsertUser')
-          .map((p) {
-            final envelope = Map<String, dynamic>.from(p['payload'] as Map? ?? {});
-            final row = Map<String, dynamic>.from(envelope['payload'] as Map? ?? {});
-            row.remove('pin_hash');
-            row.remove('reset_token_hash');
-            row.remove('reset_token_expires_at');
-            return row;
-          })
-          .toList();
+      final list = _queuedActionPayloads('upsertUser').map((p) {
+        final envelope = Map<String, dynamic>.from(p['payload'] as Map? ?? {});
+        final row =
+            Map<String, dynamic>.from(envelope['payload'] as Map? ?? {});
+        row.remove('pin_hash');
+        row.remove('reset_token_hash');
+        row.remove('reset_token_expires_at');
+        return row;
+      }).toList();
       return {'ok': true, 'data': list};
     }
 
     if (action == 'listBeneficiaries') {
-      final list = _queuedActionPayloads('upsertBeneficiary')
-          .map((p) {
-            final envelope = Map<String, dynamic>.from(p['payload'] as Map? ?? {});
-            return Map<String, dynamic>.from(envelope['payload'] as Map? ?? {});
-          })
-          .toList();
+      final list = _queuedActionPayloads('upsertBeneficiary').map((p) {
+        final envelope = Map<String, dynamic>.from(p['payload'] as Map? ?? {});
+        return Map<String, dynamic>.from(envelope['payload'] as Map? ?? {});
+      }).toList();
       return {'ok': true, 'data': list};
     }
 
     if (action == 'listStaff') {
-      final list = _queuedActionPayloads('upsertStaff')
-          .map((p) {
-            final envelope = Map<String, dynamic>.from(p['payload'] as Map? ?? {});
-            return Map<String, dynamic>.from(envelope['payload'] as Map? ?? {});
-          })
-          .toList();
+      final list = _queuedActionPayloads('upsertStaff').map((p) {
+        final envelope = Map<String, dynamic>.from(p['payload'] as Map? ?? {});
+        return Map<String, dynamic>.from(envelope['payload'] as Map? ?? {});
+      }).toList();
       return {'ok': true, 'data': list};
     }
 
     if (action == 'listSalaryPayments') {
-      final list = _queuedActionPayloads('recordSalaryPayment')
-          .map((p) {
-            final envelope = Map<String, dynamic>.from(p['payload'] as Map? ?? {});
-            return Map<String, dynamic>.from(envelope['payload'] as Map? ?? {});
-          })
-          .toList();
+      final list = _queuedActionPayloads('recordSalaryPayment').map((p) {
+        final envelope = Map<String, dynamic>.from(p['payload'] as Map? ?? {});
+        return Map<String, dynamic>.from(envelope['payload'] as Map? ?? {});
+      }).toList();
       return {'ok': true, 'data': list};
     }
 
@@ -1230,10 +1352,12 @@ class ApiService {
       final monthKey = (query['monthKey'] ?? '').trim();
       final list = _queuedActionPayloads('saveScholarshipPayment')
           .map((p) {
-            final envelope = Map<String, dynamic>.from(p['payload'] as Map? ?? {});
+            final envelope =
+                Map<String, dynamic>.from(p['payload'] as Map? ?? {});
             return Map<String, dynamic>.from(envelope['payload'] as Map? ?? {});
           })
-          .where((r) => monthKey.isEmpty || (r['month_key'] ?? '').toString() == monthKey)
+          .where((r) =>
+              monthKey.isEmpty || (r['month_key'] ?? '').toString() == monthKey)
           .toList();
       return {'ok': true, 'data': list};
     }
@@ -1262,9 +1386,11 @@ class ApiService {
 
     for (final item in queue) {
       final envelope = Map<String, dynamic>.from(item['payload'] as Map? ?? {});
-      final payload = Map<String, dynamic>.from(envelope['payload'] as Map? ?? {});
+      final payload =
+          Map<String, dynamic>.from(envelope['payload'] as Map? ?? {});
       final row = {
-        'id': payload['id'] ?? 'offline_${item['queued_at'] ?? DateTime.now().toIso8601String()}',
+        'id': payload['id'] ??
+            'offline_${item['queued_at'] ?? DateTime.now().toIso8601String()}',
         'txn_date': payload['txn_date'] ?? '',
         'direction': payload['direction'] ?? '',
         'fund_type': payload['fund_type'] ?? '',
@@ -1280,17 +1406,22 @@ class ApiService {
     }
 
     final scoped = rows.where((r) {
-      if (role == 'FIELD_USER' && (r['created_by'] ?? '').toString() != userId) return false;
+      if (role == 'FIELD_USER' && (r['created_by'] ?? '').toString() != userId)
+        return false;
       if (role == 'VIEWER') return false;
-      if (direction.isNotEmpty && (r['direction'] ?? '').toString() != direction) return false;
-      if (fundType.isNotEmpty && (r['fund_type'] ?? '').toString() != fundType) return false;
+      if (direction.isNotEmpty &&
+          (r['direction'] ?? '').toString() != direction) return false;
+      if (fundType.isNotEmpty && (r['fund_type'] ?? '').toString() != fundType)
+        return false;
       final d = (r['txn_date'] ?? '').toString();
       if (from.isNotEmpty && d.compareTo(from) < 0) return false;
       if (to.isNotEmpty && d.compareTo(to) > 0) return false;
       return true;
     }).toList();
 
-    scoped.sort((a, b) => (b['txn_date'] ?? '').toString().compareTo((a['txn_date'] ?? '').toString()));
+    scoped.sort((a, b) => (b['txn_date'] ?? '')
+        .toString()
+        .compareTo((a['txn_date'] ?? '').toString()));
     return scoped;
   }
 

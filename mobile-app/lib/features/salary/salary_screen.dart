@@ -35,11 +35,30 @@ class _SalaryScreenState extends State<SalaryScreen> {
     _loadAll();
   }
 
+  bool _isValidMonthKey(String value) {
+    return RegExp(r'^\d{4}-(0[1-9]|1[0-2])$').hasMatch(value.trim());
+  }
+
+  Future<void> _reloadByMonth() async {
+    final month = _monthKey.text.trim();
+    if (!_isValidMonthKey(month)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Use month format YYYY-MM')),
+      );
+      return;
+    }
+    await _loadAll();
+  }
+
   Future<void> _loadAll() async {
     setState(() => _loading = true);
     try {
       final staffRes = await _api.get('listStaff');
-      final paymentRes = await _api.get('listSalaryPayments');
+      final month = _monthKey.text.trim();
+      final paymentRes = await _api.get(
+        'listSalaryPayments',
+        query: _isValidMonthKey(month) ? {'monthKey': month} : null,
+      );
 
       if (staffRes['ok'] == true) {
         _staff = ((staffRes['data'] as List<dynamic>? ?? []).map((e) => Map<String, dynamic>.from(e as Map)).toList());
@@ -161,7 +180,14 @@ class _SalaryScreenState extends State<SalaryScreen> {
                   decoration: const InputDecoration(labelText: 'Staff'),
                 ),
                 const SizedBox(height: 8),
-                TextField(controller: _monthKey, decoration: const InputDecoration(labelText: 'Month Key (YYYY-MM)')),
+                TextField(
+                  controller: _monthKey,
+                  decoration: const InputDecoration(
+                    labelText: 'Month Key (YYYY-MM)',
+                    helperText: 'Filter and save month',
+                  ),
+                  onSubmitted: (_) => _reloadByMonth(),
+                ),
                 const SizedBox(height: 8),
                 DropdownButtonFormField<String>(
                   value: _fundType,
@@ -187,7 +213,11 @@ class _SalaryScreenState extends State<SalaryScreen> {
                   children: [
                     const Text('Recent Salary Payments', style: TextStyle(fontWeight: FontWeight.bold)),
                     const Spacer(),
-                    IconButton(onPressed: _loadAll, icon: const Icon(Icons.refresh)),
+                    IconButton(
+                      tooltip: 'Reload selected month',
+                      onPressed: _reloadByMonth,
+                      icon: const Icon(Icons.refresh),
+                    ),
                   ],
                 ),
                 ..._payments.map(

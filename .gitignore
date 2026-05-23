@@ -13,3 +13,6 @@ node_modules/
 
 # Tool outputs
 tools/output/*.csv
+
+# Local SDK / runtime cache
+.local-tools/

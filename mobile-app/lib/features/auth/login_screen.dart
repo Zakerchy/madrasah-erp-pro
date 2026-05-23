@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 
 import '../../shared/models/session_user.dart';
 import '../../shared/services/api_service.dart';
-import '../../shared/services/google_auth_service.dart';
 import '../../shared/services/session_service.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -38,7 +37,8 @@ class _LoginScreenState extends State<LoginScreen> {
       final email = _normalizedEmail;
       if (email.isEmpty || !email.contains('@')) {
         if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please enter a valid Gmail')));
+        ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Please enter a valid Gmail')));
         setState(() => _loading = false);
         return;
       }
@@ -48,26 +48,36 @@ class _LoginScreenState extends State<LoginScreen> {
       if (!mounted) return;
 
       if (res['ok'] == true) {
-        final user = SessionUser.fromMap((res['data'] ?? {}) as Map<String, dynamic>);
+        final user =
+            SessionUser.fromMap((res['data'] ?? {}) as Map<String, dynamic>);
         SessionService.setUser(user);
         await SessionService.saveOfflineCredential(
           email: email,
           googleId: '',
           user: user,
         );
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Welcome ${user.name}')));
-        Navigator.pushNamedAndRemoveUntil(context, '/dashboard', (route) => false);
-      } else if (res['offline'] == true && SessionService.loginFromOfflineCredential(email: email, googleId: '')) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Offline login successful')));
-        Navigator.pushNamedAndRemoveUntil(context, '/dashboard', (route) => false);
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('Welcome ${user.name}')));
+        Navigator.pushNamedAndRemoveUntil(
+            context, '/dashboard', (route) => false);
+      } else if (res['offline'] == true &&
+          SessionService.loginFromOfflineCredential(
+              email: email, googleId: '')) {
+        ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Offline login successful')));
+        Navigator.pushNamedAndRemoveUntil(
+            context, '/dashboard', (route) => false);
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('${res['message'] ?? res['error'] ?? 'Login failed'}')),
+          SnackBar(
+              content:
+                  Text('${res['message'] ?? res['error'] ?? 'Login failed'}')),
         );
       }
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('Error: $e')));
     }
 
     if (mounted) setState(() => _loading = false);
@@ -79,7 +89,8 @@ class _LoginScreenState extends State<LoginScreen> {
       final email = _normalizedEmail;
       if (email.isEmpty || !email.contains('@')) {
         if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Enter Gmail first, then request sign up')));
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+            content: Text('Enter Gmail first, then request sign up')));
         setState(() => _loading = false);
         return;
       }
@@ -99,11 +110,13 @@ class _LoginScreenState extends State<LoginScreen> {
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Text('Gmail: $email', style: const TextStyle(fontSize: 12)),
+                      Text('Gmail: $email',
+                          style: const TextStyle(fontSize: 12)),
                       const SizedBox(height: 8),
                       TextField(
                         controller: nameCtrl,
-                        decoration: const InputDecoration(labelText: 'Full Name'),
+                        decoration:
+                            const InputDecoration(labelText: 'Full Name'),
                       ),
                       const SizedBox(height: 8),
                       TextField(
@@ -114,20 +127,29 @@ class _LoginScreenState extends State<LoginScreen> {
                       const SizedBox(height: 8),
                       DropdownButtonFormField<String>(
                         value: requestedRole,
-                        decoration: const InputDecoration(labelText: 'Requested Role'),
+                        decoration:
+                            const InputDecoration(labelText: 'Requested Role'),
                         items: const [
-                          DropdownMenuItem(value: 'VIEWER', child: Text('VIEWER')),
-                          DropdownMenuItem(value: 'FIELD_USER', child: Text('FIELD_USER')),
-                          DropdownMenuItem(value: 'ACCOUNTANT', child: Text('ACCOUNTANT')),
+                          DropdownMenuItem(
+                              value: 'VIEWER', child: Text('VIEWER')),
+                          DropdownMenuItem(
+                              value: 'FIELD_USER', child: Text('FIELD_USER')),
+                          DropdownMenuItem(
+                              value: 'ACCOUNTANT', child: Text('ACCOUNTANT')),
                         ],
-                        onChanged: (v) => setStateDialog(() => requestedRole = v ?? 'VIEWER'),
+                        onChanged: (v) =>
+                            setStateDialog(() => requestedRole = v ?? 'VIEWER'),
                       ),
                     ],
                   ),
                 ),
                 actions: [
-                  TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
-                  FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('Submit')),
+                  TextButton(
+                      onPressed: () => Navigator.pop(context, false),
+                      child: const Text('Cancel')),
+                  FilledButton(
+                      onPressed: () => Navigator.pop(context, true),
+                      child: const Text('Submit')),
                 ],
               );
             },
@@ -144,7 +166,8 @@ class _LoginScreenState extends State<LoginScreen> {
       final res = await _api.post('signupRequest', {
         'payload': {
           'email': email,
-          'name': nameCtrl.text.trim().isEmpty ? 'New User' : nameCtrl.text.trim(),
+          'name':
+              nameCtrl.text.trim().isEmpty ? 'New User' : nameCtrl.text.trim(),
           'phone': phoneCtrl.text.trim(),
           'requested_role': requestedRole,
         }
@@ -152,11 +175,14 @@ class _LoginScreenState extends State<LoginScreen> {
 
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('${res['message'] ?? (res['ok'] == true ? 'Request submitted' : 'Request failed')}')),
+        SnackBar(
+            content: Text(
+                '${res['message'] ?? (res['ok'] == true ? 'Request submitted' : 'Request failed')}')),
       );
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('Error: $e')));
     }
     if (mounted) setState(() => _loading = false);
   }
@@ -167,7 +193,8 @@ class _LoginScreenState extends State<LoginScreen> {
       final email = _normalizedEmail;
       if (email.isEmpty || !email.contains('@')) {
         if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Enter Gmail first')));
+        ScaffoldMessenger.of(context)
+            .showSnackBar(const SnackBar(content: Text('Enter Gmail first')));
         setState(() => _loading = false);
         return;
       }
@@ -186,13 +213,18 @@ class _LoginScreenState extends State<LoginScreen> {
                 TextField(
                   controller: tokenCtrl,
                   textCapitalization: TextCapitalization.characters,
-                  decoration: const InputDecoration(labelText: 'Temporary Token'),
+                  decoration:
+                      const InputDecoration(labelText: 'Temporary Token'),
                 ),
               ],
             ),
             actions: [
-              TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
-              FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('Apply')),
+              TextButton(
+                  onPressed: () => Navigator.pop(context, false),
+                  child: const Text('Cancel')),
+              FilledButton(
+                  onPressed: () => Navigator.pop(context, true),
+                  child: const Text('Apply')),
             ],
           );
         },
@@ -206,7 +238,8 @@ class _LoginScreenState extends State<LoginScreen> {
 
       final token = tokenCtrl.text.trim().toUpperCase();
       if (token.isEmpty) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Token is required')));
+        ScaffoldMessenger.of(context)
+            .showSnackBar(const SnackBar(content: Text('Token is required')));
         setState(() => _loading = false);
         return;
       }
@@ -221,7 +254,9 @@ class _LoginScreenState extends State<LoginScreen> {
       if (!mounted) return;
       if (resetRes['ok'] != true) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('${resetRes['message'] ?? resetRes['error'] ?? 'Token verification failed'}')),
+          SnackBar(
+              content: Text(
+                  '${resetRes['message'] ?? resetRes['error'] ?? 'Token verification failed'}')),
         );
         setState(() => _loading = false);
         return;
@@ -230,64 +265,29 @@ class _LoginScreenState extends State<LoginScreen> {
       final loginRes = await _api.post('login', {'email': email});
       if (!mounted) return;
       if (loginRes['ok'] == true) {
-        final user = SessionUser.fromMap((loginRes['data'] ?? {}) as Map<String, dynamic>);
+        final user = SessionUser.fromMap(
+            (loginRes['data'] ?? {}) as Map<String, dynamic>);
         SessionService.setUser(user);
         await SessionService.saveOfflineCredential(
           email: email,
           googleId: '',
           user: user,
         );
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Access reset successful. Logged in.')));
-        Navigator.pushNamedAndRemoveUntil(context, '/dashboard', (route) => false);
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+            content: Text('Access reset successful. Logged in.')));
+        Navigator.pushNamedAndRemoveUntil(
+            context, '/dashboard', (route) => false);
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('${loginRes['message'] ?? loginRes['error'] ?? 'Login failed after reset'}')),
+          SnackBar(
+              content: Text(
+                  '${loginRes['message'] ?? loginRes['error'] ?? 'Login failed after reset'}')),
         );
       }
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
-    }
-    if (mounted) setState(() => _loading = false);
-  }
-
-  Future<void> _verifyGoogleSync() async {
-    setState(() => _loading = true);
-    try {
-      final email = _normalizedEmail;
-      if (email.isEmpty || !email.contains('@')) {
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Enter Gmail first')));
-        setState(() => _loading = false);
-        return;
-      }
-
-      final account = await GoogleAuthService.signInInteractive();
-      if (!mounted) return;
-      if (account == null) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Google verification cancelled')));
-        setState(() => _loading = false);
-        return;
-      }
-
-      final accountEmail = account.email.trim().toLowerCase();
-      if (accountEmail != email) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Google account mismatch. Use $email for sync verify.')),
-        );
-        setState(() => _loading = false);
-        return;
-      }
-
-      final client = await GoogleAuthService.authClient(trySilentSignIn: false);
-      if (client == null) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Google sync verification failed')));
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Google sync verified successfully')));
-      }
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('Error: $e')));
     }
     if (mounted) setState(() => _loading = false);
   }
@@ -305,10 +305,12 @@ class _LoginScreenState extends State<LoginScreen> {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Text('Madrasah ERP Lite', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+                  const Text('Madrasah ERP Lite',
+                      style:
+                          TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
                   const SizedBox(height: 8),
                   const Text(
-                    'First: login by Gmail only. Later: verify the same Gmail to activate Google sync.',
+                    'Sign in with Gmail. Use a Gmail that already has access to the shared sheet.',
                     textAlign: TextAlign.center,
                   ),
                   const SizedBox(height: 16),
@@ -327,18 +329,13 @@ class _LoginScreenState extends State<LoginScreen> {
                     child: FilledButton.icon(
                       onPressed: _loading ? null : _loginWithEmail,
                       icon: _loading
-                          ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                          ? const SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(strokeWidth: 2))
                           : const Icon(Icons.login),
-                      label: Text(_loading ? 'Signing in...' : 'Sign In (Gmail)'),
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  SizedBox(
-                    width: double.infinity,
-                    child: OutlinedButton.icon(
-                      onPressed: _loading ? null : _verifyGoogleSync,
-                      icon: const Icon(Icons.verified_user),
-                      label: const Text('Verify Google Sync (Later)'),
+                      label:
+                          Text(_loading ? 'Signing in...' : 'Sign In (Gmail)'),
                     ),
                   ),
                   const SizedBox(height: 8),
