@@ -47,7 +47,16 @@ class ApiService {
         await LocalStoreService.cacheGetResponse(cacheKey, res);
       }
       return res;
-    } catch (_) {
+    } catch (e) {
+      final err = e.toString();
+      if (err.contains('Google authorization required')) {
+        return {
+          'ok': false,
+          'auth_required': true,
+          'message': 'Sync access is not verified for this Gmail. Please verify Google Sync first.',
+        };
+      }
+
       final cached = LocalStoreService.readCachedGetResponse(cacheKey);
       if (cached != null) {
         return {
@@ -83,7 +92,16 @@ class ApiService {
   }) async {
     try {
       return await _handlePost(action, payload);
-    } catch (_) {
+    } catch (e) {
+      final err = e.toString();
+      if (err.contains('Google authorization required')) {
+        return {
+          'ok': false,
+          'auth_required': true,
+          'message': 'Google Sync verification required for this Gmail',
+        };
+      }
+
       if (allowQueue && _queueableActions.contains(action)) {
         await LocalStoreService.appendPendingPost({
           'action': action,

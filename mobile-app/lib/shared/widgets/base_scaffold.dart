@@ -22,10 +22,13 @@ class BaseScaffold extends StatelessWidget {
             onPressed: () async {
               final res = await SyncService.syncPending();
               if (!context.mounted) return;
+              final authRequired = res['auth_required'] == true;
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
                   content: Text(
-                    'Synced: ${res['synced'] ?? 0}, Pending: ${res['remaining'] ?? 0}',
+                    authRequired
+                        ? 'Sync প্রয়োজন: আগে একই Gmail দিয়ে Google Sync verify করুন'
+                        : 'Synced: ${res['synced'] ?? 0}, Pending: ${res['remaining'] ?? 0}',
                   ),
                 ),
               );

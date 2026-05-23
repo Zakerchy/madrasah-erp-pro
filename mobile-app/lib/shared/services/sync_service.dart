@@ -13,6 +13,7 @@ class SyncService {
     final api = ApiService();
     final remaining = <Map<String, dynamic>>[];
     var synced = 0;
+    var authRequired = false;
 
     for (final item in queue) {
       final action = (item['action'] ?? '').toString();
@@ -21,6 +22,7 @@ class SyncService {
       if (res['ok'] == true) {
         synced++;
       } else {
+        if (res['auth_required'] == true) authRequired = true;
         remaining.add(item);
       }
     }
@@ -30,6 +32,7 @@ class SyncService {
       'ok': true,
       'synced': synced,
       'remaining': remaining.length,
+      'auth_required': authRequired,
     };
   }
 }
