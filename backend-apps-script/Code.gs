@@ -31,7 +31,16 @@ const CONFIG = {
 // can use HTTP POST for all requests (simpler client code).
 function doGet(e) {
   try {
-    return handleRequest_((e && e.parameter) || {});
+    const params = (e && e.parameter) || {};
+    if (params.action === 'resetPinForm') return servePinResetForm_(params);
+    if (params.action === 'confirmPinReset') {
+      const r = confirmPinReset_(params);
+      const msg = r.ok
+        ? '<h2 style="color:#166534">✅ পিন রিসেট সফল হয়েছে</h2><p>ব্যবহারকারীকে নতুন পিন জানিয়ে দিন।</p>'
+        : '<h2 style="color:#991b1b">❌ ত্রুটি</h2><p>' + (r.message || 'অজানা ত্রুটি') + '</p>';
+      return HtmlService.createHtmlOutput('<html><body style="font-family:sans-serif;text-align:center;padding:40px">' + msg + '</body></html>');
+    }
+    return handleRequest_(params);
   } catch (err) {
     return json({ ok: false, error: String(err) });
   }
@@ -78,6 +87,8 @@ function handleRequest_(params) {
 
     // Write actions
     if (action === 'login') return json(login_(params));
+    if (action === 'requestPinReset') return json(requestPinReset_(params));
+    if (action === 'confirmPinReset') return json(confirmPinReset_(params));
 
     if (action === 'createTransaction') {
       assertRole_(params.user_role, ['ADMIN', 'ACCOUNTANT', 'FIELD_USER']);
@@ -607,6 +618,105 @@ function pinHash_(pin) {
 
 function json(obj) {
   return ContentService.createTextOutput(JSON.stringify(obj)).setMimeType(ContentService.MimeType.JSON);
+}
+
+function requestPinReset_(params) {
+  const email = String(params.email || '').trim().toLowerCase();
+  if (!email) return { ok: false, message: 'ইমেইল প্রয়োজন' };
+
+  const users = listSheetRows_(CONFIG.SHEETS.USERS).data || [];
+  const user = users.find(u => String(u.email || '').trim().toLowerCase() === email);
+  if (!user) return { ok: false, message: 'এই ইমেইলে কোনো অ্যাকাউন্ট নেই' };
+
+  const token = String(Math.floor(100000 + Math.random() * 900000));
+  const expiry = Date.now() + 30 * 60 * 1000;
+  PropertiesService.getScriptProperties().setProperty('reset_' + email, token + '_' + expiry);
+
+  const webAppUrl = ScriptApp.getService().getUrl();
+  const resetUrl = webAppUrl + '?action=resetPinForm&token=' + token + '&email=' + encodeURIComponent(email);
+
+  const adminEmail = 'zakerchy@gmail.com';
+  GmailApp.sendEmail(
+    adminEmail,
+    'পিন রিসেট অনুরোধ — ' + user.name,
+    'ব্যবহারকারী: ' + user.name + '\nইমেইল: ' + email + '\n\nপিন রিসেট লিংক:\n' + resetUrl + '\n\n৩০ মিনিটের মধ্যে করতে হবে।',
+    {
+      name: 'মাদ্রাসা ERP',
+      htmlBody: '<p><b>ব্যবহারকারী:</b> ' + user.name + '<br><b>ইমেইল:</b> ' + email + '</p>' +
+        '<p><a href="' + resetUrl + '" style="background:#166534;color:white;padding:10px 20px;text-decoration:none;border-radius:6px">পিন রিসেট করুন</a></p>' +
+        '<p style="color:#666;font-size:12px">লিংকটি ৩০ মিনিটের মধ্যে ব্যবহার করুন।</p>'
+    }
+  );
+
+  return { ok: true, message: 'Admin-এর ইমেইলে রিসেট লিংক পাঠানো হয়েছে। কিছুক্ষণ অপেক্ষা করুন।' };
+}
+
+function servePinResetForm_(params) {
+  const token = String(params.token || '');
+  const email = String(params.email || '');
+  const webAppUrl = ScriptApp.getService().getUrl();
+  const confirmUrl = webAppUrl + '?action=confirmPinReset&token=' + encodeURIComponent(token) + '&email=' + encodeURIComponent(email);
+
+  const html = '<!DOCTYPE html><html lang="bn"><head><meta charset="UTF-8">' +
+    '<meta name="viewport" content="width=device-width,initial-scale=1">' +
+    '<title>পিন রিসেট — মাদ্রাসা ERP</title>' +
+    '<style>body{font-family:sans-serif;max-width:380px;margin:40px auto;padding:20px;background:#f0fdf4}' +
+    'h2{color:#166534}label{font-size:14px;color:#374151}' +
+    'input{width:100%;padding:10px;margin:8px 0 16px;border:1px solid #d1d5db;border-radius:8px;font-size:18px;box-sizing:border-box}' +
+    'button{background:#166534;color:white;padding:12px;border:none;border-radius:8px;cursor:pointer;font-size:16px;width:100%}' +
+    'p.info{color:#6b7280;font-size:13px}</style></head>' +
+    '<body><h2>🔑 পিন রিসেট</h2>' +
+    '<p>ব্যবহারকারীর ইমেইল: <b>' + email + '</b></p>' +
+    '<form id="f"><label>নতুন পিন (৪-৬ সংখ্যা):</label>' +
+    '<input type="password" inputmode="numeric" id="pin" maxlength="6" placeholder="নতুন পিন" required>' +
+    '<button type="submit">পিন সেট করুন</button></form>' +
+    '<p class="info">পিন সেট হওয়ার পর ব্যবহারকারীকে জানিয়ে দিন।</p>' +
+    '<script>document.getElementById("f").onsubmit=async function(e){' +
+    'e.preventDefault();const p=document.getElementById("pin").value.trim();' +
+    'if(p.length<4){alert("পিন কমপক্ষে ৪ সংখ্যার হতে হবে");return;}' +
+    'const buf=await crypto.subtle.digest("SHA-256",new TextEncoder().encode(p));' +
+    'const hash=Array.from(new Uint8Array(buf)).map(x=>x.toString(16).padStart(2,"0")).join("");' +
+    'window.location.href="' + confirmUrl + '&new_pin_hash="+hash;' +
+    '};</script></body></html>';
+
+  return HtmlService.createHtmlOutput(html).setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+}
+
+function confirmPinReset_(params) {
+  const token = String(params.token || '').trim();
+  const email = String(params.email || '').trim().toLowerCase();
+  const newPinHash = String(params.new_pin_hash || '').trim();
+
+  if (!token || !email || !newPinHash) return { ok: false, message: 'অসম্পূর্ণ তথ্য' };
+
+  const stored = PropertiesService.getScriptProperties().getProperty('reset_' + email);
+  if (!stored) return { ok: false, message: 'রিসেট টোকেন পাওয়া যায়নি বা মেয়াদ শেষ' };
+
+  const parts = stored.split('_');
+  if (parts[0] !== token) return { ok: false, message: 'টোকেন অবৈধ' };
+  if (Date.now() > parseInt(parts[1])) return { ok: false, message: 'রিসেট লিংকের মেয়াদ ৩০ মিনিট পার হয়ে গেছে' };
+
+  const ss = SpreadsheetApp.openById(getSheetId_());
+  const sheet = ss.getSheetByName(CONFIG.SHEETS.USERS);
+  const data = sheet.getDataRange().getValues();
+  const headers = data[0];
+  const emailIdx = headers.indexOf('email');
+  const pinHashIdx = headers.indexOf('pin_hash');
+  const updatedAtIdx = headers.indexOf('updated_at');
+
+  let updated = false;
+  for (let i = 1; i < data.length; i++) {
+    if (String(data[i][emailIdx] || '').trim().toLowerCase() === email) {
+      sheet.getRange(i + 1, pinHashIdx + 1).setValue(newPinHash);
+      if (updatedAtIdx >= 0) sheet.getRange(i + 1, updatedAtIdx + 1).setValue(nowIso());
+      updated = true;
+      break;
+    }
+  }
+
+  if (!updated) return { ok: false, message: 'ব্যবহারকারী খুঁজে পাওয়া যায়নি' };
+  PropertiesService.getScriptProperties().deleteProperty('reset_' + email);
+  return { ok: true, message: 'পিন সফলভাবে রিসেট হয়েছে' };
 }
 
 // One-time setup: call this once from Apps Script editor to set Sheet ID property
