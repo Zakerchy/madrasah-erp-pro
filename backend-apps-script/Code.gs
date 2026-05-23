@@ -608,3 +608,9 @@ function pinHash_(pin) {
 function json(obj) {
   return ContentService.createTextOutput(JSON.stringify(obj)).setMimeType(ContentService.MimeType.JSON);
 }
+
+// One-time setup: call this once from Apps Script editor to set Sheet ID property
+function setupSheetId() {
+  PropertiesService.getScriptProperties().setProperty('SHEET_ID', 'PUT_YOUR_GOOGLE_SHEET_ID_HERE');
+  Logger.log('SHEET_ID set: ' + PropertiesService.getScriptProperties().getProperty('SHEET_ID'));
+}

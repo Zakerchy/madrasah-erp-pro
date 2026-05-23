@@ -25,6 +25,44 @@ class ApiService {
 
   bool get _isConfigured => !AppConfig.appsScriptUrl.contains('PLACEHOLDER');
 
+  // Apps Script web apps return a 302 redirect on POST.
+  // The redirect URL (script.googleusercontent.com) serves the JSON response via GET.
+  Future<Map<String, dynamic>> _postToAppsScript(
+    Map<String, dynamic> payload,
+  ) async {
+    final client = http.Client();
+    try {
+      // Step 1: POST without following redirects
+      final req = http.Request('POST', Uri.parse(AppConfig.appsScriptUrl))
+        ..headers['Content-Type'] = 'application/json'
+        ..body = jsonEncode(payload);
+      final streamed = await client.send(req).timeout(const Duration(seconds: 25));
+
+      String? location;
+      if (streamed.statusCode == 302 || streamed.statusCode == 301) {
+        location = streamed.headers['location'];
+      }
+
+      if (location != null) {
+        // Step 2: GET the redirect URL to retrieve the response
+        final res = await client
+            .get(Uri.parse(location))
+            .timeout(const Duration(seconds: 20));
+        if (res.statusCode == 200) return jsonDecode(res.body) as Map<String, dynamic>;
+        throw Exception('Redirect GET HTTP ${res.statusCode}');
+      }
+
+      // No redirect — read body directly
+      final body = await streamed.stream.bytesToString();
+      if (streamed.statusCode == 200) {
+        return jsonDecode(body) as Map<String, dynamic>;
+      }
+      throw Exception('HTTP ${streamed.statusCode}');
+    } finally {
+      client.close();
+    }
+  }
+
   Future<Map<String, dynamic>> _send(
     String action,
     Map<String, dynamic> body, {
@@ -43,25 +81,11 @@ class ApiService {
     }
 
     try {
-      final res = await http
-          .post(
-            Uri.parse(AppConfig.appsScriptUrl),
-            headers: {'Content-Type': 'application/json'},
-            body: jsonEncode({'action': action, ...body}),
-          )
-          .timeout(const Duration(seconds: 25));
-
-      if (res.statusCode == 200) {
-        final decoded = jsonDecode(res.body);
-        if (decoded is Map<String, dynamic>) {
-          if (decoded['ok'] == true && isReadOnly) {
-            await LocalStoreService.cacheGetResponse(cacheKey, decoded);
-          }
-          return decoded;
-        }
-        return {'ok': false, 'message': 'Server থেকে অপ্রত্যাশিত response'};
+      final decoded = await _postToAppsScript({'action': action, ...body});
+      if (decoded['ok'] == true && isReadOnly) {
+        await LocalStoreService.cacheGetResponse(cacheKey, decoded);
       }
-      throw Exception('HTTP ${res.statusCode}');
+      return decoded;
     } catch (e) {
       if (isReadOnly) {
         final cached = LocalStoreService.readCachedGetResponse(cacheKey);
