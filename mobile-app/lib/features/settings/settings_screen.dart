@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../core/app_lang.dart';
 import '../../shared/services/api_service.dart';
 import '../../shared/services/session_service.dart';
 import '../../shared/widgets/base_scaffold.dart';
@@ -58,7 +59,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     } else {
       setState(() => _loadingUsers = false);
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('${res['message'] ?? res['error'] ?? 'Failed to load users'}')),
+        SnackBar(content: Text('${res['message'] ?? res['error'] ?? AppLang.t('ব্যবহারকারী লোড ব্যর্থ', 'Failed to load users')}')),
       );
     }
   }
@@ -69,7 +70,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final phone = _phone.text.trim();
 
     if (name.isEmpty || email.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Name and email are required')));
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(AppLang.t('নাম ও ইমেইল প্রয়োজন', 'Name and email are required'))));
       return;
     }
 
@@ -103,12 +104,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
       await _loadUsers();
 
       final msg = res['queued'] == true
-          ? 'Offline saved. User will sync automatically later.'
-          : 'User created successfully';
+          ? AppLang.t('অফলাইনে সংরক্ষিত।', 'Offline saved. Will sync automatically.')
+          : AppLang.t('ব্যবহারকারী তৈরি সফল', 'User created successfully');
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('${res['message'] ?? res['error'] ?? 'User create failed'}')),
+        SnackBar(content: Text('${res['message'] ?? res['error'] ?? AppLang.t('ব্যবহারকারী তৈরি ব্যর্থ', 'User create failed')}')),
       );
     }
   }
@@ -157,10 +158,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
     setState(() => _saving = false);
     if (res['ok'] == true) {
       await _loadUsers();
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Status updated to $status')));
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('${AppLang.t('অবস্থা আপডেট', 'Status updated')}: $status')));
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('${res['message'] ?? res['error'] ?? 'Status update failed'}')),
+        SnackBar(content: Text('${res['message'] ?? res['error'] ?? AppLang.t('আপডেট ব্যর্থ', 'Status update failed')}')),
       );
     }
   }
@@ -184,18 +185,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
         context: context,
         builder: (context) {
           return AlertDialog(
-            title: const Text('Temporary Reset Token'),
+            title: Text(AppLang.t('রিসেট টোকেন', 'Temporary Reset Token')),
             content: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('User: ${(user['name'] ?? '').toString()}'),
+                Text('${AppLang.t('ব্যবহারকারী', 'User')}: ${(user['name'] ?? '').toString()}'),
                 const SizedBox(height: 8),
-                SelectableText('Token: $token', style: const TextStyle(fontWeight: FontWeight.bold)),
+                SelectableText('${AppLang.t('টোকেন', 'Token')}: $token',
+                    style: const TextStyle(fontWeight: FontWeight.bold)),
                 const SizedBox(height: 4),
-                Text('Expires: $expires'),
+                Text('${AppLang.t('মেয়াদ', 'Expires')}: $expires'),
                 const SizedBox(height: 8),
-                const Text('Share this token securely. It can be used once before expiry.', style: TextStyle(fontSize: 12)),
+                Text(AppLang.t('এই টোকেনটি নিরাপদে শেয়ার করুন।', 'Share this token securely. It can be used once before expiry.'),
+                    style: const TextStyle(fontSize: 12)),
               ],
             ),
             actions: [
@@ -236,148 +239,182 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final res = await _api.get('health');
     if (!mounted) return;
     setState(() {
-      _health = res['ok'] == true ? 'OK - ${res['ts'] ?? ''}' : 'Failed';
+      _health = res['ok'] == true
+          ? '${AppLang.t('সংযুক্ত', 'OK')} - ${res['ts'] ?? ''}'
+          : AppLang.t('সংযোগ ব্যর্থ', 'Failed');
     });
   }
 
   @override
   Widget build(BuildContext context) {
-    return BaseScaffold(
-      title: 'Settings',
-      body: ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          const Text('Admin User Management', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-          const SizedBox(height: 8),
-          TextField(controller: _name, decoration: const InputDecoration(labelText: 'Name')),
-          const SizedBox(height: 8),
-          TextField(controller: _email, keyboardType: TextInputType.emailAddress, decoration: const InputDecoration(labelText: 'Email (Gmail)')),
-          const SizedBox(height: 8),
-          TextField(controller: _phone, keyboardType: TextInputType.phone, decoration: const InputDecoration(labelText: 'Phone (optional)')),
-          const SizedBox(height: 8),
-          DropdownButtonFormField<String>(
-            value: _role,
-            items: const [
-              DropdownMenuItem(value: 'ADMIN', child: Text('ADMIN')),
-              DropdownMenuItem(value: 'ACCOUNTANT', child: Text('ACCOUNTANT')),
-              DropdownMenuItem(value: 'FIELD_USER', child: Text('FIELD_USER')),
-              DropdownMenuItem(value: 'VIEWER', child: Text('VIEWER')),
-            ],
-            onChanged: (v) => setState(() => _role = v ?? 'VIEWER'),
-            decoration: const InputDecoration(labelText: 'Role'),
-          ),
-          const SizedBox(height: 8),
-          DropdownButtonFormField<String>(
-            value: _approvalStatus,
-            items: const [
-              DropdownMenuItem(value: 'APPROVED', child: Text('APPROVED')),
-              DropdownMenuItem(value: 'PENDING', child: Text('PENDING')),
-              DropdownMenuItem(value: 'REJECTED', child: Text('REJECTED')),
-              DropdownMenuItem(value: 'BLOCKED', child: Text('BLOCKED')),
-            ],
-            onChanged: (v) => setState(() => _approvalStatus = v ?? 'APPROVED'),
-            decoration: const InputDecoration(labelText: 'Approval Status'),
-          ),
-          const SizedBox(height: 8),
-          SwitchListTile(
-            value: _active,
-            onChanged: (v) => setState(() => _active = v),
-            title: const Text('Active user'),
-            contentPadding: EdgeInsets.zero,
-          ),
-          const SizedBox(height: 8),
-          FilledButton.icon(
-            onPressed: _saving ? null : _createUser,
-            icon: _saving
-                ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
-                : const Icon(Icons.person_add),
-            label: Text(_saving ? 'Saving...' : 'Create User'),
-          ),
-          const Divider(height: 28),
-          Row(
-            children: [
-              const Text('User List', style: TextStyle(fontWeight: FontWeight.bold)),
-              const Spacer(),
-              IconButton(onPressed: _loadUsers, icon: const Icon(Icons.refresh)),
-            ],
-          ),
-          if (_loadingUsers)
-            const Padding(
-              padding: EdgeInsets.all(16),
-              child: Center(child: CircularProgressIndicator()),
-            )
-          else if (_users.isEmpty)
-            const Text('No users found')
-          else
-            ..._users.map(
-              (u) => Card(
-                child: ListTile(
-                  title: Text('${u['name'] ?? ''} (${u['role'] ?? ''})'),
-                  subtitle: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text('${u['email'] ?? ''} • ${u['phone'] ?? ''}'),
-                      const SizedBox(height: 4),
-                      Wrap(
-                        spacing: 8,
-                        runSpacing: 6,
-                        children: [
-                          Chip(
-                            label: Text(_statusOf(u)),
-                            backgroundColor: _statusColor(_statusOf(u)).withOpacity(0.15),
-                            side: BorderSide(color: _statusColor(_statusOf(u))),
-                          ),
-                          Chip(
-                            label: Text((u['active'] ?? 'FALSE').toString().toUpperCase() == 'TRUE' ? 'ACTIVE' : 'INACTIVE'),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 8),
-                      Wrap(
-                        spacing: 8,
-                        runSpacing: 8,
-                        children: [
-                          OutlinedButton(
-                            onPressed: _saving ? null : () => _setApprovalStatus(u, 'APPROVED'),
-                            child: const Text('Approve'),
-                          ),
-                          OutlinedButton(
-                            onPressed: _saving ? null : () => _setApprovalStatus(u, 'PENDING'),
-                            child: const Text('Pending'),
-                          ),
-                          OutlinedButton(
-                            onPressed: _saving ? null : () => _setApprovalStatus(u, 'REJECTED'),
-                            child: const Text('Reject'),
-                          ),
-                          OutlinedButton(
-                            onPressed: _saving ? null : () => _setApprovalStatus(u, 'BLOCKED'),
-                            child: const Text('Block'),
-                          ),
-                          FilledButton.tonal(
-                            onPressed: _saving ? null : () => _generateTempToken(u),
-                            child: const Text('Temp Reset Token'),
-                          ),
-                          TextButton(
-                            onPressed: _saving ? null : () => _toggleActive(u),
-                            child: Text(
-                              (u['active'] ?? 'FALSE').toString().toUpperCase() == 'TRUE' ? 'Deactivate' : 'Activate',
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                  isThreeLine: true,
-                ),
+    return ValueListenableBuilder<bool>(
+      valueListenable: AppLang.isEnglish,
+      builder: (context, isEn, _) => BaseScaffold(
+        title: AppLang.t('সেটিংস', 'Settings'),
+        body: ListView(
+          padding: const EdgeInsets.all(16),
+          children: [
+            // Language toggle
+            Card(
+              child: SwitchListTile(
+                value: isEn,
+                onChanged: (v) => AppLang.setEnglish(v),
+                title: const Text('English / বাংলা'),
+                subtitle: Text(isEn ? 'English mode is on' : 'বাংলা মোড চালু আছে'),
+                secondary: const Icon(Icons.language),
               ),
             ),
-          const Divider(height: 28),
-          const Text('System Check', style: TextStyle(fontWeight: FontWeight.bold)),
-          const SizedBox(height: 8),
-          FilledButton.icon(onPressed: _checkHealth, icon: const Icon(Icons.health_and_safety), label: const Text('Check Data Connection')),
-          const SizedBox(height: 8),
-          Text('Health: $_health'),
-        ],
+            const Divider(height: 28),
+            Text(AppLang.t('ব্যবহারকারী ব্যবস্থাপনা', 'Admin User Management'),
+                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+            const SizedBox(height: 8),
+            TextField(controller: _name, decoration: InputDecoration(labelText: AppLang.t('নাম', 'Name'))),
+            const SizedBox(height: 8),
+            TextField(
+                controller: _email,
+                keyboardType: TextInputType.emailAddress,
+                decoration: InputDecoration(labelText: AppLang.t('ইমেইল (Gmail)', 'Email (Gmail)'))),
+            const SizedBox(height: 8),
+            TextField(
+                controller: _phone,
+                keyboardType: TextInputType.phone,
+                decoration: InputDecoration(labelText: AppLang.t('ফোন (ঐচ্ছিক)', 'Phone (optional)'))),
+            const SizedBox(height: 8),
+            DropdownButtonFormField<String>(
+              value: _role,
+              items: const [
+                DropdownMenuItem(value: 'ADMIN', child: Text('ADMIN')),
+                DropdownMenuItem(value: 'ACCOUNTANT', child: Text('ACCOUNTANT')),
+                DropdownMenuItem(value: 'FIELD_USER', child: Text('FIELD_USER')),
+                DropdownMenuItem(value: 'VIEWER', child: Text('VIEWER')),
+              ],
+              onChanged: (v) => setState(() => _role = v ?? 'VIEWER'),
+              decoration: InputDecoration(labelText: AppLang.t('ভূমিকা', 'Role')),
+            ),
+            const SizedBox(height: 8),
+            DropdownButtonFormField<String>(
+              value: _approvalStatus,
+              items: const [
+                DropdownMenuItem(value: 'APPROVED', child: Text('APPROVED')),
+                DropdownMenuItem(value: 'PENDING', child: Text('PENDING')),
+                DropdownMenuItem(value: 'REJECTED', child: Text('REJECTED')),
+                DropdownMenuItem(value: 'BLOCKED', child: Text('BLOCKED')),
+              ],
+              onChanged: (v) => setState(() => _approvalStatus = v ?? 'APPROVED'),
+              decoration: InputDecoration(labelText: AppLang.t('অনুমোদন অবস্থা', 'Approval Status')),
+            ),
+            const SizedBox(height: 8),
+            SwitchListTile(
+              value: _active,
+              onChanged: (v) => setState(() => _active = v),
+              title: Text(AppLang.t('সক্রিয় ব্যবহারকারী', 'Active user')),
+              contentPadding: EdgeInsets.zero,
+            ),
+            const SizedBox(height: 8),
+            FilledButton.icon(
+              onPressed: _saving ? null : _createUser,
+              icon: _saving
+                  ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                  : const Icon(Icons.person_add),
+              label: Text(_saving
+                  ? AppLang.t('সংরক্ষণ হচ্ছে...', 'Saving...')
+                  : AppLang.t('ব্যবহারকারী তৈরি করুন', 'Create User')),
+            ),
+            const Divider(height: 28),
+            Row(
+              children: [
+                Text(AppLang.t('ব্যবহারকারীর তালিকা', 'User List'),
+                    style: const TextStyle(fontWeight: FontWeight.bold)),
+                const Spacer(),
+                IconButton(onPressed: _loadUsers, icon: const Icon(Icons.refresh)),
+              ],
+            ),
+            if (_loadingUsers)
+              const Padding(
+                padding: EdgeInsets.all(16),
+                child: Center(child: CircularProgressIndicator()),
+              )
+            else if (_users.isEmpty)
+              Text(AppLang.t('কোনো ব্যবহারকারী নেই', 'No users found'))
+            else
+              ..._users.map(
+                (u) => Card(
+                  child: ListTile(
+                    title: Text('${u['name'] ?? ''} (${u['role'] ?? ''})'),
+                    subtitle: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('${u['email'] ?? ''} • ${u['phone'] ?? ''}'),
+                        const SizedBox(height: 4),
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 6,
+                          children: [
+                            Chip(
+                              label: Text(_statusOf(u)),
+                              backgroundColor: _statusColor(_statusOf(u)).withOpacity(0.15),
+                              side: BorderSide(color: _statusColor(_statusOf(u))),
+                            ),
+                            Chip(
+                              label: Text((u['active'] ?? 'FALSE').toString().toUpperCase() == 'TRUE'
+                                  ? AppLang.t('সক্রিয়', 'ACTIVE')
+                                  : AppLang.t('নিষ্ক্রিয়', 'INACTIVE')),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: [
+                            OutlinedButton(
+                              onPressed: _saving ? null : () => _setApprovalStatus(u, 'APPROVED'),
+                              child: Text(AppLang.t('অনুমোদন', 'Approve')),
+                            ),
+                            OutlinedButton(
+                              onPressed: _saving ? null : () => _setApprovalStatus(u, 'PENDING'),
+                              child: Text(AppLang.t('অপেক্ষমান', 'Pending')),
+                            ),
+                            OutlinedButton(
+                              onPressed: _saving ? null : () => _setApprovalStatus(u, 'REJECTED'),
+                              child: Text(AppLang.t('প্রত্যাখ্যান', 'Reject')),
+                            ),
+                            OutlinedButton(
+                              onPressed: _saving ? null : () => _setApprovalStatus(u, 'BLOCKED'),
+                              child: Text(AppLang.t('ব্লক', 'Block')),
+                            ),
+                            FilledButton.tonal(
+                              onPressed: _saving ? null : () => _generateTempToken(u),
+                              child: Text(AppLang.t('রিসেট টোকেন', 'Reset Token')),
+                            ),
+                            TextButton(
+                              onPressed: _saving ? null : () => _toggleActive(u),
+                              child: Text(
+                                (u['active'] ?? 'FALSE').toString().toUpperCase() == 'TRUE'
+                                    ? AppLang.t('নিষ্ক্রিয় করুন', 'Deactivate')
+                                    : AppLang.t('সক্রিয় করুন', 'Activate'),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                    isThreeLine: true,
+                  ),
+                ),
+              ),
+            const Divider(height: 28),
+            Text(AppLang.t('সিস্টেম পরীক্ষা', 'System Check'),
+                style: const TextStyle(fontWeight: FontWeight.bold)),
+            const SizedBox(height: 8),
+            FilledButton.icon(
+                onPressed: _checkHealth,
+                icon: const Icon(Icons.health_and_safety),
+                label: Text(AppLang.t('ডেটা সংযোগ পরীক্ষা করুন', 'Check Data Connection'))),
+            const SizedBox(height: 8),
+            Text('${AppLang.t('স্বাস্থ্য', 'Health')}: $_health'),
+          ],
+        ),
       ),
     );
   }

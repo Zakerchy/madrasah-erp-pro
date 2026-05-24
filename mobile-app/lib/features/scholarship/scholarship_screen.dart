@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../core/app_lang.dart';
 import '../../shared/services/api_service.dart';
 import '../../shared/services/session_service.dart';
 import '../../shared/widgets/base_scaffold.dart';
@@ -64,7 +65,7 @@ class _ScholarshipScreenState extends State<ScholarshipScreen> {
 
   Future<void> _savePayment() async {
     if (_selectedBeneficiaryId.isEmpty || _monthKey.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Beneficiary and month are required')));
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(AppLang.t('সুবিধাভোগী ও মাস প্রয়োজন', 'Beneficiary and month are required'))));
       return;
     }
 
@@ -99,8 +100,8 @@ class _ScholarshipScreenState extends State<ScholarshipScreen> {
       _remaining.text = '0';
       await _loadAll();
       final msg = res['queued'] == true
-          ? 'Offline saved. Scholarship payment will sync automatically later.'
-          : 'Scholarship payment saved';
+          ? AppLang.t('অফলাইনে সংরক্ষিত।', 'Offline saved. Will sync automatically.')
+          : AppLang.t('বৃত্তি পরিশোধ সংরক্ষিত', 'Scholarship payment saved');
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
     } else {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('${res['message'] ?? res['error']}')));
@@ -109,92 +110,95 @@ class _ScholarshipScreenState extends State<ScholarshipScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return BaseScaffold(
-      title: 'Scholarship',
-      body: _loading
-          ? const Center(child: CircularProgressIndicator())
-          : ListView(
-              padding: const EdgeInsets.all(16),
-              children: [
-                const Text('Record Scholarship Payment', style: TextStyle(fontWeight: FontWeight.bold)),
-                const SizedBox(height: 8),
-                TextField(
-                  controller: _monthCtrl,
-                  decoration: const InputDecoration(labelText: 'Month Key (YYYY-MM)'),
-                  onChanged: (v) => _monthKey = v.trim(),
-                ),
-                const SizedBox(height: 8),
-                DropdownButtonFormField<String>(
-                  value: _selectedBeneficiaryId.isEmpty ? null : _selectedBeneficiaryId,
-                  items: _beneficiaries
-                      .map((b) => DropdownMenuItem(
-                            value: b['id'].toString(),
-                            child: Text(b['name_bn']?.toString() ?? ''),
-                          ))
-                      .toList(),
-                  onChanged: (v) {
-                    final item = _beneficiaries.firstWhere((b) => b['id'].toString() == v, orElse: () => {});
-                    setState(() {
-                      _selectedBeneficiaryId = v ?? '';
-                      _selectedBeneficiaryName = item['name_bn']?.toString() ?? '';
-                    });
-                  },
-                  decoration: const InputDecoration(labelText: 'Beneficiary'),
-                ),
-                const SizedBox(height: 8),
-                TextField(controller: _school, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'School Fee')),
-                const SizedBox(height: 8),
-                TextField(controller: _bangla, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Bangla Tutor')),
-                const SizedBox(height: 8),
-                TextField(controller: _arabi, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Arabi Tutor')),
-                const SizedBox(height: 8),
-                TextField(controller: _materials, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Materials')),
-                const SizedBox(height: 8),
-                TextField(controller: _other, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Other')),
-                const SizedBox(height: 8),
-                TextField(controller: _remaining, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Remaining Amount')),
-                const SizedBox(height: 8),
-                DropdownButtonFormField<String>(
-                  value: _status,
-                  items: const [
-                    DropdownMenuItem(value: 'PAID', child: Text('PAID')),
-                    DropdownMenuItem(value: 'PARTIAL', child: Text('PARTIAL')),
-                    DropdownMenuItem(value: 'CANCELLED', child: Text('CANCELLED')),
-                  ],
-                  onChanged: (v) => setState(() => _status = v ?? 'PAID'),
-                  decoration: const InputDecoration(labelText: 'Status'),
-                ),
-                const SizedBox(height: 8),
-                DropdownButtonFormField<String>(
-                  value: _fundType,
-                  items: const [
-                    DropdownMenuItem(value: 'SCHOLARSHIP', child: Text('Scholarship Fund')),
-                    DropdownMenuItem(value: 'JAKAT', child: Text('Jakat Fund')),
-                    DropdownMenuItem(value: 'GENERAL', child: Text('General Fund')),
-                  ],
-                  onChanged: (v) => setState(() => _fundType = v ?? 'SCHOLARSHIP'),
-                  decoration: const InputDecoration(labelText: 'Fund Type'),
-                ),
-                const SizedBox(height: 12),
-                FilledButton.icon(onPressed: _savePayment, icon: const Icon(Icons.save), label: const Text('Save Payment')),
-                const Divider(height: 28),
-                Row(
-                  children: [
-                    Text('Payments of $_monthKey', style: const TextStyle(fontWeight: FontWeight.bold)),
-                    const Spacer(),
-                    IconButton(onPressed: _loadAll, icon: const Icon(Icons.refresh)),
-                  ],
-                ),
-                ..._payments.map(
-                  (p) => Card(
-                    child: ListTile(
-                      title: Text('${p['beneficiary_id'] ?? ''} • ৳${p['total_paid'] ?? 0}'),
-                      subtitle: Text('${p['month_key'] ?? ''} • ${p['payment_status'] ?? ''} • ${p['payment_date'] ?? ''}'),
+    return ValueListenableBuilder<bool>(
+      valueListenable: AppLang.isEnglish,
+      builder: (context, isEn, _) => BaseScaffold(
+        title: AppLang.t('বৃত্তি', 'Scholarship'),
+        body: _loading
+            ? const Center(child: CircularProgressIndicator())
+            : ListView(
+                padding: const EdgeInsets.all(16),
+                children: [
+                  Text(AppLang.t('বৃত্তি পরিশোধ নথিভুক্ত করুন', 'Record Scholarship Payment'), style: const TextStyle(fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 8),
+                  TextField(
+                    controller: _monthCtrl,
+                    decoration: InputDecoration(labelText: AppLang.t('মাস (YYYY-MM)', 'Month (YYYY-MM)')),
+                    onChanged: (v) => _monthKey = v.trim(),
+                  ),
+                  const SizedBox(height: 8),
+                  DropdownButtonFormField<String>(
+                    value: _selectedBeneficiaryId.isEmpty ? null : _selectedBeneficiaryId,
+                    items: _beneficiaries
+                        .map((b) => DropdownMenuItem(
+                              value: b['id'].toString(),
+                              child: Text(b['name_bn']?.toString() ?? ''),
+                            ))
+                        .toList(),
+                    onChanged: (v) {
+                      final item = _beneficiaries.firstWhere((b) => b['id'].toString() == v, orElse: () => {});
+                      setState(() {
+                        _selectedBeneficiaryId = v ?? '';
+                        _selectedBeneficiaryName = item['name_bn']?.toString() ?? '';
+                      });
+                    },
+                    decoration: InputDecoration(labelText: AppLang.t('সুবিধাভোগী', 'Beneficiary')),
+                  ),
+                  const SizedBox(height: 8),
+                  TextField(controller: _school, keyboardType: TextInputType.number, decoration: InputDecoration(labelText: AppLang.t('বিদ্যালয় বেতন', 'School Fee'))),
+                  const SizedBox(height: 8),
+                  TextField(controller: _bangla, keyboardType: TextInputType.number, decoration: InputDecoration(labelText: AppLang.t('বাংলা প্রাইভেট', 'Bangla Tutor'))),
+                  const SizedBox(height: 8),
+                  TextField(controller: _arabi, keyboardType: TextInputType.number, decoration: InputDecoration(labelText: AppLang.t('আরবি প্রাইভেট', 'Arabi Tutor'))),
+                  const SizedBox(height: 8),
+                  TextField(controller: _materials, keyboardType: TextInputType.number, decoration: InputDecoration(labelText: AppLang.t('শিক্ষাসামগ্রী', 'Materials'))),
+                  const SizedBox(height: 8),
+                  TextField(controller: _other, keyboardType: TextInputType.number, decoration: InputDecoration(labelText: AppLang.t('অন্যান্য', 'Other'))),
+                  const SizedBox(height: 8),
+                  TextField(controller: _remaining, keyboardType: TextInputType.number, decoration: InputDecoration(labelText: AppLang.t('বাকি পরিমাণ', 'Remaining Amount'))),
+                  const SizedBox(height: 8),
+                  DropdownButtonFormField<String>(
+                    value: _status,
+                    items: [
+                      DropdownMenuItem(value: 'PAID', child: Text(AppLang.t('পরিশোধিত', 'PAID'))),
+                      DropdownMenuItem(value: 'PARTIAL', child: Text(AppLang.t('আংশিক', 'PARTIAL'))),
+                      DropdownMenuItem(value: 'CANCELLED', child: Text(AppLang.t('বাতিল', 'CANCELLED'))),
+                    ],
+                    onChanged: (v) => setState(() => _status = v ?? 'PAID'),
+                    decoration: InputDecoration(labelText: AppLang.t('অবস্থা', 'Status')),
+                  ),
+                  const SizedBox(height: 8),
+                  DropdownButtonFormField<String>(
+                    value: _fundType,
+                    items: [
+                      DropdownMenuItem(value: 'SCHOLARSHIP', child: Text(AppLang.t('বৃত্তি ফান্ড', 'Scholarship Fund'))),
+                      DropdownMenuItem(value: 'JAKAT', child: Text(AppLang.t('যাকাত ফান্ড', 'Jakat Fund'))),
+                      DropdownMenuItem(value: 'GENERAL', child: Text(AppLang.t('সাধারণ ফান্ড', 'General Fund'))),
+                    ],
+                    onChanged: (v) => setState(() => _fundType = v ?? 'SCHOLARSHIP'),
+                    decoration: InputDecoration(labelText: AppLang.t('ফান্ড ধরন', 'Fund Type')),
+                  ),
+                  const SizedBox(height: 12),
+                  FilledButton.icon(onPressed: _savePayment, icon: const Icon(Icons.save), label: Text(AppLang.t('পরিশোধ সংরক্ষণ', 'Save Payment'))),
+                  const Divider(height: 28),
+                  Row(
+                    children: [
+                      Text('${AppLang.t('পরিশোধ', 'Payments')} $_monthKey', style: const TextStyle(fontWeight: FontWeight.bold)),
+                      const Spacer(),
+                      IconButton(onPressed: _loadAll, icon: const Icon(Icons.refresh)),
+                    ],
+                  ),
+                  ..._payments.map(
+                    (p) => Card(
+                      child: ListTile(
+                        title: Text('${p['notes'] ?? p['beneficiary_id'] ?? ''} • ৳${p['total_paid'] ?? 0}'),
+                        subtitle: Text('${p['month_key'] ?? ''} • ${p['payment_status'] ?? ''} • ${p['payment_date'] ?? ''}'),
+                      ),
                     ),
                   ),
-                ),
-              ],
-            ),
+                ],
+              ),
+      ),
     );
   }
 }

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../core/app_lang.dart';
 import '../../shared/services/api_service.dart';
 import '../../shared/services/session_service.dart';
 import '../../shared/widgets/base_scaffold.dart';
@@ -43,7 +44,7 @@ class _SalaryScreenState extends State<SalaryScreen> {
     final month = _monthKey.text.trim();
     if (!_isValidMonthKey(month)) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Use month format YYYY-MM')),
+        SnackBar(content: Text(AppLang.t('মাসের ফরম্যাট YYYY-MM দিন', 'Use month format YYYY-MM'))),
       );
       return;
     }
@@ -75,7 +76,7 @@ class _SalaryScreenState extends State<SalaryScreen> {
 
   Future<void> _saveStaff() async {
     if (_staffName.text.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Staff name required')));
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(AppLang.t('কর্মীর নাম দিন', 'Staff name required'))));
       return;
     }
 
@@ -100,8 +101,8 @@ class _SalaryScreenState extends State<SalaryScreen> {
       _staffSalary.clear();
       await _loadAll();
       final msg = res['queued'] == true
-          ? 'Offline saved. Staff will sync automatically later.'
-          : 'Staff saved';
+          ? AppLang.t('অফলাইনে সংরক্ষিত।', 'Offline saved. Will sync automatically.')
+          : AppLang.t('কর্মী সংরক্ষিত', 'Staff saved');
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
     } else {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('${res['message'] ?? res['error']}')));
@@ -110,7 +111,7 @@ class _SalaryScreenState extends State<SalaryScreen> {
 
   Future<void> _recordPayment() async {
     if (_selectedStaffId.isEmpty || _paidAmount.text.trim().isEmpty || _monthKey.text.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Staff, month, and paid amount required')));
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(AppLang.t('কর্মী, মাস ও প্রদত্ত পরিমাণ দিন', 'Staff, month, and paid amount required'))));
       return;
     }
 
@@ -139,8 +140,8 @@ class _SalaryScreenState extends State<SalaryScreen> {
       _dueAmount.text = '0';
       await _loadAll();
       final msg = res['queued'] == true
-          ? 'Offline saved. Salary payment will sync automatically later.'
-          : 'Salary payment recorded';
+          ? AppLang.t('অফলাইনে সংরক্ষিত।', 'Offline saved. Will sync automatically.')
+          : AppLang.t('বেতন পরিশোধ নথিভুক্ত হয়েছে', 'Salary payment recorded');
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
     } else {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('${res['message'] ?? res['error']}')));
@@ -149,87 +150,90 @@ class _SalaryScreenState extends State<SalaryScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return BaseScaffold(
-      title: 'Salary',
-      body: _loading
-          ? const Center(child: CircularProgressIndicator())
-          : ListView(
-              padding: const EdgeInsets.all(16),
-              children: [
-                const Text('Add Staff', style: TextStyle(fontWeight: FontWeight.bold)),
-                const SizedBox(height: 8),
-                TextField(controller: _staffName, decoration: const InputDecoration(labelText: 'Staff Name')),
-                const SizedBox(height: 8),
-                TextField(controller: _staffRole, decoration: const InputDecoration(labelText: 'Role/Designation')),
-                const SizedBox(height: 8),
-                TextField(controller: _staffSalary, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Monthly Salary')),
-                const SizedBox(height: 10),
-                FilledButton.icon(onPressed: _saveStaff, icon: const Icon(Icons.person_add), label: const Text('Save Staff')),
-                const Divider(height: 28),
-                const Text('Record Salary Payment', style: TextStyle(fontWeight: FontWeight.bold)),
-                const SizedBox(height: 8),
-                DropdownButtonFormField<String>(
-                  value: _selectedStaffId.isEmpty ? null : _selectedStaffId,
-                  items: _staff
-                      .map((s) => DropdownMenuItem(
-                            value: s['id'].toString(),
-                            child: Text('${s['staff_name'] ?? ''} (${s['role'] ?? ''})'),
-                          ))
-                      .toList(),
-                  onChanged: (v) => setState(() => _selectedStaffId = v ?? ''),
-                  decoration: const InputDecoration(labelText: 'Staff'),
-                ),
-                const SizedBox(height: 8),
-                TextField(
-                  controller: _monthKey,
-                  decoration: const InputDecoration(
-                    labelText: 'Month Key (YYYY-MM)',
-                    helperText: 'Filter and save month',
+    return ValueListenableBuilder<bool>(
+      valueListenable: AppLang.isEnglish,
+      builder: (context, isEn, _) => BaseScaffold(
+        title: AppLang.t('বেতন', 'Salary'),
+        body: _loading
+            ? const Center(child: CircularProgressIndicator())
+            : ListView(
+                padding: const EdgeInsets.all(16),
+                children: [
+                  Text(AppLang.t('কর্মী যোগ করুন', 'Add Staff'), style: const TextStyle(fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 8),
+                  TextField(controller: _staffName, decoration: InputDecoration(labelText: AppLang.t('কর্মীর নাম', 'Staff Name'))),
+                  const SizedBox(height: 8),
+                  TextField(controller: _staffRole, decoration: InputDecoration(labelText: AppLang.t('পদবী', 'Role/Designation'))),
+                  const SizedBox(height: 8),
+                  TextField(controller: _staffSalary, keyboardType: TextInputType.number, decoration: InputDecoration(labelText: AppLang.t('মাসিক বেতন', 'Monthly Salary'))),
+                  const SizedBox(height: 10),
+                  FilledButton.icon(onPressed: _saveStaff, icon: const Icon(Icons.person_add), label: Text(AppLang.t('কর্মী সংরক্ষণ', 'Save Staff'))),
+                  const Divider(height: 28),
+                  Text(AppLang.t('বেতন প্রদান নথিভুক্ত করুন', 'Record Salary Payment'), style: const TextStyle(fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 8),
+                  DropdownButtonFormField<String>(
+                    value: _selectedStaffId.isEmpty ? null : _selectedStaffId,
+                    items: _staff
+                        .map((s) => DropdownMenuItem(
+                              value: s['id'].toString(),
+                              child: Text('${s['staff_name'] ?? ''} (${s['role'] ?? ''})'),
+                            ))
+                        .toList(),
+                    onChanged: (v) => setState(() => _selectedStaffId = v ?? ''),
+                    decoration: InputDecoration(labelText: AppLang.t('কর্মী', 'Staff')),
                   ),
-                  onSubmitted: (_) => _reloadByMonth(),
-                ),
-                const SizedBox(height: 8),
-                DropdownButtonFormField<String>(
-                  value: _fundType,
-                  items: const [
-                    DropdownMenuItem(value: 'GENERAL', child: Text('General')),
-                    DropdownMenuItem(value: 'CONSTRUCTION', child: Text('Construction')),
-                    DropdownMenuItem(value: 'JAKAT', child: Text('Jakat')),
-                    DropdownMenuItem(value: 'SCHOLARSHIP', child: Text('Scholarship')),
-                  ],
-                  onChanged: (v) => setState(() => _fundType = v ?? 'GENERAL'),
-                  decoration: const InputDecoration(labelText: 'Fund Type'),
-                ),
-                const SizedBox(height: 8),
-                TextField(controller: _payableAmount, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Payable Amount')),
-                const SizedBox(height: 8),
-                TextField(controller: _paidAmount, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Paid Amount')),
-                const SizedBox(height: 8),
-                TextField(controller: _dueAmount, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Due Amount')),
-                const SizedBox(height: 10),
-                FilledButton.icon(onPressed: _recordPayment, icon: const Icon(Icons.payments), label: const Text('Record Payment')),
-                const Divider(height: 28),
-                Row(
-                  children: [
-                    const Text('Recent Salary Payments', style: TextStyle(fontWeight: FontWeight.bold)),
-                    const Spacer(),
-                    IconButton(
-                      tooltip: 'Reload selected month',
-                      onPressed: _reloadByMonth,
-                      icon: const Icon(Icons.refresh),
+                  const SizedBox(height: 8),
+                  TextField(
+                    controller: _monthKey,
+                    decoration: InputDecoration(
+                      labelText: AppLang.t('মাস (YYYY-MM)', 'Month (YYYY-MM)'),
+                      helperText: AppLang.t('ফিল্টার ও সংরক্ষণের মাস', 'Filter and save month'),
                     ),
-                  ],
-                ),
-                ..._payments.map(
-                  (p) => Card(
-                    child: ListTile(
-                      title: Text('Staff ID: ${p['staff_id'] ?? ''} • ৳${p['paid_amount'] ?? 0}'),
-                      subtitle: Text('${p['month_key'] ?? ''} • ${p['payment_date'] ?? ''} • ${p['status'] ?? ''}'),
+                    onSubmitted: (_) => _reloadByMonth(),
+                  ),
+                  const SizedBox(height: 8),
+                  DropdownButtonFormField<String>(
+                    value: _fundType,
+                    items: [
+                      DropdownMenuItem(value: 'GENERAL', child: Text(AppLang.t('সাধারণ', 'General'))),
+                      DropdownMenuItem(value: 'CONSTRUCTION', child: Text(AppLang.t('নির্মাণ', 'Construction'))),
+                      DropdownMenuItem(value: 'JAKAT', child: Text(AppLang.t('যাকাত', 'Jakat'))),
+                      DropdownMenuItem(value: 'SCHOLARSHIP', child: Text(AppLang.t('বৃত্তি', 'Scholarship'))),
+                    ],
+                    onChanged: (v) => setState(() => _fundType = v ?? 'GENERAL'),
+                    decoration: InputDecoration(labelText: AppLang.t('ফান্ড ধরন', 'Fund Type')),
+                  ),
+                  const SizedBox(height: 8),
+                  TextField(controller: _payableAmount, keyboardType: TextInputType.number, decoration: InputDecoration(labelText: AppLang.t('প্রদেয় পরিমাণ', 'Payable Amount'))),
+                  const SizedBox(height: 8),
+                  TextField(controller: _paidAmount, keyboardType: TextInputType.number, decoration: InputDecoration(labelText: AppLang.t('প্রদত্ত পরিমাণ', 'Paid Amount'))),
+                  const SizedBox(height: 8),
+                  TextField(controller: _dueAmount, keyboardType: TextInputType.number, decoration: InputDecoration(labelText: AppLang.t('বাকি পরিমাণ', 'Due Amount'))),
+                  const SizedBox(height: 10),
+                  FilledButton.icon(onPressed: _recordPayment, icon: const Icon(Icons.payments), label: Text(AppLang.t('বেতন নথিভুক্ত করুন', 'Record Payment'))),
+                  const Divider(height: 28),
+                  Row(
+                    children: [
+                      Text(AppLang.t('সাম্প্রতিক বেতন পরিশোধ', 'Recent Salary Payments'), style: const TextStyle(fontWeight: FontWeight.bold)),
+                      const Spacer(),
+                      IconButton(
+                        tooltip: AppLang.t('নির্বাচিত মাস রিলোড করুন', 'Reload selected month'),
+                        onPressed: _reloadByMonth,
+                        icon: const Icon(Icons.refresh),
+                      ),
+                    ],
+                  ),
+                  ..._payments.map(
+                    (p) => Card(
+                      child: ListTile(
+                        title: Text('${p['staff_id'] ?? ''} • ৳${p['paid_amount'] ?? 0}'),
+                        subtitle: Text('${p['month_key'] ?? ''} • ${p['payment_date'] ?? ''} • ${p['status'] ?? ''}'),
+                      ),
                     ),
                   ),
-                ),
-              ],
-            ),
+                ],
+              ),
+      ),
     );
   }
 }

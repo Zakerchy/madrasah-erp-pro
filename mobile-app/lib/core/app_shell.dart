@@ -9,16 +9,36 @@ import '../features/reports/reports_screen.dart';
 import '../features/salary/salary_screen.dart';
 import '../features/scholarship/scholarship_screen.dart';
 import '../features/settings/settings_screen.dart';
+import 'app_lang.dart';
 import 'theme.dart';
 
-class MadrasahErpLiteApp extends StatelessWidget {
+class MadrasahErpLiteApp extends StatefulWidget {
   const MadrasahErpLiteApp({super.key});
+
+  @override
+  State<MadrasahErpLiteApp> createState() => _MadrasahErpLiteAppState();
+}
+
+class _MadrasahErpLiteAppState extends State<MadrasahErpLiteApp> {
+  @override
+  void initState() {
+    super.initState();
+    AppLang.isEnglish.addListener(_onLangChange);
+  }
+
+  @override
+  void dispose() {
+    AppLang.isEnglish.removeListener(_onLangChange);
+    super.dispose();
+  }
+
+  void _onLangChange() => setState(() {});
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-      title: 'Madrasah ERP Lite',
+      title: AppLang.t('মাদ্রাসা ERP Lite', 'Madrasah ERP Lite'),
       theme: buildTheme(),
       initialRoute: '/login',
       routes: {

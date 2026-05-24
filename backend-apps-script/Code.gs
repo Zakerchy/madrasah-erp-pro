@@ -120,6 +120,29 @@ function handleRequest_(params) {
       return json(saveScholarshipPayment_(params.payload));
     }
 
+    if (action === 'listUsers') return json(listUsers_(params));
+
+    if (action === 'upsertUser') {
+      assertRole_(params.user_role, ['ADMIN']);
+      return json(upsertById_(CONFIG.SHEETS.USERS, params.payload));
+    }
+
+    if (action === 'setUserApprovalStatus') {
+      assertRole_(params.user_role, ['ADMIN']);
+      return json(setUserApprovalStatus_(params.payload));
+    }
+
+    if (action === 'generateTempResetToken') {
+      assertRole_(params.user_role, ['ADMIN']);
+      return json(generateTempResetToken_(params.payload));
+    }
+
+    if (action === 'importMigratedData') {
+      const secret = String(params.import_secret || '');
+      if (secret !== 'MADRASAH_IMPORT_2025') return json({ ok: false, message: 'unauthorized' });
+      return json(importMigratedData_(String(params.sheet_name || ''), params.rows || []));
+    }
+
     return json({ ok: false, message: 'Unknown action: ' + action });
   } catch (err) {
     return json({ ok: false, error: String(err) });
@@ -717,6 +740,140 @@ function confirmPinReset_(params) {
   if (!updated) return { ok: false, message: 'ব্যবহারকারী খুঁজে পাওয়া যায়নি' };
   PropertiesService.getScriptProperties().deleteProperty('reset_' + email);
   return { ok: true, message: 'পিন সফলভাবে রিসেট হয়েছে' };
+}
+
+function listUsers_(params) {
+  params = params || {};
+  assertRole_(params.user_role, ['ADMIN']);
+  const users = listSheetRows_(CONFIG.SHEETS.USERS).data || [];
+  return {
+    ok: true,
+    data: users.map(function(u) {
+      return {
+        id: u.id, name: u.name, email: u.email, phone: u.phone,
+        role: u.role, active: u.active, approval_status: u.approval_status,
+      };
+    }),
+  };
+}
+
+function setUserApprovalStatus_(payload) {
+  validateRequired_(payload, ['id', 'approval_status']);
+  const validStatuses = ['APPROVED', 'PENDING', 'REJECTED', 'BLOCKED'];
+  if (validStatuses.indexOf(String(payload.approval_status)) === -1) {
+    throw new Error('Invalid approval_status: ' + payload.approval_status);
+  }
+  const res = updateById_(CONFIG.SHEETS.USERS, payload.id, { approval_status: payload.approval_status });
+  return { ok: true, data: res.after };
+}
+
+function generateTempResetToken_(payload) {
+  validateRequired_(payload, ['id']);
+  const users = listSheetRows_(CONFIG.SHEETS.USERS).data || [];
+  const user = users.find(function(u) { return String(u.id || '') === String(payload.id); });
+  if (!user) return { ok: false, message: 'User not found' };
+
+  const token = String(Math.floor(100000 + Math.random() * 900000));
+  const expiresInMinutes = Number(payload.expires_in_minutes || 30);
+  const expiry = Date.now() + expiresInMinutes * 60 * 1000;
+  PropertiesService.getScriptProperties().setProperty('reset_' + String(user.email || '').toLowerCase(), token + '_' + expiry);
+
+  const webAppUrl = ScriptApp.getService().getUrl();
+  const resetUrl = webAppUrl + '?action=resetPinForm&token=' + token + '&email=' + encodeURIComponent(String(user.email || '').toLowerCase());
+
+  return { ok: true, data: { token: token, expires_at: new Date(expiry).toISOString(), reset_url: resetUrl } };
+}
+
+function importMigratedData_(sheetName, rows) {
+  if (!sheetName || !Array.isArray(rows)) return { ok: false, message: 'sheet_name and rows array required' };
+  const now = nowIso();
+  const today = todayIso_();
+  let count = 0;
+
+  if (sheetName === 'fund_transactions') {
+    const existing = listSheetRows_(CONFIG.SHEETS.TXN).data || [];
+    if (existing.length > 0) return { ok: false, message: 'fund_transactions already has ' + existing.length + ' rows. Clear first.' };
+    for (let i = 0; i < rows.length; i++) {
+      const r = rows[i];
+      appendRow_(CONFIG.SHEETS.TXN, {
+        id: uid_('txn'),
+        txn_date: String(r.txn_date || today),
+        direction: String(r.direction || 'IN'),
+        fund_type: String(r.fund_type || 'GENERAL'),
+        amount: Number(r.amount || 0),
+        source_or_vendor: String(r.source_or_vendor || ''),
+        category: String(r.category || ''),
+        reference: '',
+        notes: String(r.notes || 'migrated'),
+        related_entity_type: '',
+        related_entity_id: '',
+        status: 'ACTIVE',
+        created_by: 'migration',
+        created_at: now,
+        updated_at: now,
+      });
+      count++;
+    }
+    return { ok: true, imported: count };
+  }
+
+  if (sheetName === 'beneficiaries') {
+    const existing = listSheetRows_(CONFIG.SHEETS.BENEFICIARIES).data || [];
+    if (existing.length > 0) return { ok: false, message: 'beneficiaries already has ' + existing.length + ' rows.' };
+    for (let i = 0; i < rows.length; i++) {
+      const r = rows[i];
+      appendRow_(CONFIG.SHEETS.BENEFICIARIES, {
+        id: uid_('ben'),
+        serial_no: String(r.serial_no || ''),
+        name_bn: String(r.name_bn || ''),
+        age: String(r.age || ''),
+        guardian_status: String(r.guardian_status || ''),
+        class_name: String(r.class_name || ''),
+        primary_need: String(r.primary_need || ''),
+        monthly_need: String(r.monthly_need || ''),
+        monthly_need_amount: Number(r.monthly_need_amount || 0),
+        active: String(r.active || 'TRUE').toString().toUpperCase() === 'FALSE' ? 'FALSE' : 'TRUE',
+        created_at: now,
+        updated_at: now,
+      });
+      count++;
+    }
+    return { ok: true, imported: count };
+  }
+
+  if (sheetName === 'scholarship_payments') {
+    const existing = listSheetRows_(CONFIG.SHEETS.SCHOLAR_PAY).data || [];
+    if (existing.length > 0) return { ok: false, message: 'scholarship_payments already has ' + existing.length + ' rows.' };
+    const bens = listSheetRows_(CONFIG.SHEETS.BENEFICIARIES).data || [];
+    const nameToId = {};
+    for (let i = 0; i < bens.length; i++) {
+      nameToId[String(bens[i].name_bn || '').trim()] = String(bens[i].id || '');
+    }
+    for (let i = 0; i < rows.length; i++) {
+      const r = rows[i];
+      const benName = String(r.beneficiary_name || '').trim();
+      appendRow_(CONFIG.SHEETS.SCHOLAR_PAY, {
+        id: uid_('sp'),
+        month_key: String(r.month_key || ''),
+        beneficiary_id: nameToId[benName] || '',
+        school_fee: Number(r.school_fee || 0),
+        bangla_tutor: Number(r.bangla_tutor || 0),
+        arabi_tutor: Number(r.arabi_tutor || 0),
+        materials: Number(r.materials || 0),
+        other: Number(r.other || 0),
+        total_paid: Number(r.total_paid || 0),
+        remaining_amount: Number(r.remaining_amount || 0),
+        payment_date: r.month_key ? String(r.month_key) + '-01' : today,
+        payment_status: String(r.payment_status || 'PAID'),
+        txn_id: '',
+        notes: benName,
+      });
+      count++;
+    }
+    return { ok: true, imported: count };
+  }
+
+  return { ok: false, message: 'Unknown sheet_name: ' + sheetName };
 }
 
 // One-time setup: call this once from Apps Script editor to set Sheet ID property

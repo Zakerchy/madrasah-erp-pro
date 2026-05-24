@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../core/app_lang.dart';
 import '../../shared/services/api_service.dart';
 import '../../shared/services/session_service.dart';
 import '../../shared/widgets/base_scaffold.dart';
@@ -91,15 +92,15 @@ class _DonationScreenState extends State<DonationScreen> {
         _note.clear();
         await _loadRows();
         final msg = res['queued'] == true
-            ? 'Offline saved. Donation will sync automatically later.'
-            : 'Donation saved successfully';
+            ? AppLang.t('অফলাইনে সংরক্ষিত। সংযোগে এলে পাঠানো হবে।', 'Offline saved. Will sync automatically.')
+            : AppLang.t('দান সফলভাবে সংরক্ষিত', 'Donation saved successfully');
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed: ${res['message'] ?? res['error']}')));
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('${res['message'] ?? res['error']}')));
       }
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('${AppLang.t('ত্রুটি', 'Error')}: $e')));
     }
 
     if (mounted) setState(() => _saving = false);
@@ -107,104 +108,107 @@ class _DonationScreenState extends State<DonationScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return BaseScaffold(
-      title: 'Donations',
-      body: ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          Form(
-            key: _formKey,
-            child: Column(
-              children: [
-                TextFormField(
-                  controller: _date,
-                  readOnly: true,
-                  decoration: InputDecoration(
-                    labelText: 'Date (YYYY-MM-DD)',
-                    suffixIcon: IconButton(
-                      tooltip: 'Select date',
-                      onPressed: _pickDate,
-                      icon: const Icon(Icons.calendar_month),
+    return ValueListenableBuilder<bool>(
+      valueListenable: AppLang.isEnglish,
+      builder: (context, isEn, _) => BaseScaffold(
+        title: AppLang.t('দান সংগ্রহ', 'Donations'),
+        body: ListView(
+          padding: const EdgeInsets.all(16),
+          children: [
+            Form(
+              key: _formKey,
+              child: Column(
+                children: [
+                  TextFormField(
+                    controller: _date,
+                    readOnly: true,
+                    decoration: InputDecoration(
+                      labelText: AppLang.t('তারিখ (YYYY-MM-DD)', 'Date (YYYY-MM-DD)'),
+                      suffixIcon: IconButton(
+                        tooltip: AppLang.t('তারিখ নির্বাচন', 'Select date'),
+                        onPressed: _pickDate,
+                        icon: const Icon(Icons.calendar_month),
+                      ),
+                    ),
+                    onTap: _pickDate,
+                    validator: (v) {
+                      final value = (v ?? '').trim();
+                      if (value.isEmpty) return AppLang.t('তারিখ দিন', 'Date required');
+                      if (_parseIsoDate(value) == null) return AppLang.t('বৈধ তারিখ দিন YYYY-MM-DD', 'Use valid date YYYY-MM-DD');
+                      return null;
+                    },
+                  ),
+                  const SizedBox(height: 12),
+                  DropdownButtonFormField<String>(
+                    value: _fundType,
+                    items: [
+                      DropdownMenuItem(value: 'CONSTRUCTION', child: Text(AppLang.t('নির্মাণ', 'Construction'))),
+                      DropdownMenuItem(value: 'JAKAT', child: Text(AppLang.t('যাকাত', 'Jakat'))),
+                      DropdownMenuItem(value: 'SCHOLARSHIP', child: Text(AppLang.t('বৃত্তি', 'Scholarship'))),
+                      DropdownMenuItem(value: 'GENERAL', child: Text(AppLang.t('সাধারণ', 'General'))),
+                    ],
+                    onChanged: (v) => setState(() => _fundType = v ?? 'CONSTRUCTION'),
+                    decoration: InputDecoration(labelText: AppLang.t('ফান্ড ধরন', 'Fund Type')),
+                  ),
+                  const SizedBox(height: 12),
+                  TextFormField(
+                    controller: _amount,
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    decoration: InputDecoration(labelText: AppLang.t('পরিমাণ', 'Amount')),
+                    validator: (v) {
+                      final n = double.tryParse((v ?? '').trim()) ?? 0;
+                      return n <= 0 ? AppLang.t('পরিমাণ ০ এর বেশি হতে হবে', 'Amount must be > 0') : null;
+                    },
+                  ),
+                  const SizedBox(height: 12),
+                  TextFormField(
+                    controller: _source,
+                    decoration: InputDecoration(labelText: AppLang.t('দাতার নাম', 'Donor Name')),
+                    validator: (v) => (v == null || v.trim().isEmpty) ? AppLang.t('দাতার নাম দিন', 'Donor required') : null,
+                  ),
+                  const SizedBox(height: 12),
+                  TextFormField(
+                    controller: _note,
+                    minLines: 2,
+                    maxLines: 4,
+                    decoration: InputDecoration(labelText: AppLang.t('মন্তব্য', 'Notes')),
+                  ),
+                  const SizedBox(height: 16),
+                  SizedBox(
+                    width: double.infinity,
+                    child: FilledButton.icon(
+                      onPressed: _saving ? null : _submit,
+                      icon: _saving
+                          ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                          : const Icon(Icons.save),
+                      label: Text(_saving ? AppLang.t('সংরক্ষণ হচ্ছে...', 'Saving...') : AppLang.t('দান সংরক্ষণ', 'Save Donation')),
                     ),
                   ),
-                  onTap: _pickDate,
-                  validator: (v) {
-                    final value = (v ?? '').trim();
-                    if (value.isEmpty) return 'Date required';
-                    if (_parseIsoDate(value) == null) return 'Use valid date format YYYY-MM-DD';
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 12),
-                DropdownButtonFormField<String>(
-                  value: _fundType,
-                  items: const [
-                    DropdownMenuItem(value: 'CONSTRUCTION', child: Text('Construction')),
-                    DropdownMenuItem(value: 'JAKAT', child: Text('Jakat')),
-                    DropdownMenuItem(value: 'SCHOLARSHIP', child: Text('Scholarship')),
-                    DropdownMenuItem(value: 'GENERAL', child: Text('General')),
-                  ],
-                  onChanged: (v) => setState(() => _fundType = v ?? 'CONSTRUCTION'),
-                  decoration: const InputDecoration(labelText: 'Fund Type'),
-                ),
-                const SizedBox(height: 12),
-                TextFormField(
-                  controller: _amount,
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                  decoration: const InputDecoration(labelText: 'Amount'),
-                  validator: (v) {
-                    final n = double.tryParse((v ?? '').trim()) ?? 0;
-                    return n <= 0 ? 'Amount must be greater than 0' : null;
-                  },
-                ),
-                const SizedBox(height: 12),
-                TextFormField(
-                  controller: _source,
-                  decoration: const InputDecoration(labelText: 'Donor Name'),
-                  validator: (v) => (v == null || v.trim().isEmpty) ? 'Donor required' : null,
-                ),
-                const SizedBox(height: 12),
-                TextFormField(
-                  controller: _note,
-                  minLines: 2,
-                  maxLines: 4,
-                  decoration: const InputDecoration(labelText: 'Notes'),
-                ),
-                const SizedBox(height: 16),
-                SizedBox(
-                  width: double.infinity,
-                  child: FilledButton.icon(
-                    onPressed: _saving ? null : _submit,
-                    icon: _saving
-                        ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
-                        : const Icon(Icons.save),
-                    label: Text(_saving ? 'Saving...' : 'Save Donation'),
-                  ),
-                ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 20),
+            Row(
+              children: [
+                Text(AppLang.t('সাম্প্রতিক দান', 'Recent Donations'), style: const TextStyle(fontWeight: FontWeight.bold)),
+                const Spacer(),
+                IconButton(onPressed: _loadRows, icon: const Icon(Icons.refresh)),
               ],
             ),
-          ),
-          const SizedBox(height: 20),
-          Row(
-            children: [
-              const Text('Recent Donations', style: TextStyle(fontWeight: FontWeight.bold)),
-              const Spacer(),
-              IconButton(onPressed: _loadRows, icon: const Icon(Icons.refresh)),
-            ],
-          ),
-          if (_loadingList)
-            const Padding(
-              padding: EdgeInsets.all(16),
-              child: Center(child: CircularProgressIndicator()),
-            )
-          else
-            ..._rows.map((r) => Card(
-                  child: ListTile(
-                    title: Text('${r['source_or_vendor'] ?? 'Donor'} • ৳${r['amount'] ?? 0}'),
-                    subtitle: Text('${r['fund_type'] ?? ''} • ${r['txn_date'] ?? ''}'),
-                  ),
-                )),
-        ],
+            if (_loadingList)
+              const Padding(
+                padding: EdgeInsets.all(16),
+                child: Center(child: CircularProgressIndicator()),
+              )
+            else
+              ..._rows.map((r) => Card(
+                    child: ListTile(
+                      title: Text('${r['source_or_vendor'] ?? AppLang.t('দাতা', 'Donor')} • ৳${r['amount'] ?? 0}'),
+                      subtitle: Text('${r['fund_type'] ?? ''} • ${r['txn_date'] ?? ''}'),
+                    ),
+                  )),
+          ],
+        ),
       ),
     );
   }

@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+
+import '../../core/app_lang.dart';
 import 'app_drawer.dart';
 import '../services/local_store_service.dart';
 import '../services/sync_service.dart';
@@ -13,59 +15,69 @@ class BaseScaffold extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final mergedActions = <Widget>[
-      ...?actions,
-      ValueListenableBuilder<int>(
-        valueListenable: LocalStoreService.pendingCount,
-        builder: (_, pending, __) {
-          return IconButton(
-            tooltip: pending > 0 ? 'Sync pending ($pending)' : 'Sync',
-            onPressed: () async {
-              final res = await SyncService.syncPending();
-              if (!context.mounted) return;
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text(
-                    'Synced: ${res['synced'] ?? 0}, Pending: ${res['remaining'] ?? 0}',
-                  ),
+    return ValueListenableBuilder<bool>(
+      valueListenable: AppLang.isEnglish,
+      builder: (context, _, __) {
+        final mergedActions = <Widget>[
+          ...?actions,
+          ValueListenableBuilder<int>(
+            valueListenable: LocalStoreService.pendingCount,
+            builder: (_, pending, __) {
+              return IconButton(
+                tooltip: pending > 0
+                    ? AppLang.t('সিঙ্ক বাকি ($pending)', 'Sync pending ($pending)')
+                    : AppLang.t('সিঙ্ক', 'Sync'),
+                onPressed: () async {
+                  final res = await SyncService.syncPending();
+                  if (!context.mounted) return;
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(
+                        AppLang.t(
+                          'সিঙ্ক: ${res['synced'] ?? 0}, বাকি: ${res['remaining'] ?? 0}',
+                          'Synced: ${res['synced'] ?? 0}, Pending: ${res['remaining'] ?? 0}',
+                        ),
+                      ),
+                    ),
+                  );
+                },
+                icon: Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    const Icon(Icons.sync),
+                    if (pending > 0)
+                      Positioned(
+                        right: -4,
+                        top: -4,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 4, vertical: 1),
+                          decoration: BoxDecoration(
+                            color: Colors.red.shade600,
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Text(
+                            pending.toString(),
+                            style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold),
+                          ),
+                        ),
+                      ),
+                  ],
                 ),
               );
             },
-            icon: Stack(
-              clipBehavior: Clip.none,
-              children: [
-                const Icon(Icons.sync),
-                if (pending > 0)
-                  Positioned(
-                    right: -4,
-                    top: -4,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 4, vertical: 1),
-                      decoration: BoxDecoration(
-                        color: Colors.red.shade600,
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: Text(
-                        pending.toString(),
-                        style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 10,
-                            fontWeight: FontWeight.bold),
-                      ),
-                    ),
-                  ),
-              ],
-            ),
-          );
-        },
-      ),
-    ];
+          ),
+        ];
 
-    return Scaffold(
-      appBar: AppBar(title: Text(title), actions: mergedActions),
-      drawer: const AppDrawer(),
-      body: body,
+        return Scaffold(
+          appBar: AppBar(title: Text(title), actions: mergedActions),
+          drawer: const AppDrawer(),
+          body: body,
+        );
+      },
     );
   }
 }

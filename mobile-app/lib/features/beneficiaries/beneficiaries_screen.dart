@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../core/app_lang.dart';
 import '../../shared/services/api_service.dart';
 import '../../shared/services/session_service.dart';
 import '../../shared/widgets/base_scaffold.dart';
@@ -42,7 +43,7 @@ class _BeneficiariesScreenState extends State<BeneficiariesScreen> {
 
   Future<void> _save() async {
     if (_name.text.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Name is required')));
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(AppLang.t('নাম প্রয়োজন', 'Name is required'))));
       return;
     }
 
@@ -71,8 +72,8 @@ class _BeneficiariesScreenState extends State<BeneficiariesScreen> {
       _monthlyAmount.clear();
       await _load();
       final msg = res['queued'] == true
-          ? 'Offline saved. Beneficiary will sync automatically later.'
-          : 'Beneficiary saved';
+          ? AppLang.t('অফলাইনে সংরক্ষিত।', 'Offline saved. Will sync automatically.')
+          : AppLang.t('সুবিধাভোগী সংরক্ষিত', 'Beneficiary saved');
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
     } else {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('${res['message'] ?? res['error']}')));
@@ -81,44 +82,47 @@ class _BeneficiariesScreenState extends State<BeneficiariesScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return BaseScaffold(
-      title: 'Beneficiaries',
-      body: ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          const Text('Add Beneficiary', style: TextStyle(fontWeight: FontWeight.bold)),
-          const SizedBox(height: 8),
-          TextField(controller: _name, decoration: const InputDecoration(labelText: 'Name (Bangla)')),
-          const SizedBox(height: 8),
-          TextField(controller: _age, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Age')),
-          const SizedBox(height: 8),
-          TextField(controller: _className, decoration: const InputDecoration(labelText: 'Class')),
-          const SizedBox(height: 8),
-          TextField(controller: _guardianStatus, decoration: const InputDecoration(labelText: 'Guardian Status')),
-          const SizedBox(height: 8),
-          TextField(controller: _monthlyAmount, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Monthly Need Amount')),
-          const SizedBox(height: 12),
-          FilledButton.icon(onPressed: _save, icon: const Icon(Icons.save), label: const Text('Save Beneficiary')),
-          const SizedBox(height: 20),
-          Row(
-            children: [
-              const Text('Beneficiary List', style: TextStyle(fontWeight: FontWeight.bold)),
-              const Spacer(),
-              IconButton(onPressed: _load, icon: const Icon(Icons.refresh)),
-            ],
-          ),
-          if (_loading)
-            const Center(child: Padding(padding: EdgeInsets.all(16), child: CircularProgressIndicator()))
-          else
-            ..._rows.map(
-              (r) => Card(
-                child: ListTile(
-                  title: Text(r['name_bn']?.toString() ?? 'Unnamed'),
-                  subtitle: Text('Class: ${r['class_name'] ?? '-'} | Monthly: ৳${r['monthly_need_amount'] ?? 0}'),
+    return ValueListenableBuilder<bool>(
+      valueListenable: AppLang.isEnglish,
+      builder: (context, isEn, _) => BaseScaffold(
+        title: AppLang.t('সুবিধাভোগী', 'Beneficiaries'),
+        body: ListView(
+          padding: const EdgeInsets.all(16),
+          children: [
+            Text(AppLang.t('সুবিধাভোগী যোগ করুন', 'Add Beneficiary'), style: const TextStyle(fontWeight: FontWeight.bold)),
+            const SizedBox(height: 8),
+            TextField(controller: _name, decoration: InputDecoration(labelText: AppLang.t('নাম (বাংলায়)', 'Name (Bangla)'))),
+            const SizedBox(height: 8),
+            TextField(controller: _age, keyboardType: TextInputType.number, decoration: InputDecoration(labelText: AppLang.t('বয়স', 'Age'))),
+            const SizedBox(height: 8),
+            TextField(controller: _className, decoration: InputDecoration(labelText: AppLang.t('শ্রেণি', 'Class'))),
+            const SizedBox(height: 8),
+            TextField(controller: _guardianStatus, decoration: InputDecoration(labelText: AppLang.t('অভিভাবকের অবস্থা', 'Guardian Status'))),
+            const SizedBox(height: 8),
+            TextField(controller: _monthlyAmount, keyboardType: TextInputType.number, decoration: InputDecoration(labelText: AppLang.t('মাসিক প্রয়োজন (৳)', 'Monthly Need Amount'))),
+            const SizedBox(height: 12),
+            FilledButton.icon(onPressed: _save, icon: const Icon(Icons.save), label: Text(AppLang.t('সুবিধাভোগী সংরক্ষণ', 'Save Beneficiary'))),
+            const SizedBox(height: 20),
+            Row(
+              children: [
+                Text(AppLang.t('সুবিধাভোগীর তালিকা', 'Beneficiary List'), style: const TextStyle(fontWeight: FontWeight.bold)),
+                const Spacer(),
+                IconButton(onPressed: _load, icon: const Icon(Icons.refresh)),
+              ],
+            ),
+            if (_loading)
+              const Center(child: Padding(padding: EdgeInsets.all(16), child: CircularProgressIndicator()))
+            else
+              ..._rows.map(
+                (r) => Card(
+                  child: ListTile(
+                    title: Text(r['name_bn']?.toString() ?? AppLang.t('নামহীন', 'Unnamed')),
+                    subtitle: Text('${AppLang.t('শ্রেণি', 'Class')}: ${r['class_name'] ?? '-'} | ${AppLang.t('মাসিক', 'Monthly')}: ৳${r['monthly_need_amount'] ?? 0}'),
+                  ),
                 ),
               ),
-            ),
-        ],
+          ],
+        ),
       ),
     );
   }
