@@ -1,11 +1,13 @@
 {
-    "name": "madrasah_erp_lite",
-    "short_name": "madrasah_erp_lite",
-    "start_url": ".",
+    "name": "Madrasah App Lite",
+    "short_name": "Madrasah",
+    "start_url": "/",
+    "scope": "/",
     "display": "standalone",
+    "display_override": ["fullscreen", "standalone", "minimal-ui"],
     "background_color": "#0175C2",
     "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
+    "description": "Madrasah App Lite web portal for fund management.",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

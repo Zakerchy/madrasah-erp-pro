@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../shared/models/dashboard_summary.dart';
 import '../../shared/models/notification_settings.dart';
 import '../../shared/services/api_service.dart';
 import '../../shared/services/local_store_service.dart';
+import '../../shared/services/pwa_runtime_service.dart';
 import '../../shared/services/session_service.dart';
 import 'fund_detail_page.dart';
 
@@ -17,6 +19,9 @@ class DashboardScreen extends StatefulWidget {
 
 class _DashboardScreenState extends State<DashboardScreen> {
   final _api = ApiService();
+  static final Uri _apkDownloadUri = Uri.parse(
+    'https://github.com/Zakerchy/madrasah-erp-lite/releases/download/latest-apk/app-debug.apk',
+  );
   bool _loading = true;
   bool _offline = false;
   String? _error;
@@ -31,6 +36,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
   double _monthlyIn = 0;
   double _monthlyOut = 0;
   double _monthlyBalance = 0;
+  bool _isStandalonePwa = true;
+  bool _canInstallPwa = false;
+  bool _webOnline = true;
   String _summaryFrom = '';
   String _summaryTo = '';
   DateTime? _lastBackPressedAt;
@@ -38,7 +46,28 @@ class _DashboardScreenState extends State<DashboardScreen> {
   @override
   void initState() {
     super.initState();
+    _syncPwaState();
+    pwaRuntimeService.standaloneMode.addListener(_syncPwaState);
+    pwaRuntimeService.installAvailable.addListener(_syncPwaState);
+    pwaRuntimeService.onlineStatus.addListener(_syncPwaState);
     _load();
+  }
+
+  @override
+  void dispose() {
+    pwaRuntimeService.standaloneMode.removeListener(_syncPwaState);
+    pwaRuntimeService.installAvailable.removeListener(_syncPwaState);
+    pwaRuntimeService.onlineStatus.removeListener(_syncPwaState);
+    super.dispose();
+  }
+
+  void _syncPwaState() {
+    if (!mounted) return;
+    setState(() {
+      _isStandalonePwa = pwaRuntimeService.standaloneMode.value;
+      _canInstallPwa = pwaRuntimeService.installAvailable.value;
+      _webOnline = pwaRuntimeService.onlineStatus.value;
+    });
   }
 
   Future<void> _load() async {
@@ -243,6 +272,30 @@ class _DashboardScreenState extends State<DashboardScreen> {
       context,
       MaterialPageRoute(
         builder: (_) => FundDetailPage(fundKey: fundKey, fundName: fundName),
+      ),
+    );
+  }
+
+  Future<void> _downloadApk() async {
+    final opened = await launchUrl(
+      _apkDownloadUri,
+      mode: LaunchMode.externalApplication,
+    );
+    if (!opened && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('APK download link খোলা যায়নি')),
+      );
+    }
+  }
+
+  Future<void> _installWebApp() async {
+    final opened = await pwaRuntimeService.promptInstall();
+    if (opened || !mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          pwaRuntimeService.installHelpMessage(isEnglish: false),
+        ),
       ),
     );
   }
@@ -522,9 +575,24 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   onAddIncome: () => _quickEntry(income: true),
                   onAddExpense: () => _quickEntry(income: false),
                   onOpenReports: () => Navigator.pushNamed(context, '/reports'),
+                  onDownloadApk: _downloadApk,
+                  onInstallPwa: (!_isStandalonePwa && _canInstallPwa)
+                      ? _installWebApp
+                      : null,
                   onOpenSettings: SessionService.role == 'ADMIN'
                       ? () => Navigator.pushNamed(context, '/settings')
                       : null,
+                ),
+                const SizedBox(height: 14),
+                _PwaModeCard(
+                  isStandalonePwa: _isStandalonePwa,
+                  canInstallPwa: _canInstallPwa,
+                  isOnline: _webOnline,
+                  onInstallPwa: (!_isStandalonePwa && _canInstallPwa)
+                      ? _installWebApp
+                      : null,
+                  installHelpText:
+                      pwaRuntimeService.installHelpMessage(isEnglish: false),
                 ),
                 const SizedBox(height: 14),
                 _ControlBarCard(
@@ -1012,6 +1080,121 @@ class _SepRow extends StatelessWidget {
   }
 }
 
+class _PwaModeCard extends StatelessWidget {
+  final bool isStandalonePwa;
+  final bool canInstallPwa;
+  final bool isOnline;
+  final VoidCallback? onInstallPwa;
+  final String installHelpText;
+
+  const _PwaModeCard({
+    required this.isStandalonePwa,
+    required this.canInstallPwa,
+    required this.isOnline,
+    required this.onInstallPwa,
+    required this.installHelpText,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final borderColor =
+        isStandalonePwa ? const Color(0xFF99F6E4) : const Color(0xFFBFDBFE);
+    final bgColor =
+        isStandalonePwa ? const Color(0xFFF0FDFA) : const Color(0xFFEFF6FF);
+    final iconColor =
+        isStandalonePwa ? const Color(0xFF0F766E) : const Color(0xFF1D4ED8);
+
+    return Card(
+      elevation: 0,
+      color: bgColor,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(14),
+        side: BorderSide(color: borderColor),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(
+                  isStandalonePwa
+                      ? Icons.phone_android_rounded
+                      : Icons.language_rounded,
+                  color: iconColor,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    isStandalonePwa
+                        ? 'Native-like mode active'
+                        : 'Browser mode detected',
+                    style: const TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                ),
+                _StatusDot(
+                  color:
+                      isOnline ? Colors.green.shade600 : Colors.orange.shade700,
+                  label: isOnline ? 'Online' : 'Offline',
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Text(
+              isStandalonePwa
+                  ? 'URL bar ছাড়া app-mode এ চলছে।'
+                  : 'Real app feel পেতে Install Web App ব্যবহার করুন।',
+              style: TextStyle(color: Colors.grey.shade700),
+            ),
+            if (!isStandalonePwa) ...[
+              const SizedBox(height: 10),
+              if (onInstallPwa != null)
+                FilledButton.icon(
+                  onPressed: onInstallPwa,
+                  icon: const Icon(Icons.install_mobile),
+                  label: const Text('Install Web App'),
+                ),
+              if (onInstallPwa == null || !canInstallPwa)
+                Text(
+                  installHelpText,
+                  style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
+                ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _StatusDot extends StatelessWidget {
+  final Color color;
+  final String label;
+
+  const _StatusDot({required this.color, required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 8,
+          height: 8,
+          decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+        ),
+        const SizedBox(width: 6),
+        Text(
+          label,
+          style: TextStyle(
+              color: color, fontWeight: FontWeight.w600, fontSize: 12),
+        ),
+      ],
+    );
+  }
+}
+
 // ─── Error View ──────────────────────────────────────────────────────────────
 
 class _ErrorView extends StatelessWidget {
@@ -1048,12 +1231,16 @@ class _QuickActionsRow extends StatelessWidget {
   final VoidCallback onAddIncome;
   final VoidCallback onAddExpense;
   final VoidCallback onOpenReports;
+  final VoidCallback onDownloadApk;
+  final VoidCallback? onInstallPwa;
   final VoidCallback? onOpenSettings;
 
   const _QuickActionsRow({
     required this.onAddIncome,
     required this.onAddExpense,
     required this.onOpenReports,
+    required this.onDownloadApk,
+    this.onInstallPwa,
     this.onOpenSettings,
   });
 
@@ -1087,6 +1274,17 @@ class _QuickActionsRow extends StatelessWidget {
               label: const Text('রিপোর্ট'),
               onPressed: onOpenReports,
             ),
+            ActionChip(
+              avatar: const Icon(Icons.download_for_offline_outlined, size: 18),
+              label: const Text('APK ডাউনলোড'),
+              onPressed: onDownloadApk,
+            ),
+            if (onInstallPwa != null)
+              ActionChip(
+                avatar: const Icon(Icons.install_mobile, size: 18),
+                label: const Text('Install Web App'),
+                onPressed: onInstallPwa,
+              ),
             if (onOpenSettings != null)
               ActionChip(
                 avatar: const Icon(Icons.tune, size: 18),
