@@ -15,6 +15,7 @@ This guide verifies everything implemented up to Phase 4.
 - `scholarship_payments`
 - `audit_log`
 - `settings`
+- `notifications`
 3. From `sheets/*.csv`, copy only header row to each tab.
 
 ## B) Import Initial Data (Optional but Recommended)

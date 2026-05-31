@@ -1,5 +1,6 @@
 import 'api_service.dart';
 import 'local_store_service.dart';
+import 'session_service.dart';
 
 class SyncService {
   static Future<Map<String, dynamic>> syncPending() async {
@@ -22,6 +23,34 @@ class SyncService {
         synced++;
       } else {
         remaining.add(item);
+        final failedAt = DateTime.now().toIso8601String();
+        await LocalStoreService.appendInAppNotification({
+          'id': 'local_sync_fail_$failedAt',
+          'category': 'failed_sync',
+          'title': 'Sync failed',
+          'message':
+              'Queued action "$action" failed and will retry automatically.',
+          'created_at': failedAt,
+          'source': 'local_sync_worker',
+        });
+
+        try {
+          await api.post(
+              'createNotificationEvent',
+              {
+                'user_role': SessionService.role,
+                'user_id': SessionService.userId,
+                'payload': {
+                  'category': 'failed_sync',
+                  'title': 'Sync failed',
+                  'message':
+                      'Queued action "$action" failed and will retry automatically.',
+                },
+              },
+              allowQueue: false);
+        } catch (_) {
+          // No-op. In-app local event is already captured above.
+        }
       }
     }
 

@@ -8,6 +8,8 @@
     "migrate": "node tools/migrate_excel_to_normalized.js",
     "check:server": "node local-check/server.mjs",
     "check:smoke": "node local-check/smoke-test.mjs",
-    "admin:web": "node local-check/server.mjs"
+    "admin:web": "node local-check/server.mjs",
+    "app:web": "./tools/run-local-web.sh web-server",
+    "app:web:chrome": "./tools/run-local-web.sh chrome"
   }
 }

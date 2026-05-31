@@ -1,0 +1,52 @@
+name: web-build-check
+
+on:
+  pull_request:
+    paths:
+      - "mobile-app/**"
+      - ".github/workflows/web-build-check.yml"
+  push:
+    branches: ["main"]
+    paths:
+      - "mobile-app/**"
+      - ".github/workflows/web-build-check.yml"
+
+jobs:
+  build-web:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: mobile-app
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+
+      - name: Flutter pub get
+        run: flutter pub get
+
+      - name: Build web
+        env:
+          APPS_SCRIPT_URL: ${{ secrets.APPS_SCRIPT_URL }}
+          API_BASE_URL: ${{ secrets.API_BASE_URL }}
+          APPS_SCRIPT_DEPLOYMENT_ID: ${{ secrets.APPS_SCRIPT_DEPLOYMENT_ID }}
+        run: |
+          URL="${APPS_SCRIPT_URL:-$API_BASE_URL}"
+          if [ -n "$URL" ]; then
+            DEFINE_ARG="--dart-define=APPS_SCRIPT_URL=$URL"
+          elif [ -n "$APPS_SCRIPT_DEPLOYMENT_ID" ]; then
+            DEFINE_ARG="--dart-define=APPS_SCRIPT_DEPLOYMENT_ID=$APPS_SCRIPT_DEPLOYMENT_ID"
+          else
+            DEFINE_ARG=""
+          fi
+          flutter build web --release $DEFINE_ARG
+
+      - name: Upload web artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: madrasah-erp-web-build
+          path: mobile-app/build/web

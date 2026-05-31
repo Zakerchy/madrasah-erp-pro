@@ -9,3 +9,10 @@
 ## Notes
 - Keep the first row in each sheet as exact header row.
 - Backend expects column names from `sheets/*.csv` headers.
+- Notification controls are stored in `settings` sheet keys:
+  - `notify.in_app.enabled` (locked TRUE)
+  - `notify.email.approval`
+  - `notify.email.failed_sync`
+  - `notify.email.daily_summary`
+  - `notify.email.due_reminder`
+  - `notify.email.security_alert`

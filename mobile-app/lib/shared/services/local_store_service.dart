@@ -8,6 +8,7 @@ class LocalStoreService {
   static const String _getCacheKey = 'get_cache_v1';
   static const String _sessionUserKey = 'session_user_v1';
   static const String _offlineCredentialKey = 'offline_credentials_v2';
+  static const String _inAppNotificationsKey = 'in_app_notifications_v1';
   static const Duration _getCacheTtl = Duration(minutes: 15);
 
   static SharedPreferences? _prefs;
@@ -24,7 +25,8 @@ class LocalStoreService {
     pendingCount.value = getPendingPosts().length;
   }
 
-  static Future<void> cacheGetResponse(String cacheKey, Map<String, dynamic> value) async {
+  static Future<void> cacheGetResponse(
+      String cacheKey, Map<String, dynamic> value) async {
     await init();
     final bucket = _getCacheMap();
     bucket[cacheKey] = {
@@ -37,8 +39,10 @@ class LocalStoreService {
   static Map<String, dynamic>? readCachedGetResponse(String cacheKey) {
     final bucket = _getCacheMap();
     final raw = bucket[cacheKey];
-    if (raw is Map<String, dynamic>) return _parseCachedGet(raw, bucket, cacheKey);
-    if (raw is Map) return _parseCachedGet(Map<String, dynamic>.from(raw), bucket, cacheKey);
+    if (raw is Map<String, dynamic>)
+      return _parseCachedGet(raw, bucket, cacheKey);
+    if (raw is Map)
+      return _parseCachedGet(Map<String, dynamic>.from(raw), bucket, cacheKey);
     return null;
   }
 
@@ -49,7 +53,10 @@ class LocalStoreService {
     final decoded = jsonDecode(raw);
     if (decoded is! List) return [];
 
-    return decoded.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList();
+    return decoded
+        .whereType<Map>()
+        .map((e) => Map<String, dynamic>.from(e))
+        .toList();
   }
 
   static Future<void> appendPendingPost(Map<String, dynamic> item) async {
@@ -60,7 +67,8 @@ class LocalStoreService {
     await refreshPendingCount();
   }
 
-  static Future<void> replacePendingPosts(List<Map<String, dynamic>> list) async {
+  static Future<void> replacePendingPosts(
+      List<Map<String, dynamic>> list) async {
     await init();
     await _prefs!.setString(_pendingQueueKey, jsonEncode(list));
     await refreshPendingCount();
@@ -110,6 +118,28 @@ class LocalStoreService {
     await _prefs!.remove(_offlineCredentialKey);
   }
 
+  static List<Map<String, dynamic>> readInAppNotifications() {
+    final raw = _prefs?.getString(_inAppNotificationsKey);
+    if (raw == null || raw.isEmpty) return [];
+    final decoded = jsonDecode(raw);
+    if (decoded is! List) return [];
+    return decoded
+        .whereType<Map>()
+        .map((e) => Map<String, dynamic>.from(e))
+        .toList();
+  }
+
+  static Future<void> appendInAppNotification(
+      Map<String, dynamic> event) async {
+    await init();
+    final list = readInAppNotifications();
+    list.insert(0, event);
+    if (list.length > 200) {
+      list.removeRange(200, list.length);
+    }
+    await _prefs!.setString(_inAppNotificationsKey, jsonEncode(list));
+  }
+
   static Map<String, dynamic> _getCacheMap() {
     final raw = _prefs?.getString(_getCacheKey);
     if (raw == null || raw.isEmpty) return {};
@@ -126,9 +156,11 @@ class LocalStoreService {
     String cacheKey,
   ) {
     if (raw.containsKey('cached_at_ms') && raw['value'] is Map) {
-      final savedAtMs = int.tryParse((raw['cached_at_ms'] ?? '').toString()) ?? 0;
+      final savedAtMs =
+          int.tryParse((raw['cached_at_ms'] ?? '').toString()) ?? 0;
       final nowMs = DateTime.now().millisecondsSinceEpoch;
-      final expired = savedAtMs <= 0 || (nowMs - savedAtMs) > _getCacheTtl.inMilliseconds;
+      final expired =
+          savedAtMs <= 0 || (nowMs - savedAtMs) > _getCacheTtl.inMilliseconds;
       if (expired) {
         bucket.remove(cacheKey);
         _prefs?.setString(_getCacheKey, jsonEncode(bucket));

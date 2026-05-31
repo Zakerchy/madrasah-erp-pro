@@ -4,6 +4,10 @@ on:
   workflow_dispatch:
   push:
     branches: ["main"]
+    paths:
+      - "mobile-app/**"
+      - "backend-apps-script/**"
+      - ".github/workflows/android-apk.yml"
 
 permissions:
   contents: write
@@ -41,9 +45,20 @@ jobs:
       - name: Build debug APK
         env:
           APPS_SCRIPT_URL: ${{ secrets.APPS_SCRIPT_URL }}
+          API_BASE_URL: ${{ secrets.API_BASE_URL }}
+          APPS_SCRIPT_DEPLOYMENT_ID: ${{ secrets.APPS_SCRIPT_DEPLOYMENT_ID }}
         run: |
+          URL="${APPS_SCRIPT_URL:-$API_BASE_URL}"
+          if [ -n "$URL" ]; then
+            DEFINE_ARG="--dart-define=APPS_SCRIPT_URL=$URL"
+          elif [ -n "$APPS_SCRIPT_DEPLOYMENT_ID" ]; then
+            DEFINE_ARG="--dart-define=APPS_SCRIPT_DEPLOYMENT_ID=$APPS_SCRIPT_DEPLOYMENT_ID"
+          else
+            echo "Missing APPS_SCRIPT_URL/API_BASE_URL/APPS_SCRIPT_DEPLOYMENT_ID secret" >&2
+            exit 1
+          fi
           flutter build apk --debug \
-            --dart-define=APPS_SCRIPT_URL="$APPS_SCRIPT_URL"
+            "$DEFINE_ARG"
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4

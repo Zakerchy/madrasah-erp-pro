@@ -24,6 +24,8 @@ class _DonationScreenState extends State<DonationScreen> {
   bool _saving = false;
   bool _loadingList = true;
   List<Map<String, dynamic>> _rows = [];
+  DateTime? _historyFrom;
+  DateTime? _historyTo;
 
   @override
   void initState() {
@@ -35,13 +37,69 @@ class _DonationScreenState extends State<DonationScreen> {
   Future<void> _loadRows() async {
     setState(() => _loadingList = true);
     try {
-      final res = await _api.get('listTransactions', query: {'direction': 'IN'});
+      final today = DateTime.now();
+      _historyTo ??= DateTime(today.year, today.month, today.day);
+      _historyFrom ??= await _resolveDefaultFromDate();
+
+      final res = await _api.get('listTransactions', query: {
+        'direction': 'IN',
+        'from': _dateKey(_historyFrom!),
+        'to': _dateKey(_historyTo!),
+        'limit': 300,
+      });
       if (res['ok'] == true) {
         final data = (res['data'] as List<dynamic>? ?? []);
-        _rows = data.take(30).map((e) => Map<String, dynamic>.from(e as Map)).toList();
+        _rows = data.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+      } else {
+        _rows = [];
       }
     } catch (_) {}
     if (mounted) setState(() => _loadingList = false);
+  }
+
+  String _dateKey(DateTime value) {
+    return '${value.year.toString().padLeft(4, '0')}-${value.month.toString().padLeft(2, '0')}-${value.day.toString().padLeft(2, '0')}';
+  }
+
+  Future<DateTime> _resolveDefaultFromDate() async {
+    final fallback = DateTime(2022, 1, 26);
+    try {
+      final res = await _api.get('datasetStats');
+      if (res['ok'] == true) {
+        final data = Map<String, dynamic>.from(res['data'] as Map? ?? {});
+        final parsed = _parseIsoDate('${data['first_txn_date'] ?? ''}');
+        if (parsed != null) return parsed;
+      }
+    } catch (_) {}
+    return fallback;
+  }
+
+  Future<void> _pickHistoryDate({required bool from}) async {
+    final now = DateTime.now();
+    final current = from
+        ? (_historyFrom ?? DateTime(now.year, 1, 1))
+        : (_historyTo ?? DateTime(now.year, now.month, now.day));
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: current,
+      firstDate: DateTime(2000),
+      lastDate: DateTime(2100),
+    );
+    if (picked == null) return;
+    setState(() {
+      if (from) {
+        _historyFrom = DateTime(picked.year, picked.month, picked.day);
+        if (_historyTo != null && _historyFrom!.isAfter(_historyTo!)) {
+          _historyTo = _historyFrom;
+        }
+      } else {
+        _historyTo = DateTime(picked.year, picked.month, picked.day);
+        if (_historyFrom != null && _historyTo!.isBefore(_historyFrom!)) {
+          _historyFrom = _historyTo;
+        }
+      }
+    });
+    await _loadRows();
   }
 
   DateTime? _parseIsoDate(String value) {
@@ -49,7 +107,8 @@ class _DonationScreenState extends State<DonationScreen> {
     if (!RegExp(r'^\d{4}-\d{2}-\d{2}$').hasMatch(trimmed)) return null;
     final dt = DateTime.tryParse(trimmed);
     if (dt == null) return null;
-    final normalized = '${dt.year.toString().padLeft(4, '0')}-${dt.month.toString().padLeft(2, '0')}-${dt.day.toString().padLeft(2, '0')}';
+    final normalized =
+        '${dt.year.toString().padLeft(4, '0')}-${dt.month.toString().padLeft(2, '0')}-${dt.day.toString().padLeft(2, '0')}';
     return normalized == trimmed ? dt : null;
   }
 
@@ -62,7 +121,8 @@ class _DonationScreenState extends State<DonationScreen> {
       lastDate: DateTime(2100),
     );
     if (picked == null) return;
-    _date.text = '${picked.year.toString().padLeft(4, '0')}-${picked.month.toString().padLeft(2, '0')}-${picked.day.toString().padLeft(2, '0')}';
+    _date.text =
+        '${picked.year.toString().padLeft(4, '0')}-${picked.month.toString().padLeft(2, '0')}-${picked.day.toString().padLeft(2, '0')}';
     if (mounted) setState(() {});
   }
 
@@ -91,16 +151,21 @@ class _DonationScreenState extends State<DonationScreen> {
         _source.clear();
         _note.clear();
         await _loadRows();
+        if (!mounted) return;
         final msg = res['queued'] == true
-            ? AppLang.t('অফলাইনে সংরক্ষিত। সংযোগে এলে পাঠানো হবে।', 'Offline saved. Will sync automatically.')
+            ? AppLang.t('অফলাইনে সংরক্ষিত। সংযোগে এলে পাঠানো হবে।',
+                'Offline saved. Will sync automatically.')
             : AppLang.t('দান সফলভাবে সংরক্ষিত', 'Donation saved successfully');
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(msg)));
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('${res['message'] ?? res['error']}')));
+        ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('${res['message'] ?? res['error']}')));
       }
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('${AppLang.t('ত্রুটি', 'Error')}: $e')));
+      ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('${AppLang.t('ত্রুটি', 'Error')}: $e')));
     }
 
     if (mounted) setState(() => _saving = false);
@@ -123,7 +188,8 @@ class _DonationScreenState extends State<DonationScreen> {
                     controller: _date,
                     readOnly: true,
                     decoration: InputDecoration(
-                      labelText: AppLang.t('তারিখ (YYYY-MM-DD)', 'Date (YYYY-MM-DD)'),
+                      labelText:
+                          AppLang.t('তারিখ (YYYY-MM-DD)', 'Date (YYYY-MM-DD)'),
                       suffixIcon: IconButton(
                         tooltip: AppLang.t('তারিখ নির্বাচন', 'Select date'),
                         onPressed: _pickDate,
@@ -133,45 +199,69 @@ class _DonationScreenState extends State<DonationScreen> {
                     onTap: _pickDate,
                     validator: (v) {
                       final value = (v ?? '').trim();
-                      if (value.isEmpty) return AppLang.t('তারিখ দিন', 'Date required');
-                      if (_parseIsoDate(value) == null) return AppLang.t('বৈধ তারিখ দিন YYYY-MM-DD', 'Use valid date YYYY-MM-DD');
+                      if (value.isEmpty) {
+                        return AppLang.t('তারিখ দিন', 'Date required');
+                      }
+                      if (_parseIsoDate(value) == null) {
+                        return AppLang.t('বৈধ তারিখ দিন YYYY-MM-DD',
+                            'Use valid date YYYY-MM-DD');
+                      }
                       return null;
                     },
                   ),
                   const SizedBox(height: 12),
                   DropdownButtonFormField<String>(
-                    value: _fundType,
+                    initialValue: _fundType,
                     items: [
-                      DropdownMenuItem(value: 'CONSTRUCTION', child: Text(AppLang.t('নির্মাণ', 'Construction'))),
-                      DropdownMenuItem(value: 'JAKAT', child: Text(AppLang.t('যাকাত', 'Jakat'))),
-                      DropdownMenuItem(value: 'SCHOLARSHIP', child: Text(AppLang.t('বৃত্তি', 'Scholarship'))),
-                      DropdownMenuItem(value: 'GENERAL', child: Text(AppLang.t('সাধারণ', 'General'))),
+                      DropdownMenuItem(
+                          value: 'CONSTRUCTION',
+                          child: Text(AppLang.t('নির্মাণ', 'Construction'))),
+                      DropdownMenuItem(
+                          value: 'JAKAT',
+                          child: Text(AppLang.t('যাকাত', 'Jakat'))),
+                      DropdownMenuItem(
+                          value: 'SCHOLARSHIP',
+                          child: Text(AppLang.t('বৃত্তি', 'Scholarship'))),
+                      DropdownMenuItem(
+                          value: 'GENERAL',
+                          child: Text(AppLang.t('সাধারণ', 'General'))),
                     ],
-                    onChanged: (v) => setState(() => _fundType = v ?? 'CONSTRUCTION'),
-                    decoration: InputDecoration(labelText: AppLang.t('ফান্ড ধরন', 'Fund Type')),
+                    onChanged: (v) =>
+                        setState(() => _fundType = v ?? 'CONSTRUCTION'),
+                    decoration: InputDecoration(
+                        labelText: AppLang.t('ফান্ড ধরন', 'Fund Type')),
                   ),
                   const SizedBox(height: 12),
                   TextFormField(
                     controller: _amount,
-                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                    decoration: InputDecoration(labelText: AppLang.t('পরিমাণ', 'Amount')),
+                    keyboardType:
+                        const TextInputType.numberWithOptions(decimal: true),
+                    decoration: InputDecoration(
+                        labelText: AppLang.t('পরিমাণ', 'Amount')),
                     validator: (v) {
                       final n = double.tryParse((v ?? '').trim()) ?? 0;
-                      return n <= 0 ? AppLang.t('পরিমাণ ০ এর বেশি হতে হবে', 'Amount must be > 0') : null;
+                      return n <= 0
+                          ? AppLang.t(
+                              'পরিমাণ ০ এর বেশি হতে হবে', 'Amount must be > 0')
+                          : null;
                     },
                   ),
                   const SizedBox(height: 12),
                   TextFormField(
                     controller: _source,
-                    decoration: InputDecoration(labelText: AppLang.t('দাতার নাম', 'Donor Name')),
-                    validator: (v) => (v == null || v.trim().isEmpty) ? AppLang.t('দাতার নাম দিন', 'Donor required') : null,
+                    decoration: InputDecoration(
+                        labelText: AppLang.t('দাতার নাম', 'Donor Name')),
+                    validator: (v) => (v == null || v.trim().isEmpty)
+                        ? AppLang.t('দাতার নাম দিন', 'Donor required')
+                        : null,
                   ),
                   const SizedBox(height: 12),
                   TextFormField(
                     controller: _note,
                     minLines: 2,
                     maxLines: 4,
-                    decoration: InputDecoration(labelText: AppLang.t('মন্তব্য', 'Notes')),
+                    decoration: InputDecoration(
+                        labelText: AppLang.t('মন্তব্য', 'Notes')),
                   ),
                   const SizedBox(height: 16),
                   SizedBox(
@@ -179,9 +269,14 @@ class _DonationScreenState extends State<DonationScreen> {
                     child: FilledButton.icon(
                       onPressed: _saving ? null : _submit,
                       icon: _saving
-                          ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                          ? const SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(strokeWidth: 2))
                           : const Icon(Icons.save),
-                      label: Text(_saving ? AppLang.t('সংরক্ষণ হচ্ছে...', 'Saving...') : AppLang.t('দান সংরক্ষণ', 'Save Donation')),
+                      label: Text(_saving
+                          ? AppLang.t('সংরক্ষণ হচ্ছে...', 'Saving...')
+                          : AppLang.t('দান সংরক্ষণ', 'Save Donation')),
                     ),
                   ),
                 ],
@@ -190,9 +285,25 @@ class _DonationScreenState extends State<DonationScreen> {
             const SizedBox(height: 20),
             Row(
               children: [
-                Text(AppLang.t('সাম্প্রতিক দান', 'Recent Donations'), style: const TextStyle(fontWeight: FontWeight.bold)),
+                Text(AppLang.t('সাম্প্রতিক দান', 'Recent Donations'),
+                    style: const TextStyle(fontWeight: FontWeight.bold)),
                 const Spacer(),
-                IconButton(onPressed: _loadRows, icon: const Icon(Icons.refresh)),
+                TextButton.icon(
+                  onPressed: () => _pickHistoryDate(from: true),
+                  icon: const Icon(Icons.calendar_today, size: 16),
+                  label: Text(_historyFrom == null
+                      ? AppLang.t('শুরু', 'From')
+                      : _dateKey(_historyFrom!)),
+                ),
+                TextButton.icon(
+                  onPressed: () => _pickHistoryDate(from: false),
+                  icon: const Icon(Icons.event, size: 16),
+                  label: Text(_historyTo == null
+                      ? AppLang.t('শেষ', 'To')
+                      : _dateKey(_historyTo!)),
+                ),
+                IconButton(
+                    onPressed: _loadRows, icon: const Icon(Icons.refresh)),
               ],
             ),
             if (_loadingList)
@@ -200,11 +311,23 @@ class _DonationScreenState extends State<DonationScreen> {
                 padding: EdgeInsets.all(16),
                 child: Center(child: CircularProgressIndicator()),
               )
+            else if (_rows.isEmpty)
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                child: Text(
+                  AppLang.t('এই তারিখ সীমায় কোনো দান পাওয়া যায়নি',
+                      'No donations found in this date range'),
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: Colors.grey.shade700),
+                ),
+              )
             else
               ..._rows.map((r) => Card(
                     child: ListTile(
-                      title: Text('${r['source_or_vendor'] ?? AppLang.t('দাতা', 'Donor')} • ৳${r['amount'] ?? 0}'),
-                      subtitle: Text('${r['fund_type'] ?? ''} • ${r['txn_date'] ?? ''}'),
+                      title: Text(
+                          '${r['source_or_vendor'] ?? AppLang.t('দাতা', 'Donor')} • ৳${r['amount'] ?? 0}'),
+                      subtitle: Text(
+                          '${r['fund_type'] ?? ''} • ${r['txn_date'] ?? ''} • ${r['notes'] ?? ''}'),
                     ),
                   )),
           ],

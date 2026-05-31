@@ -16,6 +16,7 @@ const CONFIG = {
     SCHOLAR_PAY: 'scholarship_payments',
     AUDIT: 'audit_log',
     SETTINGS: 'settings',
+    NOTIFICATIONS: 'notifications',
   },
   ENUMS: {
     ROLE: ['ADMIN', 'ACCOUNTANT', 'FIELD_USER', 'VIEWER'],
@@ -84,6 +85,12 @@ function handleRequest_(params) {
     if (action === 'listSalaryPayments') return json(listSalaryPayments_(params));
     if (action === 'listScholarshipByMonth') return json(listScholarshipByMonth_(params));
     if (action === 'monthlyReport') return json(monthlyReport_(params));
+    if (action === 'datasetStats') return json(datasetStats_(params));
+    if (action === 'getNotificationSettings') {
+      assertRole_(params.user_role, ['ADMIN']);
+      return json(getNotificationSettings_(params));
+    }
+    if (action === 'listInAppNotifications') return json(listInAppNotifications_(params));
 
     // Write actions
     if (action === 'login') return json(login_(params));
@@ -129,12 +136,22 @@ function handleRequest_(params) {
 
     if (action === 'setUserApprovalStatus') {
       assertRole_(params.user_role, ['ADMIN']);
-      return json(setUserApprovalStatus_(params.payload));
+      return json(setUserApprovalStatus_(params.payload, params));
     }
 
     if (action === 'generateTempResetToken') {
       assertRole_(params.user_role, ['ADMIN']);
-      return json(generateTempResetToken_(params.payload));
+      return json(generateTempResetToken_(params.payload, params));
+    }
+
+    if (action === 'upsertNotificationSettings') {
+      assertRole_(params.user_role, ['ADMIN']);
+      return json(upsertNotificationSettings_(params.payload, params));
+    }
+
+    if (action === 'createNotificationEvent') {
+      assertRole_(params.user_role, ['ADMIN', 'ACCOUNTANT', 'FIELD_USER', 'VIEWER']);
+      return json(createNotificationEvent_(params.payload, params));
     }
 
     if (action === 'importMigratedData') {
@@ -343,13 +360,13 @@ function dashboardSummary_(params) {
   });
 
   const scoped = role === 'FIELD_USER'
-    ? filtered.filter((r) => String(r.created_by || '') === userId)
+    ? filtered.filter((r) => isVisibleToFieldUser_(r, userId))
     : filtered;
 
   const summary = { totalIn: 0, totalOut: 0, balance: 0, byFund: {} };
 
   scoped.forEach((t) => {
-    const amt = Number(t.amount || 0);
+    const amt = normalizeNumber_(t.amount);
     const fund = t.fund_type || 'UNKNOWN';
     if (!summary.byFund[fund]) summary.byFund[fund] = { in: 0, out: 0, balance: 0 };
 
@@ -392,18 +409,18 @@ function monthlyReport_(params) {
   const monthly = txns.filter((t) => String(t.txn_date || '').slice(0, 7) === monthKey && String(t.status || 'ACTIVE') !== 'VOID');
 
   const scoped = role === 'FIELD_USER'
-    ? monthly.filter((r) => String(r.created_by || '') === userId)
+    ? monthly.filter((r) => isVisibleToFieldUser_(r, userId))
     : monthly;
 
   let totalIn = 0;
   let totalOut = 0;
   scoped.forEach((t) => {
-    const amt = Number(t.amount || 0);
+    const amt = normalizeNumber_(t.amount);
     if (t.direction === 'IN') totalIn += amt;
     else totalOut += amt;
   });
 
-  const rows = role === 'VIEWER' ? [] : scoped;
+  const rows = scoped;
   return { ok: true, data: { monthKey, totalIn, totalOut, balance: totalIn - totalOut, rows } };
 }
 
@@ -414,13 +431,12 @@ function listTransactions_(params) {
   const userId = String(params.user_id || '');
   requireUserIdIfFieldRole_(role, userId);
 
-  if (role === 'VIEWER') return { ok: true, data: [] };
-
   const rows = listSheetRows_(CONFIG.SHEETS.TXN).data || [];
   const fundType = params.fundType || '';
   const direction = params.direction || '';
   const from = params.from || '';
   const to = params.to || '';
+  const limit = Math.max(1, Math.min(500, Number(params.limit || 120)));
 
   const filtered = rows.filter((r) => {
     if (fundType && r.fund_type !== fundType) return false;
@@ -428,12 +444,54 @@ function listTransactions_(params) {
     if (from && r.txn_date < from) return false;
     if (to && r.txn_date > to) return false;
     if (String(r.status || 'ACTIVE') === 'VOID') return false;
-    if (role === 'FIELD_USER' && String(r.created_by || '') !== userId) return false;
+    if (role === 'FIELD_USER' && !isVisibleToFieldUser_(r, userId)) return false;
     return true;
   });
 
   filtered.sort((a, b) => String(b.txn_date || '').localeCompare(String(a.txn_date || '')));
-  return { ok: true, data: filtered };
+  return { ok: true, data: filtered.slice(0, limit) };
+}
+
+function datasetStats_(params) {
+  params = params || {};
+  assertRole_(params.user_role, ['ADMIN', 'ACCOUNTANT', 'FIELD_USER', 'VIEWER']);
+  const role = String(params.user_role || '');
+  const userId = String(params.user_id || '');
+  requireUserIdIfFieldRole_(role, userId);
+
+  const rows = listSheetRows_(CONFIG.SHEETS.TXN).data || [];
+  const active = rows.filter(function (r) {
+    if (String(r.status || 'ACTIVE') === 'VOID') return false;
+    if (!String(r.txn_date || '').trim()) return false;
+    if (role === 'FIELD_USER' && !isVisibleToFieldUser_(r, userId)) return false;
+    return true;
+  });
+
+  const sortedDates = active
+    .map(function (r) { return String(r.txn_date || '').trim(); })
+    .filter(function (d) { return /^\d{4}-\d{2}-\d{2}$/.test(d); })
+    .sort();
+
+  let totalIn = 0;
+  let totalOut = 0;
+  active.forEach(function (r) {
+    const amt = normalizeNumber_(r.amount);
+    if (String(r.direction || '') === 'IN') totalIn += amt;
+    else totalOut += amt;
+  });
+
+  return {
+    ok: true,
+    data: {
+      txns_total_rows: rows.length,
+      txns_active_rows: active.length,
+      first_txn_date: sortedDates.length ? sortedDates[0] : '',
+      last_txn_date: sortedDates.length ? sortedDates[sortedDates.length - 1] : '',
+      total_in: totalIn,
+      total_out: totalOut,
+      balance: totalIn - totalOut,
+    },
+  };
 }
 
 function listBeneficiaries_(params) {
@@ -496,7 +554,11 @@ function listSheetRows_(sheetName) {
     if (!row.join('').trim()) continue;
     const obj = {};
     headers.forEach((h, idx) => (obj[h] = row[idx]));
-    rows.push(obj);
+    if (sheetName === CONFIG.SHEETS.TXN) {
+      rows.push(normalizeTransactionRow_(obj));
+    } else {
+      rows.push(obj);
+    }
   }
   return { ok: true, data: rows };
 }
@@ -571,6 +633,323 @@ function addAudit_(module, action, entityId, beforeJson, afterJson, doneBy) {
   appendRow_(CONFIG.SHEETS.AUDIT, row);
 }
 
+function notificationSettingDefs_() {
+  return [
+    { key: 'notify.in_app.enabled', defaultValue: 'TRUE', notes: 'In-app notifications always enabled' },
+    { key: 'notify.email.approval', defaultValue: 'FALSE', notes: 'Email on approval-status events' },
+    { key: 'notify.email.failed_sync', defaultValue: 'FALSE', notes: 'Email on sync-failed events' },
+    { key: 'notify.email.daily_summary', defaultValue: 'FALSE', notes: 'Email daily summary alerts' },
+    { key: 'notify.email.due_reminder', defaultValue: 'FALSE', notes: 'Email due reminders' },
+    { key: 'notify.email.security_alert', defaultValue: 'FALSE', notes: 'Email security alerts' },
+  ];
+}
+
+function parseBool_(raw, defaultValue) {
+  const v = String(raw === undefined || raw === null ? '' : raw).trim().toUpperCase();
+  if (!v) return defaultValue;
+  return v === 'TRUE' || v === '1' || v === 'YES' || v === 'ON';
+}
+
+function boolToSheet_(value) {
+  return value ? 'TRUE' : 'FALSE';
+}
+
+function getSettingsMapByKey_() {
+  const rows = listSheetRows_(CONFIG.SHEETS.SETTINGS).data || [];
+  const out = {};
+  rows.forEach(function (r) {
+    const key = String(r.key || '').trim();
+    if (key) out[key] = r;
+  });
+  return out;
+}
+
+function upsertSettingByKey_(key, value, notes) {
+  const sheet = getSheet_(CONFIG.SHEETS.SETTINGS);
+  const values = sheet.getDataRange().getValues();
+  if (!values.length) throw new Error('settings sheet header missing');
+
+  const headers = values[0].map(String);
+  const keyIdx = headers.indexOf('key');
+  const valueIdx = headers.indexOf('value');
+  const notesIdx = headers.indexOf('notes');
+  const updatedAtIdx = headers.indexOf('updated_at');
+  if (keyIdx === -1 || valueIdx === -1) {
+    throw new Error('settings sheet must contain key and value columns');
+  }
+
+  const now = nowIso();
+  const nextValue = String(value || '').toUpperCase() === 'TRUE' ? 'TRUE' : 'FALSE';
+  for (let i = 1; i < values.length; i++) {
+    if (String(values[i][keyIdx] || '').trim() !== key) continue;
+    sheet.getRange(i + 1, valueIdx + 1).setValue(nextValue);
+    if (notesIdx >= 0 && notes !== undefined) sheet.getRange(i + 1, notesIdx + 1).setValue(notes || '');
+    if (updatedAtIdx >= 0) sheet.getRange(i + 1, updatedAtIdx + 1).setValue(now);
+    return { mode: 'update', before: values[i][valueIdx], after: nextValue, updated_at: now };
+  }
+
+  const rowObj = {
+    key: key,
+    value: nextValue,
+    notes: notes || '',
+    updated_at: now,
+  };
+  const writeRow = headers.map(function (h) {
+    return rowObj[h] !== undefined ? rowObj[h] : '';
+  });
+  sheet.appendRow(writeRow);
+  return { mode: 'create', before: '', after: nextValue, updated_at: now };
+}
+
+function ensureNotificationDefaults_() {
+  const defs = notificationSettingDefs_();
+  const byKey = getSettingsMapByKey_();
+  defs.forEach(function (d) {
+    if (!byKey[d.key]) {
+      upsertSettingByKey_(d.key, d.defaultValue, d.notes);
+    }
+  });
+}
+
+function readNotificationSettings_() {
+  ensureNotificationDefaults_();
+  const byKey = getSettingsMapByKey_();
+  const getUpdatedAt = function (key) {
+    return String((byKey[key] && byKey[key].updated_at) || '');
+  };
+  const updatedCandidates = notificationSettingDefs_()
+    .map(function (d) { return getUpdatedAt(d.key); })
+    .filter(function (x) { return !!x; });
+  const updatedAt = updatedCandidates.length ? updatedCandidates.sort().slice(-1)[0] : '';
+
+  return {
+    in_app_enabled: true, // locked default
+    email_approval: parseBool_((byKey['notify.email.approval'] || {}).value, false),
+    email_failed_sync: parseBool_((byKey['notify.email.failed_sync'] || {}).value, false),
+    email_daily_summary: parseBool_((byKey['notify.email.daily_summary'] || {}).value, false),
+    email_due_reminder: parseBool_((byKey['notify.email.due_reminder'] || {}).value, false),
+    email_security_alert: parseBool_((byKey['notify.email.security_alert'] || {}).value, false),
+    updated_at: updatedAt,
+  };
+}
+
+function getNotificationSettings_() {
+  return { ok: true, data: readNotificationSettings_() };
+}
+
+function getEmailToggleByCategory_(settings, category) {
+  if (category === 'approval') return !!settings.email_approval;
+  if (category === 'failed_sync') return !!settings.email_failed_sync;
+  if (category === 'daily_summary') return !!settings.email_daily_summary;
+  if (category === 'due_reminder') return !!settings.email_due_reminder;
+  if (category === 'security_alert') return !!settings.email_security_alert;
+  return false;
+}
+
+function getAdminAlertEmail_() {
+  const byKey = getSettingsMapByKey_();
+  const raw = String(((byKey['notify.email.admin_recipient'] || {}).value) || '').trim();
+  return raw || 'zakerchy@gmail.com';
+}
+
+function appendRowOptional_(sheetName, obj) {
+  const ss = SpreadsheetApp.openById(getSheetId_());
+  const sheet = ss.getSheetByName(sheetName);
+  if (!sheet) return false;
+
+  const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0].map(String);
+  const row = headers.map(function (h) { return obj[h] !== undefined ? obj[h] : ''; });
+  sheet.appendRow(row);
+  return true;
+}
+
+function listOptionalSheetRows_(sheetName) {
+  const ss = SpreadsheetApp.openById(getSheetId_());
+  const sheet = ss.getSheetByName(sheetName);
+  if (!sheet) return [];
+  const values = sheet.getDataRange().getValues();
+  if (!values.length) return [];
+
+  const headers = values[0].map(String);
+  const rows = [];
+  for (let i = 1; i < values.length; i++) {
+    const row = values[i];
+    if (!row.join('').trim()) continue;
+    const obj = {};
+    headers.forEach(function (h, idx) { obj[h] = row[idx]; });
+    rows.push(obj);
+  }
+  return rows;
+}
+
+function createInAppNotification_(category, title, message, options) {
+  options = options || {};
+  const event = {
+    id: uid_('notif'),
+    category: category || 'general',
+    title: title || 'Notification',
+    message: message || '',
+    target_role: options.target_role || '',
+    target_user_id: options.target_user_id || '',
+    email_enabled: boolToSheet_(!!options.email_enabled),
+    email_sent: boolToSheet_(!!options.email_sent),
+    email_error: options.email_error || '',
+    meta_json: options.meta_json || '',
+    created_by: options.created_by || 'system',
+    created_at: nowIso(),
+  };
+
+  const stored = appendRowOptional_(CONFIG.SHEETS.NOTIFICATIONS, event);
+  if (!stored) {
+    addAudit_('notifications', 'IN_APP_EVENT', event.id, '', JSON.stringify(event), event.created_by);
+  }
+  return Object.assign({}, event, { stored: stored });
+}
+
+function trySendNotificationEmail_(recipient, subject, textBody, htmlBody) {
+  if (!recipient) {
+    return { sent: false, skipped: true, reason: 'recipient_missing' };
+  }
+
+  try {
+    const quota = MailApp.getRemainingDailyQuota();
+    if (Number(quota || 0) <= 0) {
+      return { sent: false, skipped: true, reason: 'daily_quota_exhausted' };
+    }
+
+    GmailApp.sendEmail(recipient, subject, textBody, {
+      name: 'মাদ্রাসা ERP',
+      htmlBody: htmlBody,
+    });
+    return { sent: true };
+  } catch (err) {
+    return { sent: false, skipped: false, reason: String(err) };
+  }
+}
+
+function dispatchNotification_(opts) {
+  opts = opts || {};
+  const category = String(opts.category || 'general');
+  const settings = readNotificationSettings_();
+  const emailEnabled = getEmailToggleByCategory_(settings, category);
+
+  const emailResult = emailEnabled
+    ? trySendNotificationEmail_(
+        String(opts.recipient_email || ''),
+        String(opts.email_subject || opts.title || 'Notification'),
+        String(opts.email_text || opts.message || ''),
+        String(opts.email_html || ('<p>' + String(opts.message || '') + '</p>'))
+      )
+    : { sent: false, skipped: true, reason: 'toggle_off' };
+
+  const event = createInAppNotification_(
+    category,
+    String(opts.title || 'Notification'),
+    String(opts.message || ''),
+    {
+      target_role: String(opts.target_role || ''),
+      target_user_id: String(opts.target_user_id || ''),
+      email_enabled: emailEnabled,
+      email_sent: !!emailResult.sent,
+      email_error: emailResult.reason || '',
+      meta_json: JSON.stringify(opts.meta || {}),
+      created_by: String(opts.created_by || 'system'),
+    }
+  );
+
+  return {
+    category: category,
+    in_app: event,
+    email: emailResult,
+  };
+}
+
+function upsertNotificationSettings_(payload, params) {
+  payload = payload || {};
+  params = params || {};
+
+  const before = readNotificationSettings_();
+
+  const changes = [
+    { key: 'notify.email.approval', value: parseBool_(payload.email_approval, before.email_approval), notes: 'Email on approval-status events' },
+    { key: 'notify.email.failed_sync', value: parseBool_(payload.email_failed_sync, before.email_failed_sync), notes: 'Email on sync-failed events' },
+    { key: 'notify.email.daily_summary', value: parseBool_(payload.email_daily_summary, before.email_daily_summary), notes: 'Email daily summary alerts' },
+    { key: 'notify.email.due_reminder', value: parseBool_(payload.email_due_reminder, before.email_due_reminder), notes: 'Email due reminders' },
+    { key: 'notify.email.security_alert', value: parseBool_(payload.email_security_alert, before.email_security_alert), notes: 'Email security alerts' },
+  ];
+
+  changes.forEach(function (c) {
+    upsertSettingByKey_(c.key, boolToSheet_(c.value), c.notes);
+  });
+
+  // Locked by policy: in-app notification stays enabled.
+  upsertSettingByKey_('notify.in_app.enabled', 'TRUE', 'In-app notifications always enabled');
+
+  const after = readNotificationSettings_();
+  addAudit_(
+    'settings',
+    'NOTIFICATION_TOGGLE_UPDATE',
+    'notify.settings',
+    JSON.stringify(before),
+    JSON.stringify(after),
+    String(params.user_id || params.user_role || 'admin')
+  );
+
+  return { ok: true, data: after };
+}
+
+function listInAppNotifications_(params) {
+  params = params || {};
+  assertRole_(params.user_role, ['ADMIN', 'ACCOUNTANT', 'FIELD_USER', 'VIEWER']);
+  const role = String(params.user_role || '');
+  const userId = String(params.user_id || '');
+
+  const data = listOptionalSheetRows_(CONFIG.SHEETS.NOTIFICATIONS);
+  const rows = data.filter(function (r) {
+    const targetRole = String(r.target_role || '').trim();
+    const targetUserId = String(r.target_user_id || '').trim();
+    if (!targetRole && !targetUserId) return true;
+    if (targetUserId && targetUserId === userId) return true;
+    if (targetRole && targetRole === role) return true;
+    return false;
+  });
+
+  rows.sort(function (a, b) {
+    return String(b.created_at || '').localeCompare(String(a.created_at || ''));
+  });
+  return { ok: true, data: rows.slice(0, 100) };
+}
+
+function createNotificationEvent_(payload, params) {
+  payload = payload || {};
+  params = params || {};
+
+  const category = String(payload.category || 'general');
+  const title = String(payload.title || 'Notification');
+  const message = String(payload.message || '');
+  if (!message) return { ok: false, message: 'message is required' };
+
+  const recipient = String(payload.recipient_email || '');
+  const targetRole = String(payload.target_role || params.user_role || '');
+  const targetUserId = String(payload.target_user_id || params.user_id || '');
+
+  const result = dispatchNotification_({
+    category: category,
+    title: title,
+    message: message,
+    recipient_email: recipient,
+    email_subject: String(payload.email_subject || title),
+    email_text: String(payload.email_text || message),
+    email_html: String(payload.email_html || ('<p>' + message + '</p>')),
+    target_role: targetRole,
+    target_user_id: targetUserId,
+    created_by: String(params.user_id || params.user_role || 'system'),
+    meta: payload.meta || {},
+  });
+
+  return { ok: true, data: result };
+}
+
 function assertRole_(currentRole, allowedRoles) {
   if (!currentRole) throw new Error('user_role is required');
   validateEnum_(currentRole, CONFIG.ENUMS.ROLE, 'user_role');
@@ -583,6 +962,49 @@ function requireUserIdIfFieldRole_(role, userId) {
   if (role === 'FIELD_USER' && !userId) {
     throw new Error('user_id is required for FIELD_USER scope');
   }
+}
+
+function isVisibleToFieldUser_(row, userId) {
+  const createdBy = String((row && row.created_by) || '').trim();
+  if (createdBy === String(userId || '').trim()) return true;
+  // Legacy/migrated data had no user ownership. Keep visible as read-only history.
+  return createdBy === '' || createdBy === 'migration' || createdBy === 'system';
+}
+
+function normalizeTransactionRow_(row) {
+  const out = Object.assign({}, row || {});
+  out.txn_date = normalizeIsoDate_(out.txn_date);
+  out.direction = String(out.direction || '').trim().toUpperCase();
+  out.fund_type = String(out.fund_type || '').trim().toUpperCase();
+  out.status = String(out.status || 'ACTIVE').trim().toUpperCase() || 'ACTIVE';
+  out.amount = normalizeNumber_(out.amount);
+  return out;
+}
+
+function normalizeIsoDate_(raw) {
+  if (raw === null || raw === undefined || raw === '') return '';
+  if (Object.prototype.toString.call(raw) === '[object Date]' && !isNaN(raw.getTime())) {
+    return Utilities.formatDate(raw, Session.getScriptTimeZone(), 'yyyy-MM-dd');
+  }
+  const text = String(raw).trim();
+  if (!text) return '';
+  const match = text.match(/^(\d{4})[-/](\d{2})[-/](\d{2})/);
+  if (match) return match[1] + '-' + match[2] + '-' + match[3];
+  const parsed = new Date(text);
+  if (!isNaN(parsed.getTime())) {
+    return Utilities.formatDate(parsed, Session.getScriptTimeZone(), 'yyyy-MM-dd');
+  }
+  return text.slice(0, 10);
+}
+
+function normalizeNumber_(raw) {
+  if (raw === null || raw === undefined || raw === '') return 0;
+  if (typeof raw === 'number') return isNaN(raw) ? 0 : raw;
+  let s = String(raw).trim();
+  if (!s) return 0;
+  s = s.replace(/[৳,\s]/g, '').replace(/[^0-9.-]/g, '');
+  const n = Number(s);
+  return isNaN(n) ? 0 : n;
 }
 
 function validateTransactionPayload_(payload) {
@@ -658,20 +1080,30 @@ function requestPinReset_(params) {
   const webAppUrl = ScriptApp.getService().getUrl();
   const resetUrl = webAppUrl + '?action=resetPinForm&token=' + token + '&email=' + encodeURIComponent(email);
 
-  const adminEmail = 'zakerchy@gmail.com';
-  GmailApp.sendEmail(
-    adminEmail,
-    'পিন রিসেট অনুরোধ — ' + user.name,
-    'ব্যবহারকারী: ' + user.name + '\nইমেইল: ' + email + '\n\nপিন রিসেট লিংক:\n' + resetUrl + '\n\n৩০ মিনিটের মধ্যে করতে হবে।',
-    {
-      name: 'মাদ্রাসা ERP',
-      htmlBody: '<p><b>ব্যবহারকারী:</b> ' + user.name + '<br><b>ইমেইল:</b> ' + email + '</p>' +
-        '<p><a href="' + resetUrl + '" style="background:#166534;color:white;padding:10px 20px;text-decoration:none;border-radius:6px">পিন রিসেট করুন</a></p>' +
-        '<p style="color:#666;font-size:12px">লিংকটি ৩০ মিনিটের মধ্যে ব্যবহার করুন।</p>'
-    }
-  );
+  const adminEmail = getAdminAlertEmail_();
+  const result = dispatchNotification_({
+    category: 'security_alert',
+    title: 'পিন রিসেট অনুরোধ',
+    message: 'ব্যবহারকারী ' + String(user.name || '') + ' (' + email + ') পিন রিসেট অনুরোধ করেছেন।',
+    recipient_email: adminEmail,
+    email_subject: 'পিন রিসেট অনুরোধ — ' + String(user.name || ''),
+    email_text: 'ব্যবহারকারী: ' + user.name + '\nইমেইল: ' + email + '\n\nপিন রিসেট লিংক:\n' + resetUrl + '\n\n৩০ মিনিটের মধ্যে করতে হবে।',
+    email_html:
+      '<p><b>ব্যবহারকারী:</b> ' + user.name + '<br><b>ইমেইল:</b> ' + email + '</p>' +
+      '<p><a href="' + resetUrl + '" style="background:#166534;color:white;padding:10px 20px;text-decoration:none;border-radius:6px">পিন রিসেট করুন</a></p>' +
+      '<p style="color:#666;font-size:12px">লিংকটি ৩০ মিনিটের মধ্যে ব্যবহার করুন।</p>',
+    target_role: 'ADMIN',
+    created_by: email,
+    meta: { email: email, user_id: user.id, type: 'pin_reset_request' },
+  });
 
-  return { ok: true, message: 'Admin-এর ইমেইলে রিসেট লিংক পাঠানো হয়েছে। কিছুক্ষণ অপেক্ষা করুন।' };
+  return {
+    ok: true,
+    message: result.email.sent
+      ? 'রিসেট অনুরোধ গ্রহণ করা হয়েছে এবং ইমেইল পাঠানো হয়েছে।'
+      : 'রিসেট অনুরোধ গ্রহণ করা হয়েছে। Admin in-app notification দেখতে পারবেন।',
+    data: result,
+  };
 }
 
 function servePinResetForm_(params) {
@@ -757,17 +1189,33 @@ function listUsers_(params) {
   };
 }
 
-function setUserApprovalStatus_(payload) {
+function setUserApprovalStatus_(payload, params) {
+  params = params || {};
   validateRequired_(payload, ['id', 'approval_status']);
   const validStatuses = ['APPROVED', 'PENDING', 'REJECTED', 'BLOCKED'];
   if (validStatuses.indexOf(String(payload.approval_status)) === -1) {
     throw new Error('Invalid approval_status: ' + payload.approval_status);
   }
   const res = updateById_(CONFIG.SHEETS.USERS, payload.id, { approval_status: payload.approval_status });
-  return { ok: true, data: res.after };
+  const userEmail = String((res.after || {}).email || '').trim().toLowerCase();
+  const approval = String((res.after || {}).approval_status || payload.approval_status);
+  const notification = dispatchNotification_({
+    category: 'approval',
+    title: 'Approval status updated',
+    message: 'User "' + String((res.after || {}).name || payload.id) + '" status: ' + approval,
+    recipient_email: userEmail,
+    email_subject: 'Account status update',
+    email_text: 'আপনার অ্যাকাউন্ট স্ট্যাটাস এখন: ' + approval,
+    email_html: '<p>আপনার অ্যাকাউন্ট স্ট্যাটাস এখন: <b>' + approval + '</b></p>',
+    target_user_id: String((res.after || {}).id || payload.id),
+    created_by: String(params.user_id || params.user_role || 'admin'),
+    meta: { user_id: payload.id, approval_status: approval },
+  });
+  return { ok: true, data: res.after, notification: notification };
 }
 
-function generateTempResetToken_(payload) {
+function generateTempResetToken_(payload, params) {
+  params = params || {};
   validateRequired_(payload, ['id']);
   const users = listSheetRows_(CONFIG.SHEETS.USERS).data || [];
   const user = users.find(function(u) { return String(u.id || '') === String(payload.id); });
@@ -780,8 +1228,21 @@ function generateTempResetToken_(payload) {
 
   const webAppUrl = ScriptApp.getService().getUrl();
   const resetUrl = webAppUrl + '?action=resetPinForm&token=' + token + '&email=' + encodeURIComponent(String(user.email || '').toLowerCase());
+  const notification = dispatchNotification_({
+    category: 'security_alert',
+    title: 'Temporary reset token generated',
+    message: 'Reset token generated for ' + String(user.name || user.id || ''),
+    recipient_email: getAdminAlertEmail_(),
+    email_subject: 'Temporary reset token generated',
+    email_text: 'User: ' + String(user.name || '') + '\nEmail: ' + String(user.email || '') + '\nToken expires at: ' + new Date(expiry).toISOString(),
+    email_html: '<p><b>User:</b> ' + String(user.name || '') + '<br><b>Email:</b> ' + String(user.email || '') +
+      '<br><b>Expires:</b> ' + new Date(expiry).toISOString() + '</p>',
+    target_role: 'ADMIN',
+    created_by: String(params.user_id || params.user_role || 'admin'),
+    meta: { user_id: payload.id, type: 'temp_reset_token' },
+  });
 
-  return { ok: true, data: { token: token, expires_at: new Date(expiry).toISOString(), reset_url: resetUrl } };
+  return { ok: true, data: { token: token, expires_at: new Date(expiry).toISOString(), reset_url: resetUrl }, notification: notification };
 }
 
 function importMigratedData_(sheetName, rows) {

@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:crypto/crypto.dart';
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
 import '../../core/app_config.dart';
@@ -23,7 +24,7 @@ class ApiService {
     return sha256.convert(bytes).toString();
   }
 
-  bool get _isConfigured => !AppConfig.appsScriptUrl.contains('PLACEHOLDER');
+  bool get _isConfigured => !AppConfig.isUsingPlaceholderUrl;
 
   // Apps Script web apps return a 302 redirect on POST.
   // The redirect URL (script.googleusercontent.com) serves the JSON response via GET.
@@ -34,9 +35,13 @@ class ApiService {
     try {
       // Step 1: POST without following redirects
       final req = http.Request('POST', Uri.parse(AppConfig.appsScriptUrl))
-        ..headers['Content-Type'] = 'application/json'
+        // For Flutter Web + Google Apps Script:
+        // Use text/plain to keep request CORS-simple (avoids OPTIONS preflight).
+        ..headers['Content-Type'] =
+            kIsWeb ? 'text/plain;charset=utf-8' : 'application/json'
         ..body = jsonEncode(payload);
-      final streamed = await client.send(req).timeout(const Duration(seconds: 25));
+      final streamed =
+          await client.send(req).timeout(const Duration(seconds: 25));
 
       String? location;
       if (streamed.statusCode == 302 || streamed.statusCode == 301) {
@@ -48,7 +53,9 @@ class ApiService {
         final res = await client
             .get(Uri.parse(location))
             .timeout(const Duration(seconds: 20));
-        if (res.statusCode == 200) return jsonDecode(res.body) as Map<String, dynamic>;
+        if (res.statusCode == 200) {
+          return jsonDecode(res.body) as Map<String, dynamic>;
+        }
         throw Exception('Redirect GET HTTP ${res.statusCode}');
       }
 
@@ -76,7 +83,8 @@ class ApiService {
       if (cached != null) return {...cached, 'cached': true};
       return {
         'ok': false,
-        'message': 'Apps Script URL সেট করা হয়নি। Admin-এর কাছ থেকে URL নিন।',
+        'message':
+            'Apps Script URL সেট করা হয়নি। APPS_SCRIPT_URL / API_BASE_URL / APPS_SCRIPT_DEPLOYMENT_ID dart-define দিন।',
       };
     }
 
@@ -92,7 +100,11 @@ class ApiService {
         if (cached != null) {
           return {...cached, 'offline': true, 'cached': true};
         }
-        return {'ok': false, 'offline': true, 'message': 'ইন্টারনেট নেই এবং cached তথ্য নেই'};
+        return {
+          'ok': false,
+          'offline': true,
+          'message': 'ইন্টারনেট নেই এবং cached তথ্য নেই'
+        };
       }
       if (allowQueue && _queueableActions.contains(action)) {
         await LocalStoreService.appendPendingPost({

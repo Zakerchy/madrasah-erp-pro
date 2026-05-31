@@ -17,6 +17,11 @@
 ## Run As PC Web App (Admin)
 ```bash
 flutter pub get
+flutter run -d chrome --dart-define=APPS_SCRIPT_URL=https://script.google.com/macros/s/<DEPLOYMENT_ID>/exec
+```
+
+Backward-compatible (also works):
+```bash
 flutter run -d chrome --dart-define=API_BASE_URL=https://script.google.com/macros/s/<DEPLOYMENT_ID>/exec
 ```
 

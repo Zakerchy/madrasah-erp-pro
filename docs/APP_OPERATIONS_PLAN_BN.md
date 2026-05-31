@@ -32,7 +32,8 @@
 - `CLASPRC_JSON`
 - `APPS_SCRIPT_SCRIPT_ID`
 - `APPS_SCRIPT_DEPLOYMENT_ID`
-- `API_BASE_URL`
+- `APPS_SCRIPT_URL` (recommended)
+- `API_BASE_URL` (legacy fallback)
 - `GOOGLE_SHEET_ID`
 
 ## 7) Release ব্যবহার পদ্ধতি

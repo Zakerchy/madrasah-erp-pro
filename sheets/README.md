@@ -14,3 +14,4 @@ Recommended tab names:
 - scholarship_payments
 - audit_log
 - settings
+- notifications

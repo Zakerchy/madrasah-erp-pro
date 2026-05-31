@@ -29,8 +29,10 @@ A zero-cost, Google-Sheet-connected, Android-first native app plan and implement
 - Phase 1-4 implementation completed (see `phase-tracker/IMPLEMENTATION_PHASES.md`)
 - End-to-end testing instructions: `docs/PHASE4_TEST_GUIDE.md`
 - Full automation setup (Bangla): `docs/FULL_AUTOMATION_SETUP_BN.md`
+- Vercel setup (Bangla): `docs/VERCEL_SETUP_BN.md`
 - Final operations plan (Bangla): `docs/APP_OPERATIONS_PLAN_BN.md`
 - Pro master roadmap: `docs/PRO_ERP_MASTER_PLAN_BN.md`
 - Live sheet linkage audit: `docs/LIVE_SHEET_LINKAGE_AUDIT_BN.md`
 - Local admin commands: `docs/LOCALHOST_COMMANDS.md`
+- Local env template: `.env.example` (copy to `.env.local`)
 - APK distribution/update runbook: `docs/APK_DISTRIBUTION_AND_UPDATE_BN.md`

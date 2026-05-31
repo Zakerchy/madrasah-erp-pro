@@ -36,3 +36,11 @@ Headers:
 
 ## Reports
 - `GET ?action=monthlyReport&monthKey=YYYY-MM`
+
+## Notification Settings (ADMIN)
+- `GET ?action=getNotificationSettings&user_role=ADMIN`
+- `POST { action: "upsertNotificationSettings", user_role: "ADMIN", payload: { email_approval, email_failed_sync, email_daily_summary, email_due_reminder, email_security_alert } }`
+
+## In-App Notification Events
+- `GET ?action=listInAppNotifications&user_role=&user_id=`
+- `POST { action: "createNotificationEvent", user_role: "...", user_id: "...", payload: { category, title, message, recipient_email? } }`

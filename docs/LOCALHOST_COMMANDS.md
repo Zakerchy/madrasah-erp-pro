@@ -52,6 +52,26 @@ Force করতে চাইলে:
 FORCE_PUB_GET=1 ./tools/run-local-web.sh
 ```
 
+Apps Script URL auto inject করতে চাইলে:
+```bash
+APPS_SCRIPT_URL="https://script.google.com/macros/s/<DEPLOYMENT_ID>/exec" ./tools/run-local-web.sh web-server
+```
+অথবা legacy key:
+```bash
+API_BASE_URL="https://script.google.com/macros/s/<DEPLOYMENT_ID>/exec" ./tools/run-local-web.sh web-server
+```
+
+একবারের জন্য `.env.local` file করে রাখলে আর command-এ URL দিতে হবে না:
+```bash
+echo 'APPS_SCRIPT_URL=https://script.google.com/macros/s/<DEPLOYMENT_ID>/exec' > .env.local
+./tools/run-local-web.sh web-server
+```
+
+NPM shortcut:
+```bash
+npm run app:web
+```
+
 Terminal command টাইপ করতে না চাইলে Finder থেকে double-click করুন:
 - `tools/start-local-web.command`
 

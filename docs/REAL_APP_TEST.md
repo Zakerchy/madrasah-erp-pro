@@ -8,7 +8,8 @@
 ## 2) GitHub secret set করুন
 Repository -> Settings -> Secrets and variables -> Actions -> New repository secret
 
-- Name: `API_BASE_URL`
+- Name: `APPS_SCRIPT_URL` (recommended)
+- Optional legacy fallback: `API_BASE_URL`
 - Value: আপনার Apps Script Web App URL (e.g. `https://script.google.com/macros/s/.../exec`)
 
 ## 3) APK build করুন

@@ -121,3 +121,18 @@ Columns:
 - value
 - notes
 - updated_at
+
+## 11) notifications
+Columns:
+- id
+- category
+- title
+- message
+- target_role
+- target_user_id
+- email_enabled (TRUE|FALSE)
+- email_sent (TRUE|FALSE)
+- email_error
+- meta_json
+- created_by
+- created_at

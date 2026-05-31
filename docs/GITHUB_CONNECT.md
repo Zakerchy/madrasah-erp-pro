@@ -41,4 +41,5 @@ Required GitHub Secrets for full automation:
 - `CLASPRC_JSON`
 - `APPS_SCRIPT_SCRIPT_ID`
 - `APPS_SCRIPT_DEPLOYMENT_ID`
-- `API_BASE_URL`
+- `APPS_SCRIPT_URL` (preferred)
+- `API_BASE_URL` (legacy fallback)

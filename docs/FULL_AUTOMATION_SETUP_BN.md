@@ -33,7 +33,8 @@ Repo -> `Settings` -> `Secrets and variables` -> `Actions` -> `New repository se
 1. `CLASPRC_JSON` = `~/.clasprc.json` এর full JSON
 2. `APPS_SCRIPT_SCRIPT_ID` = script settings থেকে script id
 3. `APPS_SCRIPT_DEPLOYMENT_ID` = web app deployment id
-4. `API_BASE_URL` = web app url (`.../exec`)
+4. `APPS_SCRIPT_URL` = web app url (`.../exec`) (recommended)
+   - optional legacy fallback: `API_BASE_URL`
 5. `GOOGLE_SHEET_ID` = আপনার production Google Sheet ID
 
 ## ধাপ 4) অটোমেশন কাজ করছে কি না test
