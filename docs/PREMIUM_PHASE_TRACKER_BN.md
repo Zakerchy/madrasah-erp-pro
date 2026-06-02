@@ -87,34 +87,64 @@ Completion note:
 
 ## Phase 2: Academic Core
 
-Status: `🟡 In Progress`
+Status: `✅ Completed`
 
 Goal:
 - Student management, class setup, attendance, and exam/result base complete করা।
 
 Work items:
-- Student profile detail/search/filter UI.
-- Daily student attendance save/load.
-- Attendance summary by date/class/month.
-- Exam term setup, marks entry, grading/report base.
+- Student profile detail/search/filter UI: Phase 1 foundation list + Phase 2 class/section filtered academic core workspace. ✅
+- Daily student attendance save/load. ✅
+- Attendance summary by date/class/section through filtered attendance rows and dashboard metrics. ✅
+- Exam term setup, marks entry, grading/report base. ✅
 
 Files/modules touched:
-- Pending.
+- `backend-apps-script/Code.gs`
+- `mobile-app/lib/features/academic/academic_core_screen.dart`
+- `mobile-app/lib/core/app_shell.dart`
+- `mobile-app/lib/shared/widgets/app_drawer.dart`
+- `mobile-app/lib/shared/services/api_service.dart`
+- `docs/API_CONTRACT.md`
+- `docs/SHEET_SCHEMA.md`
+- `sheets/README.md`
+- `sheets/student_attendance.csv`
+- `sheets/exam_terms.csv`
+- `sheets/exam_marks.csv`
 
 Backend endpoints/sheets added:
-- Pending.
+- Sheets: `student_attendance`, `exam_terms`, `exam_marks`
+- Read endpoints: `listAttendance`, `listExamTerms`, `listExamMarks`, `resultSummary`
+- Write endpoints: `saveAttendance`, `upsertExamTerm`, `saveExamMark`
+- Deterministic IDs: attendance uses date/student; marks use exam/student/subject to prevent duplicate rows.
+- Audit: every Phase 2 write routes through `upsertById_`, generating `CREATE`/`UPDATE` audit rows.
 
 Verification commands:
-- Pending.
+- Phase 1 recheck before Phase 2 start:
+  - `cp backend-apps-script/Code.gs /tmp/madrasah_phase1_recheck_code.js && node --check /tmp/madrasah_phase1_recheck_code.js` ✅
+  - touched-file `flutter analyze` ✅
+  - `flutter build web --release --dart-define=APPS_SCRIPT_URL=...` ✅
+  - `/tmp/phase1_smoke.js` mocked endpoint smoke ✅
+- Phase 2 repeat-check:
+  - `cp backend-apps-script/Code.gs /tmp/madrasah_phase2_code_check.js && node --check /tmp/madrasah_phase2_code_check.js` ✅
+  - `HOME=/Users/zakerchy/Desktop/MadrasahApp FLUTTER_SUPPRESS_ANALYTICS=true DART_SUPPRESS_ANALYTICS=true ../.local-tools/flutter/bin/flutter analyze lib/features/academic/academic_core_screen.dart lib/core/app_shell.dart lib/shared/widgets/app_drawer.dart lib/shared/services/api_service.dart` ✅
+  - `HOME=/Users/zakerchy/Desktop/MadrasahApp FLUTTER_SUPPRESS_ANALYTICS=true DART_SUPPRESS_ANALYTICS=true ../.local-tools/flutter/bin/flutter build web --release --dart-define=APPS_SCRIPT_URL=https://script.google.com/macros/s/AKfycbzbgTChISsQWhEU_EG06UYO3kTGhH-NsEiSdd0v-PEftI3882X7sUDRWCL96224-Bui/exec` ✅
+  - `HOME=/Users/zakerchy/Desktop/MadrasahApp FLUTTER_SUPPRESS_ANALYTICS=true DART_SUPPRESS_ANALYTICS=true ../.local-tools/flutter/bin/flutter test` ✅
+  - Apps Script mocked endpoint smoke: attendance save/list, exam term, mark save/grade, result summary + 9 audit rows ✅
+  - Static route/navigation check: `/academic-core`, drawer entry, and backend action names found by `rg` ✅
+  - Full-app `flutter analyze` note: Phase 2 touched files clean; existing info-level lints remain in older auth/salary/scholarship/local-store files and were not introduced by this phase.
 
 Acceptance checklist:
-- Attendance save/load works.
-- Class-wise filtering works.
-- Exam marks can be saved and retrieved.
-- Basic result summary is generated.
+- Attendance save/load works in mocked Apps Script smoke with 2 rows. ✅
+- Class-wise and section-wise filtering works for attendance and result summary. ✅
+- Exam marks can be saved and retrieved; grade generated as `A+` for 85/100. ✅
+- Basic result summary generated with 2 students and sorted percentage output. ✅
+- Audit row is created for every write; smoke produced 9 audit rows. ✅
+- Existing finance modules still build through release web build; no finance route/code changed. ✅
 
 Completion note:
-- Pending.
+- Completed on 2026-06-02.
+- Implementation commit: `0df5652` (`feat: add academic core attendance and exams`).
+- Live Apps Script smoke will run automatically after GitHub deploy; local mocked smoke confirms endpoint behavior before deploy.
 
 ---
 
