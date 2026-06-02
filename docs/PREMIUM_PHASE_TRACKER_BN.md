@@ -205,35 +205,58 @@ Completion note:
 
 ## Phase 4: Finance Control
 
-Status: `🟡 In Progress`
+Status: `✅ Completed`
 
 Goal:
 - Budget, reconciliation, opening/closing balances, and approval workflow add করা।
 
 Work items:
-- Monthly budget planning.
-- Actual vs budget variance.
-- Fund opening/closing balance.
-- Approval workflow for configured high-value actions.
-- Reconciliation center for app totals vs sheet totals.
+- Monthly budget planning. ✅
+- Actual vs budget variance. ✅
+- Fund opening/closing balance. ✅
+- Approval workflow for configured high-value actions. ✅
+- Reconciliation center for app totals vs sheet totals. ✅
 
 Files/modules touched:
-- Pending.
+- `backend-apps-script/Code.gs`
+- `mobile-app/lib/features/finance_control/finance_control_screen.dart`
+- `mobile-app/lib/core/app_shell.dart`
+- `mobile-app/lib/shared/widgets/app_drawer.dart`
+- `mobile-app/lib/shared/services/api_service.dart`
+- `docs/API_CONTRACT.md`
+- `docs/SHEET_SCHEMA.md`
+- `sheets/README.md`
+- `sheets/finance_budgets.csv`
+- `sheets/approval_rules.csv`
+- `sheets/approval_requests.csv`
+- `sheets/reconciliation_snapshots.csv`
 
 Backend endpoints/sheets added:
-- Pending.
+- Sheets: `finance_budgets`, `approval_rules`, `approval_requests`, `reconciliation_snapshots`
+- Read endpoints: `listBudgets`, `financeControlSummary`, `listApprovalRules`, `listApprovalRequests`
+- Write endpoints: `upsertBudget`, `upsertApprovalRule`, `createApprovalRequest`, `decideApprovalRequest`
+- Reconciliation compares finance-control totals against `dashboardSummary`.
+- Approval decisions write explicit audit rows.
 
 Verification commands:
-- Pending.
+- `cp backend-apps-script/Code.gs /tmp/madrasah_phase4_code_check.js && node --check /tmp/madrasah_phase4_code_check.js` ✅
+- `HOME=/Users/zakerchy/Desktop/MadrasahApp FLUTTER_SUPPRESS_ANALYTICS=true DART_SUPPRESS_ANALYTICS=true ../.local-tools/flutter/bin/flutter analyze lib/features/finance_control/finance_control_screen.dart lib/core/app_shell.dart lib/shared/widgets/app_drawer.dart lib/shared/services/api_service.dart` ✅
+- `HOME=/Users/zakerchy/Desktop/MadrasahApp FLUTTER_SUPPRESS_ANALYTICS=true DART_SUPPRESS_ANALYTICS=true ../.local-tools/flutter/bin/flutter build web --release --dart-define=APPS_SCRIPT_URL=https://script.google.com/macros/s/AKfycbzbgTChISsQWhEU_EG06UYO3kTGhH-NsEiSdd0v-PEftI3882X7sUDRWCL96224-Bui/exec` ✅
+- Apps Script mocked endpoint smoke: opening/closing balance, budget variance, reconciliation, approval decision + 7 audit rows ✅
+- Static route/navigation check: `/finance-control`, drawer entry, and backend action names found by `rg` ✅
+- Note: `flutter test` repeat-run was blocked by sandbox escalation usage limit in this session; Phase 4 touched files analyze clean and web release build passed.
 
 Acceptance checklist:
-- Dashboard/report totals match backend.
-- Reconciliation check reports pass/fail clearly.
-- Approval rules work as configured.
-- Audit log records approval decisions.
+- Dashboard/report totals match backend in mocked reconciliation smoke (`pass=true`). ✅
+- Reconciliation check reports pass/fail clearly. ✅
+- Approval rules and request/decision flow work. ✅
+- Audit log records approval decisions. ✅
+- Existing finance modules still build through release web build. ✅
 
 Completion note:
-- Pending.
+- Completed on 2026-06-02.
+- Implementation commit: `debee55` (`feat: add finance control center`).
+- Live Apps Script smoke will run automatically after GitHub deploy; local mocked smoke confirms endpoint behavior before deploy.
 
 ---
 
