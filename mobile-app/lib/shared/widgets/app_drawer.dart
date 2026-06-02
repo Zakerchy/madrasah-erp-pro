@@ -36,11 +36,13 @@ class AppDrawer extends StatelessWidget {
                       children: [
                         Text(
                           AppLang.t('মাদ্রাসা ERP', 'Madrasah ERP'),
-                          style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                          style: const TextStyle(
+                              fontSize: 20, fontWeight: FontWeight.bold),
                         ),
                         const SizedBox(height: 8),
                         Text(user?.name ?? AppLang.t('অতিথি', 'Guest'),
-                            style: const TextStyle(fontWeight: FontWeight.w600)),
+                            style:
+                                const TextStyle(fontWeight: FontWeight.w600)),
                         Text(
                           '${AppLang.t('ভূমিকা', 'Role')}: ${user?.role ?? 'N/A'}',
                           style: const TextStyle(fontSize: 12),
@@ -51,11 +53,16 @@ class AppDrawer extends StatelessWidget {
                 },
               ),
               item('ড্যাশবোর্ড', 'Dashboard', '/dashboard'),
+              item('শিক্ষার্থী ও একাডেমিক', 'Students & Academic', '/academic'),
               item('দান সংগ্রহ', 'Donations', '/donations'),
-              if (role == 'ADMIN' || role == 'ACCOUNTANT') item('খরচ', 'Expenses', '/expenses'),
-              if (role == 'ADMIN' || role == 'ACCOUNTANT') item('বেতন', 'Salary', '/salary'),
-              if (role == 'ADMIN' || role == 'ACCOUNTANT') item('সুবিধাভোগী', 'Beneficiaries', '/beneficiaries'),
-              if (role == 'ADMIN' || role == 'ACCOUNTANT') item('বৃত্তি', 'Scholarship', '/scholarship'),
+              if (role == 'ADMIN' || role == 'ACCOUNTANT')
+                item('খরচ', 'Expenses', '/expenses'),
+              if (role == 'ADMIN' || role == 'ACCOUNTANT')
+                item('বেতন', 'Salary', '/salary'),
+              if (role == 'ADMIN' || role == 'ACCOUNTANT')
+                item('সুবিধাভোগী', 'Beneficiaries', '/beneficiaries'),
+              if (role == 'ADMIN' || role == 'ACCOUNTANT')
+                item('বৃত্তি', 'Scholarship', '/scholarship'),
               item('রিপোর্ট', 'Reports', '/reports'),
               if (role == 'ADMIN') item('সেটিংস', 'Settings', '/settings'),
               const Divider(),
@@ -65,7 +72,8 @@ class AppDrawer extends StatelessWidget {
                 onTap: () {
                   SessionService.clear();
                   Navigator.pop(context);
-                  Navigator.pushNamedAndRemoveUntil(context, '/login', (route) => false);
+                  Navigator.pushNamedAndRemoveUntil(
+                      context, '/login', (route) => false);
                 },
               ),
             ],

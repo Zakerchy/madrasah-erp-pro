@@ -34,6 +34,20 @@ Headers:
 - `GET ?action=listScholarshipByMonth&monthKey=YYYY-MM`
 - `POST { action: "saveScholarshipPayment", payload: {...} }`
 
+## Academic Foundation
+- `GET ?action=listStudents&class_id=&section_id=&status=&search=&limit=300`
+- `POST { action: "upsertStudent", user_role: "ADMIN|ACCOUNTANT", user_id: "...", payload: { id?, student_code?, name_bn, name_en?, gender?, date_of_birth?, admission_date?, class_id, section_id?, roll_no?, status?, phone?, address?, notes? } }`
+- `GET ?action=listStudentGuardians&student_id=`
+- `POST { action: "upsertStudentGuardian", user_role: "ADMIN|ACCOUNTANT", user_id: "...", payload: { id?, student_id, name, relation, phone, email?, address?, occupation?, primary_contact?, status?, notes? } }`
+- `GET ?action=listClasses`
+- `POST { action: "upsertClass", user_role: "ADMIN|ACCOUNTANT", user_id: "...", payload: { id?, name, level?, sort_order?, status?, notes? } }`
+- `GET ?action=listSections&class_id=`
+- `POST { action: "upsertSection", user_role: "ADMIN|ACCOUNTANT", user_id: "...", payload: { id?, class_id, name, capacity?, status?, notes? } }`
+- `GET ?action=listSubjects&class_id=`
+- `POST { action: "upsertSubject", user_role: "ADMIN|ACCOUNTANT", user_id: "...", payload: { id?, class_id, name, code?, sort_order?, status?, notes? } }`
+- Phase 1 academic sheets are auto-provisioned by Apps Script on first list/upsert if missing.
+- Every upsert uses audit log through `upsertById_`.
+
 ## Reports
 - `GET ?action=monthlyReport&monthKey=YYYY-MM`
 - `GET ?action=rangeReport&from=YYYY-MM-DD&to=YYYY-MM-DD`

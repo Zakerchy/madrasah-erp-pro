@@ -14,6 +14,11 @@ const CONFIG = {
     BENEFICIARIES: 'beneficiaries',
     SCHOLAR_PLAN: 'scholarship_monthly_plan',
     SCHOLAR_PAY: 'scholarship_payments',
+    STUDENTS: 'students',
+    GUARDIANS: 'student_guardians',
+    CLASSES: 'classes',
+    SECTIONS: 'sections',
+    SUBJECTS: 'subjects',
     AUDIT: 'audit_log',
     SETTINGS: 'settings',
     NOTIFICATIONS: 'notifications',
@@ -84,6 +89,11 @@ function handleRequest_(params) {
     if (action === 'listStaff') return json(listStaff_(params));
     if (action === 'listSalaryPayments') return json(listSalaryPayments_(params));
     if (action === 'listScholarshipByMonth') return json(listScholarshipByMonth_(params));
+    if (action === 'listStudents') return json(listStudents_(params));
+    if (action === 'listStudentGuardians') return json(listStudentGuardians_(params));
+    if (action === 'listClasses') return json(listClasses_(params));
+    if (action === 'listSections') return json(listSections_(params));
+    if (action === 'listSubjects') return json(listSubjects_(params));
     if (action === 'monthlyReport') return json(monthlyReport_(params));
     if (action === 'rangeReport') return json(rangeReport_(params));
     if (action === 'datasetStats') return json(datasetStats_(params));
@@ -128,6 +138,31 @@ function handleRequest_(params) {
     if (action === 'saveScholarshipPayment') {
       assertRole_(params.user_role, ['ADMIN', 'ACCOUNTANT']);
       return json(saveScholarshipPayment_(params.payload));
+    }
+
+    if (action === 'upsertStudent') {
+      assertRole_(params.user_role, ['ADMIN', 'ACCOUNTANT']);
+      return json(upsertStudent_(params.payload, params));
+    }
+
+    if (action === 'upsertStudentGuardian') {
+      assertRole_(params.user_role, ['ADMIN', 'ACCOUNTANT']);
+      return json(upsertStudentGuardian_(params.payload, params));
+    }
+
+    if (action === 'upsertClass') {
+      assertRole_(params.user_role, ['ADMIN', 'ACCOUNTANT']);
+      return json(upsertClass_(params.payload, params));
+    }
+
+    if (action === 'upsertSection') {
+      assertRole_(params.user_role, ['ADMIN', 'ACCOUNTANT']);
+      return json(upsertSection_(params.payload, params));
+    }
+
+    if (action === 'upsertSubject') {
+      assertRole_(params.user_role, ['ADMIN', 'ACCOUNTANT']);
+      return json(upsertSubject_(params.payload, params));
     }
 
     if (action === 'listUsers') return json(listUsers_(params));
@@ -632,6 +667,281 @@ function listScholarshipByMonth_(params) {
   return { ok: true, data: filtered };
 }
 
+function listStudents_(params) {
+  params = params || {};
+  assertRole_(params.user_role, ['ADMIN', 'ACCOUNTANT', 'FIELD_USER', 'VIEWER']);
+  ensurePhase1Sheet_(CONFIG.SHEETS.STUDENTS);
+  const classId = String(params.class_id || '').trim();
+  const sectionId = String(params.section_id || '').trim();
+  const status = String(params.status || '').trim().toUpperCase();
+  const search = String(params.search || '').trim().toLowerCase();
+  const limit = Math.max(1, Math.min(1000, Number(params.limit || 300)));
+
+  const rows = listSheetRows_(CONFIG.SHEETS.STUDENTS).data || [];
+  const filtered = rows.filter(function (r) {
+    if (classId && String(r.class_id || '') !== classId) return false;
+    if (sectionId && String(r.section_id || '') !== sectionId) return false;
+    if (status && String(r.status || '').toUpperCase() !== status) return false;
+    if (search) {
+      const hay = [
+        r.student_code,
+        r.name_bn,
+        r.name_en,
+        r.roll_no,
+        r.phone,
+      ].join(' ').toLowerCase();
+      if (hay.indexOf(search) === -1) return false;
+    }
+    return true;
+  });
+
+  filtered.sort(function (a, b) {
+    const classSort = String(a.class_id || '').localeCompare(String(b.class_id || ''));
+    if (classSort !== 0) return classSort;
+    const sectionSort = String(a.section_id || '').localeCompare(String(b.section_id || ''));
+    if (sectionSort !== 0) return sectionSort;
+    return Number(a.roll_no || 999999) - Number(b.roll_no || 999999);
+  });
+  return { ok: true, data: filtered.slice(0, limit) };
+}
+
+function listStudentGuardians_(params) {
+  params = params || {};
+  assertRole_(params.user_role, ['ADMIN', 'ACCOUNTANT', 'FIELD_USER', 'VIEWER']);
+  ensurePhase1Sheet_(CONFIG.SHEETS.GUARDIANS);
+  const studentId = String(params.student_id || '').trim();
+  const rows = listSheetRows_(CONFIG.SHEETS.GUARDIANS).data || [];
+  const filtered = rows.filter(function (r) {
+    if (studentId && String(r.student_id || '') !== studentId) return false;
+    return true;
+  });
+  filtered.sort(function (a, b) {
+    return String(a.student_id || '').localeCompare(String(b.student_id || '')) ||
+      String(a.name || '').localeCompare(String(b.name || ''));
+  });
+  return { ok: true, data: filtered };
+}
+
+function listClasses_(params) {
+  params = params || {};
+  assertRole_(params.user_role, ['ADMIN', 'ACCOUNTANT', 'FIELD_USER', 'VIEWER']);
+  ensurePhase1Sheet_(CONFIG.SHEETS.CLASSES);
+  const rows = listSheetRows_(CONFIG.SHEETS.CLASSES).data || [];
+  rows.sort(function (a, b) {
+    return Number(a.sort_order || 9999) - Number(b.sort_order || 9999) ||
+      String(a.name || '').localeCompare(String(b.name || ''));
+  });
+  return { ok: true, data: rows };
+}
+
+function listSections_(params) {
+  params = params || {};
+  assertRole_(params.user_role, ['ADMIN', 'ACCOUNTANT', 'FIELD_USER', 'VIEWER']);
+  ensurePhase1Sheet_(CONFIG.SHEETS.SECTIONS);
+  const classId = String(params.class_id || '').trim();
+  const rows = listSheetRows_(CONFIG.SHEETS.SECTIONS).data || [];
+  const filtered = rows.filter(function (r) {
+    if (classId && String(r.class_id || '') !== classId) return false;
+    return true;
+  });
+  filtered.sort(function (a, b) {
+    return String(a.class_id || '').localeCompare(String(b.class_id || '')) ||
+      String(a.name || '').localeCompare(String(b.name || ''));
+  });
+  return { ok: true, data: filtered };
+}
+
+function listSubjects_(params) {
+  params = params || {};
+  assertRole_(params.user_role, ['ADMIN', 'ACCOUNTANT', 'FIELD_USER', 'VIEWER']);
+  ensurePhase1Sheet_(CONFIG.SHEETS.SUBJECTS);
+  const classId = String(params.class_id || '').trim();
+  const rows = listSheetRows_(CONFIG.SHEETS.SUBJECTS).data || [];
+  const filtered = rows.filter(function (r) {
+    if (classId && String(r.class_id || '') !== classId) return false;
+    return true;
+  });
+  filtered.sort(function (a, b) {
+    return String(a.class_id || '').localeCompare(String(b.class_id || '')) ||
+      Number(a.sort_order || 9999) - Number(b.sort_order || 9999) ||
+      String(a.name || '').localeCompare(String(b.name || ''));
+  });
+  return { ok: true, data: filtered };
+}
+
+function upsertStudent_(payload, params) {
+  payload = payload || {};
+  validateRequired_(payload, ['name_bn', 'class_id']);
+  ensurePhase1Sheet_(CONFIG.SHEETS.STUDENTS);
+  ensurePhase1Sheet_(CONFIG.SHEETS.CLASSES);
+  ensurePhase1Sheet_(CONFIG.SHEETS.SECTIONS);
+
+  const row = Object.assign({}, payload);
+  row.id = row.id || uid_('stu');
+  row.student_code = String(row.student_code || row.id).trim();
+  row.name_bn = String(row.name_bn || '').trim();
+  row.name_en = String(row.name_en || '').trim();
+  row.gender = String(row.gender || '').trim();
+  row.date_of_birth = normalizeIsoDate_(row.date_of_birth || '');
+  row.admission_date = normalizeIsoDate_(row.admission_date || todayIso_());
+  row.class_id = String(row.class_id || '').trim();
+  row.section_id = String(row.section_id || '').trim();
+  row.roll_no = String(row.roll_no || '').trim();
+  row.status = normalizeActiveStatus_(row.status || 'ACTIVE');
+  row.phone = String(row.phone || '').trim();
+  row.address = String(row.address || '').trim();
+  row.notes = String(row.notes || '').trim();
+  row.updated_by = String(row.updated_by || params.user_id || params.user_role || 'system');
+
+  const klass = findRowByIdSafe_(CONFIG.SHEETS.CLASSES, row.class_id);
+  if (!klass) return { ok: false, message: 'class_id not found: ' + row.class_id };
+  if (row.section_id) {
+    const section = findRowByIdSafe_(CONFIG.SHEETS.SECTIONS, row.section_id);
+    if (!section) return { ok: false, message: 'section_id not found: ' + row.section_id };
+  }
+
+  return upsertById_(CONFIG.SHEETS.STUDENTS, row);
+}
+
+function upsertStudentGuardian_(payload, params) {
+  payload = payload || {};
+  validateRequired_(payload, ['student_id', 'name', 'relation', 'phone']);
+  ensurePhase1Sheet_(CONFIG.SHEETS.GUARDIANS);
+
+  const row = Object.assign({}, payload);
+  row.id = row.id || uid_('guard');
+  row.student_id = String(row.student_id || '').trim();
+  row.name = String(row.name || '').trim();
+  row.relation = String(row.relation || '').trim();
+  row.phone = String(row.phone || '').trim();
+  row.email = String(row.email || '').trim();
+  row.address = String(row.address || '').trim();
+  row.occupation = String(row.occupation || '').trim();
+  row.primary_contact = boolToSheet_(parseBool_(row.primary_contact, false));
+  row.status = normalizeActiveStatus_(row.status || 'ACTIVE');
+  row.notes = String(row.notes || '').trim();
+  row.updated_by = String(row.updated_by || params.user_id || params.user_role || 'system');
+
+  const student = findRowByIdSafe_(CONFIG.SHEETS.STUDENTS, row.student_id);
+  if (!student) return { ok: false, message: 'student_id not found: ' + row.student_id };
+  return upsertById_(CONFIG.SHEETS.GUARDIANS, row);
+}
+
+function upsertClass_(payload, params) {
+  payload = payload || {};
+  validateRequired_(payload, ['name']);
+  ensurePhase1Sheet_(CONFIG.SHEETS.CLASSES);
+
+  const row = Object.assign({}, payload);
+  row.id = row.id || uid_('class');
+  row.name = String(row.name || '').trim();
+  row.level = String(row.level || '').trim();
+  row.sort_order = Number(row.sort_order || 0);
+  row.status = normalizeActiveStatus_(row.status || 'ACTIVE');
+  row.notes = String(row.notes || '').trim();
+  row.updated_by = String(row.updated_by || params.user_id || params.user_role || 'system');
+  return upsertById_(CONFIG.SHEETS.CLASSES, row);
+}
+
+function upsertSection_(payload, params) {
+  payload = payload || {};
+  validateRequired_(payload, ['class_id', 'name']);
+  ensurePhase1Sheet_(CONFIG.SHEETS.SECTIONS);
+  ensurePhase1Sheet_(CONFIG.SHEETS.CLASSES);
+
+  const row = Object.assign({}, payload);
+  row.id = row.id || uid_('sec');
+  row.class_id = String(row.class_id || '').trim();
+  row.name = String(row.name || '').trim();
+  row.capacity = Number(row.capacity || 0);
+  row.status = normalizeActiveStatus_(row.status || 'ACTIVE');
+  row.notes = String(row.notes || '').trim();
+  row.updated_by = String(row.updated_by || params.user_id || params.user_role || 'system');
+
+  const klass = findRowByIdSafe_(CONFIG.SHEETS.CLASSES, row.class_id);
+  if (!klass) return { ok: false, message: 'class_id not found: ' + row.class_id };
+  return upsertById_(CONFIG.SHEETS.SECTIONS, row);
+}
+
+function upsertSubject_(payload, params) {
+  payload = payload || {};
+  validateRequired_(payload, ['class_id', 'name']);
+  ensurePhase1Sheet_(CONFIG.SHEETS.SUBJECTS);
+  ensurePhase1Sheet_(CONFIG.SHEETS.CLASSES);
+
+  const row = Object.assign({}, payload);
+  row.id = row.id || uid_('subj');
+  row.class_id = String(row.class_id || '').trim();
+  row.name = String(row.name || '').trim();
+  row.code = String(row.code || '').trim();
+  row.sort_order = Number(row.sort_order || 0);
+  row.status = normalizeActiveStatus_(row.status || 'ACTIVE');
+  row.notes = String(row.notes || '').trim();
+  row.updated_by = String(row.updated_by || params.user_id || params.user_role || 'system');
+
+  const klass = findRowByIdSafe_(CONFIG.SHEETS.CLASSES, row.class_id);
+  if (!klass) return { ok: false, message: 'class_id not found: ' + row.class_id };
+  return upsertById_(CONFIG.SHEETS.SUBJECTS, row);
+}
+
+function phase1SheetHeaders_() {
+  const headers = {};
+  headers[CONFIG.SHEETS.STUDENTS] = [
+    'id', 'student_code', 'name_bn', 'name_en', 'gender', 'date_of_birth',
+    'admission_date', 'class_id', 'section_id', 'roll_no', 'status', 'phone',
+    'address', 'notes', 'created_at', 'updated_at', 'updated_by',
+  ];
+  headers[CONFIG.SHEETS.GUARDIANS] = [
+    'id', 'student_id', 'name', 'relation', 'phone', 'email', 'address',
+    'occupation', 'primary_contact', 'status', 'notes', 'created_at',
+    'updated_at', 'updated_by',
+  ];
+  headers[CONFIG.SHEETS.CLASSES] = [
+    'id', 'name', 'level', 'sort_order', 'status', 'notes', 'created_at',
+    'updated_at', 'updated_by',
+  ];
+  headers[CONFIG.SHEETS.SECTIONS] = [
+    'id', 'class_id', 'name', 'capacity', 'status', 'notes', 'created_at',
+    'updated_at', 'updated_by',
+  ];
+  headers[CONFIG.SHEETS.SUBJECTS] = [
+    'id', 'class_id', 'name', 'code', 'sort_order', 'status', 'notes',
+    'created_at', 'updated_at', 'updated_by',
+  ];
+  return headers;
+}
+
+function ensurePhase1Sheet_(sheetName) {
+  const headers = phase1SheetHeaders_()[sheetName];
+  if (!headers) throw new Error('Unknown Phase 1 sheet: ' + sheetName);
+  ensureSheetWithHeaders_(sheetName, headers);
+}
+
+function ensureSheetWithHeaders_(sheetName, headers) {
+  const ss = SpreadsheetApp.openById(getSheetId_());
+  let sheet = ss.getSheetByName(sheetName);
+  if (!sheet) {
+    sheet = ss.insertSheet(sheetName);
+    sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+    sheet.setFrozenRows(1);
+    return sheet;
+  }
+
+  if (sheet.getLastRow() === 0 || sheet.getLastColumn() === 0) {
+    sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+    sheet.setFrozenRows(1);
+    return sheet;
+  }
+
+  const existing = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0].map(String);
+  const missing = headers.filter(function (h) { return existing.indexOf(h) === -1; });
+  if (missing.length) {
+    sheet.getRange(1, existing.length + 1, 1, missing.length).setValues([missing]);
+  }
+  sheet.setFrozenRows(1);
+  return sheet;
+}
+
 function listSheetRows_(sheetName) {
   const sheet = getSheet_(sheetName);
   const values = sheet.getDataRange().getValues();
@@ -707,6 +1017,15 @@ function findRowById_(sheetName, id) {
     }
   }
   return null;
+}
+
+function findRowByIdSafe_(sheetName, id) {
+  try {
+    if (!id) return null;
+    return findRowById_(sheetName, id);
+  } catch (err) {
+    return null;
+  }
 }
 
 function addAudit_(module, action, entityId, beforeJson, afterJson, doneBy) {
@@ -1214,6 +1533,11 @@ function normalizeTransactionRow_(row) {
   out.status = String(out.status || 'ACTIVE').trim().toUpperCase() || 'ACTIVE';
   out.amount = normalizeNumber_(out.amount);
   return out;
+}
+
+function normalizeActiveStatus_(raw) {
+  const value = String(raw || 'ACTIVE').trim().toUpperCase();
+  return value === 'INACTIVE' || value === 'ARCHIVED' ? value : 'ACTIVE';
 }
 
 function normalizeIsoDate_(raw) {

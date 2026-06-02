@@ -104,7 +104,81 @@ Columns:
 - txn_id
 - notes
 
-## 9) audit_log
+## 9) students
+Columns:
+- id
+- student_code
+- name_bn
+- name_en
+- gender
+- date_of_birth
+- admission_date
+- class_id
+- section_id
+- roll_no
+- status (ACTIVE|INACTIVE|ARCHIVED)
+- phone
+- address
+- notes
+- created_at
+- updated_at
+- updated_by
+
+## 10) student_guardians
+Columns:
+- id
+- student_id
+- name
+- relation
+- phone
+- email
+- address
+- occupation
+- primary_contact (TRUE|FALSE)
+- status (ACTIVE|INACTIVE|ARCHIVED)
+- notes
+- created_at
+- updated_at
+- updated_by
+
+## 11) classes
+Columns:
+- id
+- name
+- level
+- sort_order
+- status (ACTIVE|INACTIVE|ARCHIVED)
+- notes
+- created_at
+- updated_at
+- updated_by
+
+## 12) sections
+Columns:
+- id
+- class_id
+- name
+- capacity
+- status (ACTIVE|INACTIVE|ARCHIVED)
+- notes
+- created_at
+- updated_at
+- updated_by
+
+## 13) subjects
+Columns:
+- id
+- class_id
+- name
+- code
+- sort_order
+- status (ACTIVE|INACTIVE|ARCHIVED)
+- notes
+- created_at
+- updated_at
+- updated_by
+
+## 14) audit_log
 Columns:
 - id
 - module
@@ -115,14 +189,14 @@ Columns:
 - done_by
 - done_at
 
-## 10) settings
+## 15) settings
 Columns:
 - key
 - value
 - notes
 - updated_at
 
-## 11) notifications
+## 16) notifications
 Columns:
 - id
 - category

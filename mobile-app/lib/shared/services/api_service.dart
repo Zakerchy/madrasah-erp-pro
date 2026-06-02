@@ -15,6 +15,11 @@ class ApiService {
     'upsertStaff',
     'recordSalaryPayment',
     'saveScholarshipPayment',
+    'upsertStudent',
+    'upsertStudentGuardian',
+    'upsertClass',
+    'upsertSection',
+    'upsertSubject',
     'upsertUser',
     'setUserApprovalStatus',
   };
