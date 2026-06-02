@@ -19,6 +19,9 @@ const CONFIG = {
     CLASSES: 'classes',
     SECTIONS: 'sections',
     SUBJECTS: 'subjects',
+    ATTENDANCE: 'student_attendance',
+    EXAM_TERMS: 'exam_terms',
+    EXAM_MARKS: 'exam_marks',
     AUDIT: 'audit_log',
     SETTINGS: 'settings',
     NOTIFICATIONS: 'notifications',
@@ -94,6 +97,10 @@ function handleRequest_(params) {
     if (action === 'listClasses') return json(listClasses_(params));
     if (action === 'listSections') return json(listSections_(params));
     if (action === 'listSubjects') return json(listSubjects_(params));
+    if (action === 'listAttendance') return json(listAttendance_(params));
+    if (action === 'listExamTerms') return json(listExamTerms_(params));
+    if (action === 'listExamMarks') return json(listExamMarks_(params));
+    if (action === 'resultSummary') return json(resultSummary_(params));
     if (action === 'monthlyReport') return json(monthlyReport_(params));
     if (action === 'rangeReport') return json(rangeReport_(params));
     if (action === 'datasetStats') return json(datasetStats_(params));
@@ -163,6 +170,21 @@ function handleRequest_(params) {
     if (action === 'upsertSubject') {
       assertRole_(params.user_role, ['ADMIN', 'ACCOUNTANT']);
       return json(upsertSubject_(params.payload, params));
+    }
+
+    if (action === 'saveAttendance') {
+      assertRole_(params.user_role, ['ADMIN', 'ACCOUNTANT', 'FIELD_USER']);
+      return json(saveAttendance_(params.payload, params));
+    }
+
+    if (action === 'upsertExamTerm') {
+      assertRole_(params.user_role, ['ADMIN', 'ACCOUNTANT']);
+      return json(upsertExamTerm_(params.payload, params));
+    }
+
+    if (action === 'saveExamMark') {
+      assertRole_(params.user_role, ['ADMIN', 'ACCOUNTANT']);
+      return json(saveExamMark_(params.payload, params));
     }
 
     if (action === 'listUsers') return json(listUsers_(params));
@@ -884,6 +906,255 @@ function upsertSubject_(payload, params) {
   return upsertById_(CONFIG.SHEETS.SUBJECTS, row);
 }
 
+function listAttendance_(params) {
+  params = params || {};
+  assertRole_(params.user_role, ['ADMIN', 'ACCOUNTANT', 'FIELD_USER', 'VIEWER']);
+  ensurePhase2Sheet_(CONFIG.SHEETS.ATTENDANCE);
+
+  const date = normalizeIsoDate_(params.attendance_date || params.date || '');
+  const classId = String(params.class_id || '').trim();
+  const sectionId = String(params.section_id || '').trim();
+  const studentId = String(params.student_id || '').trim();
+  const rows = listSheetRows_(CONFIG.SHEETS.ATTENDANCE).data || [];
+  const filtered = rows.filter(function (r) {
+    if (date && normalizeIsoDate_(r.attendance_date || '') !== date) return false;
+    if (classId && String(r.class_id || '') !== classId) return false;
+    if (sectionId && String(r.section_id || '') !== sectionId) return false;
+    if (studentId && String(r.student_id || '') !== studentId) return false;
+    return true;
+  });
+  filtered.sort(function (a, b) {
+    return String(b.attendance_date || '').localeCompare(String(a.attendance_date || '')) ||
+      String(a.class_id || '').localeCompare(String(b.class_id || '')) ||
+      String(a.student_id || '').localeCompare(String(b.student_id || ''));
+  });
+  return { ok: true, data: filtered };
+}
+
+function saveAttendance_(payload, params) {
+  payload = payload || {};
+  params = params || {};
+  ensurePhase2Sheet_(CONFIG.SHEETS.ATTENDANCE);
+  ensurePhase1Sheet_(CONFIG.SHEETS.STUDENTS);
+  ensurePhase1Sheet_(CONFIG.SHEETS.CLASSES);
+  ensurePhase1Sheet_(CONFIG.SHEETS.SECTIONS);
+
+  const attendanceDate = normalizeIsoDate_(payload.attendance_date || payload.date || todayIso_());
+  const classId = String(payload.class_id || '').trim();
+  const sectionId = String(payload.section_id || '').trim();
+  const rows = Array.isArray(payload.rows) ? payload.rows : [payload];
+  if (!isIsoDateText_(attendanceDate)) return { ok: false, message: 'attendance_date must be YYYY-MM-DD' };
+  if (!classId) return { ok: false, message: 'class_id is required' };
+  if (!rows.length) return { ok: false, message: 'attendance rows are required' };
+
+  const klass = findRowByIdSafe_(CONFIG.SHEETS.CLASSES, classId);
+  if (!klass) return { ok: false, message: 'class_id not found: ' + classId };
+  if (sectionId && !findRowByIdSafe_(CONFIG.SHEETS.SECTIONS, sectionId)) {
+    return { ok: false, message: 'section_id not found: ' + sectionId };
+  }
+
+  const saved = [];
+  rows.forEach(function (item) {
+    const studentId = String(item.student_id || '').trim();
+    if (!studentId) throw new Error('student_id is required');
+    const student = findRowByIdSafe_(CONFIG.SHEETS.STUDENTS, studentId);
+    if (!student) throw new Error('student_id not found: ' + studentId);
+
+    const studentClassId = String(student.rowObj.class_id || classId);
+    const studentSectionId = String(student.rowObj.section_id || sectionId);
+    const status = normalizeAttendanceStatus_(item.status || 'PRESENT');
+    const row = {
+      id: item.id || stableAcademicId_('att', [attendanceDate, studentId]),
+      attendance_date: attendanceDate,
+      student_id: studentId,
+      class_id: classId || studentClassId,
+      section_id: sectionId || studentSectionId,
+      status: status,
+      notes: String(item.notes || '').trim(),
+      recorded_by: String(params.user_id || item.recorded_by || params.user_role || 'system'),
+      updated_by: String(params.user_id || item.updated_by || params.user_role || 'system'),
+    };
+    saved.push(upsertById_(CONFIG.SHEETS.ATTENDANCE, row).data);
+  });
+
+  return { ok: true, data: saved };
+}
+
+function listExamTerms_(params) {
+  params = params || {};
+  assertRole_(params.user_role, ['ADMIN', 'ACCOUNTANT', 'FIELD_USER', 'VIEWER']);
+  ensurePhase2Sheet_(CONFIG.SHEETS.EXAM_TERMS);
+  const classId = String(params.class_id || '').trim();
+  const sectionId = String(params.section_id || '').trim();
+  const rows = listSheetRows_(CONFIG.SHEETS.EXAM_TERMS).data || [];
+  const filtered = rows.filter(function (r) {
+    if (classId && String(r.class_id || '') !== classId) return false;
+    if (sectionId && String(r.section_id || '') !== sectionId) return false;
+    return true;
+  });
+  filtered.sort(function (a, b) {
+    return String(b.start_date || '').localeCompare(String(a.start_date || '')) ||
+      String(a.name || '').localeCompare(String(b.name || ''));
+  });
+  return { ok: true, data: filtered };
+}
+
+function upsertExamTerm_(payload, params) {
+  payload = payload || {};
+  validateRequired_(payload, ['name', 'class_id']);
+  ensurePhase2Sheet_(CONFIG.SHEETS.EXAM_TERMS);
+  ensurePhase1Sheet_(CONFIG.SHEETS.CLASSES);
+  ensurePhase1Sheet_(CONFIG.SHEETS.SECTIONS);
+
+  const row = Object.assign({}, payload);
+  row.id = row.id || uid_('exam');
+  row.name = String(row.name || '').trim();
+  row.class_id = String(row.class_id || '').trim();
+  row.section_id = String(row.section_id || '').trim();
+  row.start_date = normalizeIsoDate_(row.start_date || todayIso_());
+  row.end_date = normalizeIsoDate_(row.end_date || row.start_date);
+  row.status = normalizeActiveStatus_(row.status || 'ACTIVE');
+  row.notes = String(row.notes || '').trim();
+  row.updated_by = String(row.updated_by || params.user_id || params.user_role || 'system');
+
+  if (!findRowByIdSafe_(CONFIG.SHEETS.CLASSES, row.class_id)) {
+    return { ok: false, message: 'class_id not found: ' + row.class_id };
+  }
+  if (row.section_id && !findRowByIdSafe_(CONFIG.SHEETS.SECTIONS, row.section_id)) {
+    return { ok: false, message: 'section_id not found: ' + row.section_id };
+  }
+  if (!isIsoDateText_(row.start_date) || !isIsoDateText_(row.end_date)) {
+    return { ok: false, message: 'start/end date must be YYYY-MM-DD' };
+  }
+  if (row.start_date > row.end_date) return { ok: false, message: 'start_date cannot be after end_date' };
+  return upsertById_(CONFIG.SHEETS.EXAM_TERMS, row);
+}
+
+function listExamMarks_(params) {
+  params = params || {};
+  assertRole_(params.user_role, ['ADMIN', 'ACCOUNTANT', 'FIELD_USER', 'VIEWER']);
+  ensurePhase2Sheet_(CONFIG.SHEETS.EXAM_MARKS);
+  const examTermId = String(params.exam_term_id || '').trim();
+  const studentId = String(params.student_id || '').trim();
+  const subjectId = String(params.subject_id || '').trim();
+  const classId = String(params.class_id || '').trim();
+  const rows = listSheetRows_(CONFIG.SHEETS.EXAM_MARKS).data || [];
+  const filtered = rows.filter(function (r) {
+    if (examTermId && String(r.exam_term_id || '') !== examTermId) return false;
+    if (studentId && String(r.student_id || '') !== studentId) return false;
+    if (subjectId && String(r.subject_id || '') !== subjectId) return false;
+    if (classId && String(r.class_id || '') !== classId) return false;
+    return true;
+  });
+  filtered.sort(function (a, b) {
+    return String(a.student_id || '').localeCompare(String(b.student_id || '')) ||
+      String(a.subject_id || '').localeCompare(String(b.subject_id || ''));
+  });
+  return { ok: true, data: filtered };
+}
+
+function saveExamMark_(payload, params) {
+  payload = payload || {};
+  params = params || {};
+  validateRequired_(payload, ['exam_term_id', 'student_id', 'subject_id', 'marks_obtained', 'max_marks']);
+  ensurePhase2Sheet_(CONFIG.SHEETS.EXAM_MARKS);
+  ensurePhase2Sheet_(CONFIG.SHEETS.EXAM_TERMS);
+  ensurePhase1Sheet_(CONFIG.SHEETS.STUDENTS);
+  ensurePhase1Sheet_(CONFIG.SHEETS.SUBJECTS);
+
+  const exam = findRowByIdSafe_(CONFIG.SHEETS.EXAM_TERMS, payload.exam_term_id);
+  if (!exam) return { ok: false, message: 'exam_term_id not found: ' + payload.exam_term_id };
+  const student = findRowByIdSafe_(CONFIG.SHEETS.STUDENTS, payload.student_id);
+  if (!student) return { ok: false, message: 'student_id not found: ' + payload.student_id };
+  const subject = findRowByIdSafe_(CONFIG.SHEETS.SUBJECTS, payload.subject_id);
+  if (!subject) return { ok: false, message: 'subject_id not found: ' + payload.subject_id };
+
+  const maxMarks = Math.max(1, normalizeNumber_(payload.max_marks));
+  const marks = Math.max(0, normalizeNumber_(payload.marks_obtained));
+  const row = {
+    id: payload.id || stableAcademicId_('mark', [payload.exam_term_id, payload.student_id, payload.subject_id]),
+    exam_term_id: String(payload.exam_term_id || '').trim(),
+    student_id: String(payload.student_id || '').trim(),
+    subject_id: String(payload.subject_id || '').trim(),
+    class_id: String(payload.class_id || student.rowObj.class_id || exam.rowObj.class_id || ''),
+    marks_obtained: marks,
+    max_marks: maxMarks,
+    grade: String(payload.grade || gradeFromPercent_((marks / maxMarks) * 100)),
+    status: String(payload.status || 'RECORDED').trim().toUpperCase(),
+    notes: String(payload.notes || '').trim(),
+    updated_by: String(payload.updated_by || params.user_id || params.user_role || 'system'),
+  };
+  return upsertById_(CONFIG.SHEETS.EXAM_MARKS, row);
+}
+
+function resultSummary_(params) {
+  params = params || {};
+  assertRole_(params.user_role, ['ADMIN', 'ACCOUNTANT', 'FIELD_USER', 'VIEWER']);
+  ensurePhase1Sheet_(CONFIG.SHEETS.STUDENTS);
+  ensurePhase1Sheet_(CONFIG.SHEETS.SUBJECTS);
+  ensurePhase2Sheet_(CONFIG.SHEETS.EXAM_TERMS);
+  ensurePhase2Sheet_(CONFIG.SHEETS.EXAM_MARKS);
+
+  const examTermId = String(params.exam_term_id || '').trim();
+  const classId = String(params.class_id || '').trim();
+  if (!examTermId) return { ok: false, message: 'exam_term_id is required' };
+
+  const students = (listStudents_({
+    user_role: params.user_role,
+    class_id: classId,
+    section_id: params.section_id || '',
+    status: 'ACTIVE',
+    limit: 1000,
+  }).data || []);
+  const marks = listExamMarks_({
+    user_role: params.user_role,
+    exam_term_id: examTermId,
+    class_id: classId,
+  }).data || [];
+  const subjects = listSubjects_({ user_role: params.user_role, class_id: classId }).data || [];
+  const subjectById = {};
+  subjects.forEach(function (s) { subjectById[String(s.id || '')] = s; });
+
+  const markByStudent = {};
+  marks.forEach(function (m) {
+    const sid = String(m.student_id || '');
+    if (!markByStudent[sid]) markByStudent[sid] = [];
+    markByStudent[sid].push(m);
+  });
+
+  const rows = students.map(function (student) {
+    const studentMarks = markByStudent[String(student.id || '')] || [];
+    let obtained = 0;
+    let max = 0;
+    studentMarks.forEach(function (m) {
+      obtained += normalizeNumber_(m.marks_obtained);
+      max += normalizeNumber_(m.max_marks);
+    });
+    const percent = max > 0 ? (obtained / max) * 100 : 0;
+    return {
+      student_id: student.id,
+      student_name: student.name_bn || student.name_en || student.id,
+      class_id: student.class_id || classId,
+      section_id: student.section_id || '',
+      total_obtained: obtained,
+      total_max: max,
+      percent: Math.round(percent * 100) / 100,
+      grade: max > 0 ? gradeFromPercent_(percent) : '',
+      subjects_recorded: studentMarks.length,
+      marks: studentMarks.map(function (m) {
+        return Object.assign({}, m, {
+          subject_name: (subjectById[String(m.subject_id || '')] || {}).name || m.subject_id,
+        });
+      }),
+    };
+  });
+
+  rows.sort(function (a, b) {
+    return b.percent - a.percent || String(a.student_name || '').localeCompare(String(b.student_name || ''));
+  });
+  return { ok: true, data: { exam_term_id: examTermId, class_id: classId, rows: rows } };
+}
+
 function phase1SheetHeaders_() {
   const headers = {};
   headers[CONFIG.SHEETS.STUDENTS] = [
@@ -911,9 +1182,33 @@ function phase1SheetHeaders_() {
   return headers;
 }
 
+function phase2SheetHeaders_() {
+  const headers = {};
+  headers[CONFIG.SHEETS.ATTENDANCE] = [
+    'id', 'attendance_date', 'student_id', 'class_id', 'section_id', 'status',
+    'notes', 'recorded_by', 'created_at', 'updated_at', 'updated_by',
+  ];
+  headers[CONFIG.SHEETS.EXAM_TERMS] = [
+    'id', 'name', 'class_id', 'section_id', 'start_date', 'end_date', 'status',
+    'notes', 'created_at', 'updated_at', 'updated_by',
+  ];
+  headers[CONFIG.SHEETS.EXAM_MARKS] = [
+    'id', 'exam_term_id', 'student_id', 'subject_id', 'class_id',
+    'marks_obtained', 'max_marks', 'grade', 'status', 'notes', 'created_at',
+    'updated_at', 'updated_by',
+  ];
+  return headers;
+}
+
 function ensurePhase1Sheet_(sheetName) {
   const headers = phase1SheetHeaders_()[sheetName];
   if (!headers) throw new Error('Unknown Phase 1 sheet: ' + sheetName);
+  ensureSheetWithHeaders_(sheetName, headers);
+}
+
+function ensurePhase2Sheet_(sheetName) {
+  const headers = phase2SheetHeaders_()[sheetName];
+  if (!headers) throw new Error('Unknown Phase 2 sheet: ' + sheetName);
   ensureSheetWithHeaders_(sheetName, headers);
 }
 
@@ -1538,6 +1833,29 @@ function normalizeTransactionRow_(row) {
 function normalizeActiveStatus_(raw) {
   const value = String(raw || 'ACTIVE').trim().toUpperCase();
   return value === 'INACTIVE' || value === 'ARCHIVED' ? value : 'ACTIVE';
+}
+
+function normalizeAttendanceStatus_(raw) {
+  const value = String(raw || 'PRESENT').trim().toUpperCase();
+  const allowed = ['PRESENT', 'ABSENT', 'LATE', 'EXCUSED'];
+  if (allowed.indexOf(value) === -1) throw new Error('Invalid attendance status: ' + value);
+  return value;
+}
+
+function stableAcademicId_(prefix, parts) {
+  const raw = parts.map(function (p) { return String(p || '').trim(); }).join('_');
+  return prefix + '_' + raw.replace(/[^A-Za-z0-9]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 120);
+}
+
+function gradeFromPercent_(percent) {
+  const p = Number(percent || 0);
+  if (p >= 80) return 'A+';
+  if (p >= 70) return 'A';
+  if (p >= 60) return 'A-';
+  if (p >= 50) return 'B';
+  if (p >= 40) return 'C';
+  if (p >= 33) return 'D';
+  return 'F';
 }
 
 function normalizeIsoDate_(raw) {

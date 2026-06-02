@@ -48,6 +48,18 @@ Headers:
 - Phase 1 academic sheets are auto-provisioned by Apps Script on first list/upsert if missing.
 - Every upsert uses audit log through `upsertById_`.
 
+## Academic Core
+- `GET ?action=listAttendance&attendance_date=YYYY-MM-DD&class_id=&section_id=&student_id=`
+- `POST { action: "saveAttendance", user_role: "ADMIN|ACCOUNTANT|FIELD_USER", user_id: "...", payload: { attendance_date, class_id, section_id?, rows: [{ student_id, status, notes? }] } }`
+- `GET ?action=listExamTerms&class_id=&section_id=`
+- `POST { action: "upsertExamTerm", user_role: "ADMIN|ACCOUNTANT", user_id: "...", payload: { id?, name, class_id, section_id?, start_date, end_date, status?, notes? } }`
+- `GET ?action=listExamMarks&exam_term_id=&student_id=&subject_id=&class_id=`
+- `POST { action: "saveExamMark", user_role: "ADMIN|ACCOUNTANT", user_id: "...", payload: { exam_term_id, student_id, subject_id, class_id?, marks_obtained, max_marks, grade?, notes? } }`
+- `GET ?action=resultSummary&exam_term_id=&class_id=&section_id=`
+- Phase 2 sheets are auto-provisioned by Apps Script on first list/upsert if missing.
+- Attendance IDs are deterministic by date/student, and marks IDs are deterministic by exam/student/subject to prevent duplicate rows.
+- Every attendance/exam/mark write uses audit log through `upsertById_`.
+
 ## Reports
 - `GET ?action=monthlyReport&monthKey=YYYY-MM`
 - `GET ?action=rangeReport&from=YYYY-MM-DD&to=YYYY-MM-DD`

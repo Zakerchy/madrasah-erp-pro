@@ -178,7 +178,51 @@ Columns:
 - updated_at
 - updated_by
 
-## 14) audit_log
+## 14) student_attendance
+Columns:
+- id
+- attendance_date
+- student_id
+- class_id
+- section_id
+- status (PRESENT|ABSENT|LATE|EXCUSED)
+- notes
+- recorded_by
+- created_at
+- updated_at
+- updated_by
+
+## 15) exam_terms
+Columns:
+- id
+- name
+- class_id
+- section_id
+- start_date
+- end_date
+- status (ACTIVE|INACTIVE|ARCHIVED)
+- notes
+- created_at
+- updated_at
+- updated_by
+
+## 16) exam_marks
+Columns:
+- id
+- exam_term_id
+- student_id
+- subject_id
+- class_id
+- marks_obtained
+- max_marks
+- grade
+- status (RECORDED|VOID)
+- notes
+- created_at
+- updated_at
+- updated_by
+
+## 17) audit_log
 Columns:
 - id
 - module
@@ -189,14 +233,14 @@ Columns:
 - done_by
 - done_at
 
-## 15) settings
+## 18) settings
 Columns:
 - key
 - value
 - notes
 - updated_at
 
-## 16) notifications
+## 19) notifications
 Columns:
 - id
 - category

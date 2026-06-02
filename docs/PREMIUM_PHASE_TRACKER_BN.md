@@ -87,7 +87,7 @@ Completion note:
 
 ## Phase 2: Academic Core
 
-Status: `⬜ Pending`
+Status: `🟡 In Progress`
 
 Goal:
 - Student management, class setup, attendance, and exam/result base complete করা।

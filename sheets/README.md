@@ -17,10 +17,13 @@ Recommended tab names:
 - classes
 - sections
 - subjects
+- student_attendance
+- exam_terms
+- exam_marks
 - audit_log
 - settings
 - notifications
 
-Phase 1 academic tabs are also auto-created by the Apps Script backend on first
+Phase 1 and Phase 2 academic tabs are also auto-created by the Apps Script backend on first
 `list*` or `upsert*` call if they are missing. These CSV files remain the repo
 source of truth for header order.

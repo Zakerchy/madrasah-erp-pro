@@ -20,6 +20,9 @@ class ApiService {
     'upsertClass',
     'upsertSection',
     'upsertSubject',
+    'saveAttendance',
+    'upsertExamTerm',
+    'saveExamMark',
     'upsertUser',
     'setUserApprovalStatus',
   };

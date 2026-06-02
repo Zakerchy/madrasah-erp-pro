@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../features/auth/login_screen.dart';
 import '../features/academic/academic_foundation_screen.dart';
+import '../features/academic/academic_core_screen.dart';
 import '../features/beneficiaries/beneficiaries_screen.dart';
 import '../features/dashboard/dashboard_screen.dart';
 import '../features/donations/donation_screen.dart';
@@ -48,6 +49,7 @@ class _MadrasahErpLiteAppState extends State<MadrasahErpLiteApp> {
         '/login': (_) => const LoginScreen(),
         '/dashboard': (_) => const DashboardScreen(),
         '/academic': (_) => const AcademicFoundationScreen(),
+        '/academic-core': (_) => const AcademicCoreScreen(),
         '/donations': (_) => const DonationScreen(),
         '/expenses': (_) => const ExpenseScreen(),
         '/salary': (_) => const SalaryScreen(),
