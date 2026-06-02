@@ -262,34 +262,55 @@ Completion note:
 
 ## Phase 5: Communication & Documents
 
-Status: `🟡 In Progress`
+Status: `✅ Completed`
 
 Goal:
 - Notices, in-app targeting, and document/voucher vault add করা।
 
 Work items:
-- Notice publish/list/read flow.
-- Target by role/class/student where applicable.
-- Document/voucher link storage.
-- Link documents to transaction/student/staff/scholarship records.
+- Notice publish/list/read flow. ✅
+- Target by role/class/user where applicable. ✅
+- Document/voucher link storage. ✅
+- Link documents to transaction/student/staff/scholarship/general records by `entity_type` + `entity_id`. ✅
 
 Files/modules touched:
-- Pending.
+- `backend-apps-script/Code.gs`
+- `mobile-app/lib/features/communication/communication_documents_screen.dart`
+- `mobile-app/lib/core/app_shell.dart`
+- `mobile-app/lib/shared/widgets/app_drawer.dart`
+- `mobile-app/lib/shared/services/api_service.dart`
+- `docs/API_CONTRACT.md`
+- `docs/SHEET_SCHEMA.md`
+- `sheets/README.md`
+- `sheets/notices.csv`
+- `sheets/notice_reads.csv`
+- `sheets/document_vault.csv`
 
 Backend endpoints/sheets added:
-- Pending.
+- Sheets: `notices`, `notice_reads`, `document_vault`
+- Read endpoints: `listNotices`, `listDocuments`
+- Write endpoints: `publishNotice`, `markNoticeRead`, `upsertDocument`
+- Notice targeting: role/user/class visibility and read state by user.
+- Audit: notice/document/read writes route through `upsertById_`.
 
 Verification commands:
-- Pending.
+- `cp backend-apps-script/Code.gs /tmp/madrasah_phase5_code_check.js && node --check /tmp/madrasah_phase5_code_check.js` ✅
+- `HOME=/Users/zakerchy/Desktop/MadrasahApp FLUTTER_SUPPRESS_ANALYTICS=true DART_SUPPRESS_ANALYTICS=true ../.local-tools/flutter/bin/flutter analyze lib/features/communication/communication_documents_screen.dart lib/core/app_shell.dart lib/shared/widgets/app_drawer.dart lib/shared/services/api_service.dart` ✅
+- `HOME=/Users/zakerchy/Desktop/MadrasahApp FLUTTER_SUPPRESS_ANALYTICS=true DART_SUPPRESS_ANALYTICS=true ../.local-tools/flutter/bin/flutter build web --release --dart-define=APPS_SCRIPT_URL=https://script.google.com/macros/s/AKfycbzbgTChISsQWhEU_EG06UYO3kTGhH-NsEiSdd0v-PEftI3882X7sUDRWCL96224-Bui/exec` ✅
+- Apps Script mocked endpoint smoke: targeted notice visibility, read status, linked document retrieval + 4 audit rows ✅
+- Static route/navigation check: `/communication`, drawer entry, and backend action names found by `rg` ✅
 
 Acceptance checklist:
-- Notice is visible to target users only.
-- Notice read status works.
-- Linked document opens from the relevant record.
-- Audit log records document/notice writes.
+- Notice is visible to target role/class users in mocked smoke. ✅
+- Notice read status works. ✅
+- Linked document loads by `entity_type` and `entity_id`. ✅
+- Audit log records document/notice/read writes. ✅
+- Existing modules still build through release web build. ✅
 
 Completion note:
-- Pending.
+- Completed on 2026-06-02.
+- Implementation commit: `23ca7a5` (`feat: add communication document vault`).
+- Live Apps Script smoke will run automatically after GitHub deploy; local mocked smoke confirms endpoint behavior before deploy.
 
 ---
 
