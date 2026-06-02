@@ -28,35 +28,60 @@
 
 ## Phase 1: Data Foundation
 
-Status: `⬜ Pending`
+Status: `✅ Completed`
 
 Goal:
 - Students, classes, sections, subjects, guardians, and base academic schemas add করা।
 
 Work items:
-- Student, guardian, class, section, subject data model define করা।
-- Apps Script create/list/update endpoints add করা।
-- Flutter models, routes, drawer entries, and basic management UI add করা।
-- Audit log নিশ্চিত করা for create/update/status changes।
+- Student, guardian, class, section, subject data model define করা। ✅
+- Apps Script create/list/update endpoints add করা। ✅
+- Flutter models, routes, drawer entries, and basic management UI add করা। ✅
+- Audit log নিশ্চিত করা for create/update/status changes। ✅
+- Missing Phase 1 Google Sheet tabs auto-create/header-heal করা। ✅
 
 Files/modules touched:
-- Pending.
+- `backend-apps-script/Code.gs`
+- `mobile-app/lib/features/academic/academic_foundation_screen.dart`
+- `mobile-app/lib/features/academic/academic_models.dart`
+- `mobile-app/lib/core/app_shell.dart`
+- `mobile-app/lib/shared/widgets/app_drawer.dart`
+- `mobile-app/lib/shared/services/api_service.dart`
+- `docs/API_CONTRACT.md`
+- `docs/SHEET_SCHEMA.md`
+- `sheets/README.md`
+- `sheets/students.csv`
+- `sheets/student_guardians.csv`
+- `sheets/classes.csv`
+- `sheets/sections.csv`
+- `sheets/subjects.csv`
 
 Backend endpoints/sheets added:
-- Pending.
+- Sheets: `students`, `student_guardians`, `classes`, `sections`, `subjects`
+- Read endpoints: `listStudents`, `listStudentGuardians`, `listClasses`, `listSections`, `listSubjects`
+- Write endpoints: `upsertStudent`, `upsertStudentGuardian`, `upsertClass`, `upsertSection`, `upsertSubject`
+- Audit: every Phase 1 `upsert*` write routes through `upsertById_`, generating `CREATE`/`UPDATE` audit rows.
 
 Verification commands:
-- Pending.
+- `cp backend-apps-script/Code.gs /tmp/madrasah_phase1_code_check.js && node --check /tmp/madrasah_phase1_code_check.js` ✅
+- `HOME=/Users/zakerchy/Desktop/MadrasahApp FLUTTER_SUPPRESS_ANALYTICS=true DART_SUPPRESS_ANALYTICS=true ../.local-tools/flutter/bin/flutter analyze lib/features/academic/academic_foundation_screen.dart lib/features/academic/academic_models.dart lib/core/app_shell.dart lib/shared/widgets/app_drawer.dart lib/shared/services/api_service.dart` ✅
+- `HOME=/Users/zakerchy/Desktop/MadrasahApp FLUTTER_SUPPRESS_ANALYTICS=true DART_SUPPRESS_ANALYTICS=true ../.local-tools/flutter/bin/flutter build web --release --dart-define=APPS_SCRIPT_URL=https://script.google.com/macros/s/AKfycbzbgTChISsQWhEU_EG06UYO3kTGhH-NsEiSdd0v-PEftI3882X7sUDRWCL96224-Bui/exec` ✅
+- `HOME=/Users/zakerchy/Desktop/MadrasahApp FLUTTER_SUPPRESS_ANALYTICS=true DART_SUPPRESS_ANALYTICS=true ../.local-tools/flutter/bin/flutter test` ✅
+- Apps Script mocked endpoint smoke: class/section/subject/student/guardian create/list/update + 6 audit rows ✅
+- Static route/navigation check: `/academic`, drawer entry, and backend action names found by `rg` ✅
+- Full-app `flutter analyze` note: Phase 1 touched files clean; existing info-level lints remain in older auth/salary/scholarship/local-store files and were not introduced by this phase.
 
 Acceptance checklist:
-- Student create/list/update works.
-- Class/section/subject create/list/update works.
-- Guardian data is linked to student.
-- Audit row is created for every write.
-- Existing finance modules still work.
+- Student create/list/update works in mocked Apps Script smoke. ✅
+- Class/section/subject create/list/update works in mocked Apps Script smoke. ✅
+- Guardian data is linked to student and filtered by `student_id`. ✅
+- Audit row is created for every write; smoke produced 6 audit rows. ✅
+- Existing finance modules still build through release web build; no finance route/code changed. ✅
 
 Completion note:
-- Pending.
+- Completed on 2026-06-02.
+- Implementation commit: `8e19c23` (`feat: add academic data foundation`).
+- Live Apps Script smoke will run automatically after GitHub deploy; local mocked smoke confirms endpoint behavior before deploy.
 
 ---
 
@@ -226,4 +251,3 @@ Acceptance checklist:
 
 Completion note:
 - Pending.
-
