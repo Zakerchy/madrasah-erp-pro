@@ -222,7 +222,53 @@ Columns:
 - updated_at
 - updated_by
 
-## 17) audit_log
+## 17) fee_plans
+Columns:
+- id
+- name
+- class_id
+- month_from
+- month_to
+- amount
+- frequency (MONTHLY)
+- status (ACTIVE|INACTIVE|ARCHIVED)
+- notes
+- created_at
+- updated_at
+- updated_by
+
+## 18) fee_payments
+Columns:
+- id
+- student_id
+- month_key
+- amount
+- payment_date
+- method
+- reference
+- fund_type (CONSTRUCTION|JAKAT|SCHOLARSHIP|GENERAL)
+- txn_id
+- status (ACTIVE|VOID)
+- notes
+- created_at
+- updated_at
+- updated_by
+
+## 19) fee_waivers
+Columns:
+- id
+- student_id
+- month_key
+- amount
+- reason
+- approved_by
+- status (ACTIVE|VOID)
+- notes
+- created_at
+- updated_at
+- updated_by
+
+## 20) audit_log
 Columns:
 - id
 - module
@@ -233,14 +279,14 @@ Columns:
 - done_by
 - done_at
 
-## 18) settings
+## 21) settings
 Columns:
 - key
 - value
 - notes
 - updated_at
 
-## 19) notifications
+## 22) notifications
 Columns:
 - id
 - category

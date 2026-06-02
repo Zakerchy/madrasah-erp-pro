@@ -7,6 +7,7 @@ import '../features/beneficiaries/beneficiaries_screen.dart';
 import '../features/dashboard/dashboard_screen.dart';
 import '../features/donations/donation_screen.dart';
 import '../features/expenses/expense_screen.dart';
+import '../features/fees/fee_dues_screen.dart';
 import '../features/reports/reports_screen.dart';
 import '../features/salary/salary_screen.dart';
 import '../features/scholarship/scholarship_screen.dart';
@@ -52,6 +53,7 @@ class _MadrasahErpLiteAppState extends State<MadrasahErpLiteApp> {
         '/academic-core': (_) => const AcademicCoreScreen(),
         '/donations': (_) => const DonationScreen(),
         '/expenses': (_) => const ExpenseScreen(),
+        '/fees': (_) => const FeeDuesScreen(),
         '/salary': (_) => const SalaryScreen(),
         '/beneficiaries': (_) => const BeneficiariesScreen(),
         '/scholarship': (_) => const ScholarshipScreen(),

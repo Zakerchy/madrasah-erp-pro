@@ -20,10 +20,13 @@ Recommended tab names:
 - student_attendance
 - exam_terms
 - exam_marks
+- fee_plans
+- fee_payments
+- fee_waivers
 - audit_log
 - settings
 - notifications
 
-Phase 1 and Phase 2 academic tabs are also auto-created by the Apps Script backend on first
+Phase 1, Phase 2, and Phase 3 academic/fee tabs are also auto-created by the Apps Script backend on first
 `list*` or `upsert*` call if they are missing. These CSV files remain the repo
 source of truth for header order.

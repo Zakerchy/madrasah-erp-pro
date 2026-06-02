@@ -22,6 +22,9 @@ const CONFIG = {
     ATTENDANCE: 'student_attendance',
     EXAM_TERMS: 'exam_terms',
     EXAM_MARKS: 'exam_marks',
+    FEE_PLANS: 'fee_plans',
+    FEE_PAYMENTS: 'fee_payments',
+    FEE_WAIVERS: 'fee_waivers',
     AUDIT: 'audit_log',
     SETTINGS: 'settings',
     NOTIFICATIONS: 'notifications',
@@ -101,6 +104,10 @@ function handleRequest_(params) {
     if (action === 'listExamTerms') return json(listExamTerms_(params));
     if (action === 'listExamMarks') return json(listExamMarks_(params));
     if (action === 'resultSummary') return json(resultSummary_(params));
+    if (action === 'listFeePlans') return json(listFeePlans_(params));
+    if (action === 'listFeePayments') return json(listFeePayments_(params));
+    if (action === 'listFeeWaivers') return json(listFeeWaivers_(params));
+    if (action === 'listFeeDues') return json(listFeeDues_(params));
     if (action === 'monthlyReport') return json(monthlyReport_(params));
     if (action === 'rangeReport') return json(rangeReport_(params));
     if (action === 'datasetStats') return json(datasetStats_(params));
@@ -185,6 +192,21 @@ function handleRequest_(params) {
     if (action === 'saveExamMark') {
       assertRole_(params.user_role, ['ADMIN', 'ACCOUNTANT']);
       return json(saveExamMark_(params.payload, params));
+    }
+
+    if (action === 'upsertFeePlan') {
+      assertRole_(params.user_role, ['ADMIN', 'ACCOUNTANT']);
+      return json(upsertFeePlan_(params.payload, params));
+    }
+
+    if (action === 'recordFeePayment') {
+      assertRole_(params.user_role, ['ADMIN', 'ACCOUNTANT']);
+      return json(recordFeePayment_(params.payload, params));
+    }
+
+    if (action === 'upsertFeeWaiver') {
+      assertRole_(params.user_role, ['ADMIN', 'ACCOUNTANT']);
+      return json(upsertFeeWaiver_(params.payload, params));
     }
 
     if (action === 'listUsers') return json(listUsers_(params));
@@ -1155,6 +1177,245 @@ function resultSummary_(params) {
   return { ok: true, data: { exam_term_id: examTermId, class_id: classId, rows: rows } };
 }
 
+function listFeePlans_(params) {
+  params = params || {};
+  assertRole_(params.user_role, ['ADMIN', 'ACCOUNTANT', 'FIELD_USER', 'VIEWER']);
+  ensurePhase3Sheet_(CONFIG.SHEETS.FEE_PLANS);
+  const classId = String(params.class_id || '').trim();
+  const rows = listSheetRows_(CONFIG.SHEETS.FEE_PLANS).data || [];
+  const filtered = rows.filter(function (r) {
+    if (classId && String(r.class_id || '') && String(r.class_id || '') !== classId) return false;
+    return true;
+  });
+  filtered.sort(function (a, b) {
+    return String(a.class_id || '').localeCompare(String(b.class_id || '')) ||
+      String(a.name || '').localeCompare(String(b.name || ''));
+  });
+  return { ok: true, data: filtered };
+}
+
+function upsertFeePlan_(payload, params) {
+  payload = payload || {};
+  validateRequired_(payload, ['name', 'amount']);
+  ensurePhase3Sheet_(CONFIG.SHEETS.FEE_PLANS);
+  ensurePhase1Sheet_(CONFIG.SHEETS.CLASSES);
+
+  const row = Object.assign({}, payload);
+  row.id = row.id || uid_('feeplan');
+  row.name = String(row.name || '').trim();
+  row.class_id = String(row.class_id || '').trim();
+  row.month_from = normalizeMonthKey_(row.month_from || '');
+  row.month_to = normalizeMonthKey_(row.month_to || '');
+  row.amount = Math.max(0, normalizeNumber_(row.amount));
+  row.frequency = String(row.frequency || 'MONTHLY').trim().toUpperCase();
+  row.status = normalizeActiveStatus_(row.status || 'ACTIVE');
+  row.notes = String(row.notes || '').trim();
+  row.updated_by = String(row.updated_by || params.user_id || params.user_role || 'system');
+
+  if (row.class_id && !findRowByIdSafe_(CONFIG.SHEETS.CLASSES, row.class_id)) {
+    return { ok: false, message: 'class_id not found: ' + row.class_id };
+  }
+  if (row.month_from && !isMonthKey_(row.month_from)) return { ok: false, message: 'month_from must be YYYY-MM' };
+  if (row.month_to && !isMonthKey_(row.month_to)) return { ok: false, message: 'month_to must be YYYY-MM' };
+  if (row.month_from && row.month_to && row.month_from > row.month_to) {
+    return { ok: false, message: 'month_from cannot be after month_to' };
+  }
+  return upsertById_(CONFIG.SHEETS.FEE_PLANS, row);
+}
+
+function listFeePayments_(params) {
+  params = params || {};
+  assertRole_(params.user_role, ['ADMIN', 'ACCOUNTANT', 'FIELD_USER', 'VIEWER']);
+  ensurePhase3Sheet_(CONFIG.SHEETS.FEE_PAYMENTS);
+  const monthKey = normalizeMonthKey_(params.month_key || '');
+  const studentId = String(params.student_id || '').trim();
+  const rows = listSheetRows_(CONFIG.SHEETS.FEE_PAYMENTS).data || [];
+  const filtered = rows.filter(function (r) {
+    if (monthKey && String(r.month_key || '') !== monthKey) return false;
+    if (studentId && String(r.student_id || '') !== studentId) return false;
+    return String(r.status || 'ACTIVE') !== 'VOID';
+  });
+  filtered.sort(function (a, b) {
+    return String(b.payment_date || '').localeCompare(String(a.payment_date || ''));
+  });
+  return { ok: true, data: filtered };
+}
+
+function recordFeePayment_(payload, params) {
+  payload = payload || {};
+  params = params || {};
+  validateRequired_(payload, ['student_id', 'month_key', 'amount']);
+  ensurePhase3Sheet_(CONFIG.SHEETS.FEE_PAYMENTS);
+  ensurePhase1Sheet_(CONFIG.SHEETS.STUDENTS);
+
+  const student = findRowByIdSafe_(CONFIG.SHEETS.STUDENTS, payload.student_id);
+  if (!student) return { ok: false, message: 'student_id not found: ' + payload.student_id };
+  const monthKey = normalizeMonthKey_(payload.month_key || '');
+  if (!isMonthKey_(monthKey)) return { ok: false, message: 'month_key must be YYYY-MM' };
+  const amount = Math.max(0, normalizeNumber_(payload.amount));
+  if (amount <= 0) return { ok: false, message: 'amount must be > 0' };
+
+  const row = {
+    id: payload.id || uid_('feepay'),
+    student_id: String(payload.student_id || '').trim(),
+    month_key: monthKey,
+    amount: amount,
+    payment_date: normalizeIsoDate_(payload.payment_date || todayIso_()),
+    method: String(payload.method || '').trim(),
+    reference: String(payload.reference || '').trim(),
+    fund_type: String(payload.fund_type || 'GENERAL').trim().toUpperCase(),
+    txn_id: String(payload.txn_id || '').trim(),
+    status: String(payload.status || 'ACTIVE').trim().toUpperCase(),
+    notes: String(payload.notes || '').trim(),
+    updated_by: String(payload.updated_by || params.user_id || params.user_role || 'system'),
+  };
+  validateEnum_(row.fund_type, CONFIG.ENUMS.FUND, 'fund_type');
+
+  const saved = upsertById_(CONFIG.SHEETS.FEE_PAYMENTS, row);
+  let transaction = null;
+  if (!row.txn_id && saved.mode === 'create') {
+    transaction = createTransaction_({
+      txn_date: row.payment_date,
+      direction: 'IN',
+      fund_type: row.fund_type,
+      amount: row.amount,
+      source_or_vendor: String(student.rowObj.name_bn || student.rowObj.name_en || row.student_id),
+      category: 'STUDENT_FEE',
+      reference: row.reference,
+      notes: row.notes,
+      related_entity_type: 'FEE_PAYMENT',
+      related_entity_id: row.id,
+      created_by: row.updated_by,
+    });
+    updateById_(CONFIG.SHEETS.FEE_PAYMENTS, row.id, { txn_id: transaction.data.id });
+    saved.data.txn_id = transaction.data.id;
+  }
+  return { ok: true, data: saved.data, transaction: transaction ? transaction.data : null };
+}
+
+function listFeeWaivers_(params) {
+  params = params || {};
+  assertRole_(params.user_role, ['ADMIN', 'ACCOUNTANT', 'FIELD_USER', 'VIEWER']);
+  ensurePhase3Sheet_(CONFIG.SHEETS.FEE_WAIVERS);
+  const monthKey = normalizeMonthKey_(params.month_key || '');
+  const studentId = String(params.student_id || '').trim();
+  const rows = listSheetRows_(CONFIG.SHEETS.FEE_WAIVERS).data || [];
+  const filtered = rows.filter(function (r) {
+    if (monthKey && String(r.month_key || '') !== monthKey) return false;
+    if (studentId && String(r.student_id || '') !== studentId) return false;
+    return String(r.status || 'ACTIVE') !== 'VOID';
+  });
+  filtered.sort(function (a, b) {
+    return String(b.updated_at || '').localeCompare(String(a.updated_at || ''));
+  });
+  return { ok: true, data: filtered };
+}
+
+function upsertFeeWaiver_(payload, params) {
+  payload = payload || {};
+  params = params || {};
+  validateRequired_(payload, ['student_id', 'month_key', 'amount', 'reason']);
+  ensurePhase3Sheet_(CONFIG.SHEETS.FEE_WAIVERS);
+  ensurePhase1Sheet_(CONFIG.SHEETS.STUDENTS);
+
+  if (!findRowByIdSafe_(CONFIG.SHEETS.STUDENTS, payload.student_id)) {
+    return { ok: false, message: 'student_id not found: ' + payload.student_id };
+  }
+  const monthKey = normalizeMonthKey_(payload.month_key || '');
+  if (!isMonthKey_(monthKey)) return { ok: false, message: 'month_key must be YYYY-MM' };
+  const amount = Math.max(0, normalizeNumber_(payload.amount));
+  if (amount <= 0) return { ok: false, message: 'amount must be > 0' };
+
+  const row = {
+    id: payload.id || uid_('feewaive'),
+    student_id: String(payload.student_id || '').trim(),
+    month_key: monthKey,
+    amount: amount,
+    reason: String(payload.reason || '').trim(),
+    approved_by: String(payload.approved_by || params.user_id || params.user_role || 'system'),
+    status: String(payload.status || 'ACTIVE').trim().toUpperCase(),
+    notes: String(payload.notes || '').trim(),
+    updated_by: String(payload.updated_by || params.user_id || params.user_role || 'system'),
+  };
+  return upsertById_(CONFIG.SHEETS.FEE_WAIVERS, row);
+}
+
+function listFeeDues_(params) {
+  params = params || {};
+  assertRole_(params.user_role, ['ADMIN', 'ACCOUNTANT', 'FIELD_USER', 'VIEWER']);
+  ensurePhase1Sheet_(CONFIG.SHEETS.STUDENTS);
+  ensurePhase3Sheet_(CONFIG.SHEETS.FEE_PLANS);
+  ensurePhase3Sheet_(CONFIG.SHEETS.FEE_PAYMENTS);
+  ensurePhase3Sheet_(CONFIG.SHEETS.FEE_WAIVERS);
+
+  const monthKey = normalizeMonthKey_(params.month_key || params.monthKey || '');
+  if (!isMonthKey_(monthKey)) return { ok: false, message: 'month_key must be YYYY-MM' };
+  const classId = String(params.class_id || '').trim();
+  const studentId = String(params.student_id || '').trim();
+
+  const students = listStudents_({
+    user_role: params.user_role,
+    class_id: classId,
+    student_id: studentId,
+    status: 'ACTIVE',
+    limit: 1000,
+  }).data || [];
+  const scopedStudents = students.filter(function (s) {
+    if (studentId && String(s.id || '') !== studentId) return false;
+    return true;
+  });
+  const plans = (listFeePlans_({ user_role: params.user_role, class_id: classId }).data || [])
+    .filter(function (p) {
+      if (String(p.status || 'ACTIVE') !== 'ACTIVE') return false;
+      if (p.month_from && String(p.month_from) > monthKey) return false;
+      if (p.month_to && String(p.month_to) < monthKey) return false;
+      return true;
+    });
+  const payments = listFeePayments_({ user_role: params.user_role, month_key: monthKey }).data || [];
+  const waivers = listFeeWaivers_({ user_role: params.user_role, month_key: monthKey }).data || [];
+
+  const rows = scopedStudents.map(function (student) {
+    const applicable = plans.filter(function (p) {
+      const planClass = String(p.class_id || '').trim();
+      return !planClass || planClass === String(student.class_id || '');
+    });
+    const planned = applicable.reduce(function (sum, p) { return sum + normalizeNumber_(p.amount); }, 0);
+    const paid = payments
+      .filter(function (p) { return String(p.student_id || '') === String(student.id || ''); })
+      .reduce(function (sum, p) { return sum + normalizeNumber_(p.amount); }, 0);
+    const waived = waivers
+      .filter(function (w) { return String(w.student_id || '') === String(student.id || ''); })
+      .reduce(function (sum, w) { return sum + normalizeNumber_(w.amount); }, 0);
+    const due = Math.max(0, planned - paid - waived);
+    const scholarshipState = due <= 0 ? 'PAID' : (paid > 0 || waived > 0 ? 'PARTIAL' : 'UNPAID');
+    return {
+      student_id: student.id,
+      student_name: student.name_bn || student.name_en || student.id,
+      class_id: student.class_id || '',
+      section_id: student.section_id || '',
+      month_key: monthKey,
+      planned_amount: planned,
+      paid_amount: paid,
+      waived_amount: waived,
+      due_amount: due,
+      scholarship_due_state: scholarshipState,
+      fee_plan_count: applicable.length,
+    };
+  });
+  rows.sort(function (a, b) {
+    return String(a.class_id || '').localeCompare(String(b.class_id || '')) ||
+      String(a.student_name || '').localeCompare(String(b.student_name || ''));
+  });
+  const totals = rows.reduce(function (acc, r) {
+    acc.planned_amount += normalizeNumber_(r.planned_amount);
+    acc.paid_amount += normalizeNumber_(r.paid_amount);
+    acc.waived_amount += normalizeNumber_(r.waived_amount);
+    acc.due_amount += normalizeNumber_(r.due_amount);
+    return acc;
+  }, { planned_amount: 0, paid_amount: 0, waived_amount: 0, due_amount: 0 });
+  return { ok: true, data: { month_key: monthKey, rows: rows, totals: totals } };
+}
+
 function phase1SheetHeaders_() {
   const headers = {};
   headers[CONFIG.SHEETS.STUDENTS] = [
@@ -1200,6 +1461,24 @@ function phase2SheetHeaders_() {
   return headers;
 }
 
+function phase3SheetHeaders_() {
+  const headers = {};
+  headers[CONFIG.SHEETS.FEE_PLANS] = [
+    'id', 'name', 'class_id', 'month_from', 'month_to', 'amount', 'frequency',
+    'status', 'notes', 'created_at', 'updated_at', 'updated_by',
+  ];
+  headers[CONFIG.SHEETS.FEE_PAYMENTS] = [
+    'id', 'student_id', 'month_key', 'amount', 'payment_date', 'method',
+    'reference', 'fund_type', 'txn_id', 'status', 'notes', 'created_at',
+    'updated_at', 'updated_by',
+  ];
+  headers[CONFIG.SHEETS.FEE_WAIVERS] = [
+    'id', 'student_id', 'month_key', 'amount', 'reason', 'approved_by',
+    'status', 'notes', 'created_at', 'updated_at', 'updated_by',
+  ];
+  return headers;
+}
+
 function ensurePhase1Sheet_(sheetName) {
   const headers = phase1SheetHeaders_()[sheetName];
   if (!headers) throw new Error('Unknown Phase 1 sheet: ' + sheetName);
@@ -1209,6 +1488,12 @@ function ensurePhase1Sheet_(sheetName) {
 function ensurePhase2Sheet_(sheetName) {
   const headers = phase2SheetHeaders_()[sheetName];
   if (!headers) throw new Error('Unknown Phase 2 sheet: ' + sheetName);
+  ensureSheetWithHeaders_(sheetName, headers);
+}
+
+function ensurePhase3Sheet_(sheetName) {
+  const headers = phase3SheetHeaders_()[sheetName];
+  if (!headers) throw new Error('Unknown Phase 3 sheet: ' + sheetName);
   ensureSheetWithHeaders_(sheetName, headers);
 }
 
@@ -1856,6 +2141,25 @@ function gradeFromPercent_(percent) {
   if (p >= 40) return 'C';
   if (p >= 33) return 'D';
   return 'F';
+}
+
+function normalizeMonthKey_(raw) {
+  if (raw === null || raw === undefined || raw === '') return '';
+  if (Object.prototype.toString.call(raw) === '[object Date]' && !isNaN(raw.getTime())) {
+    return Utilities.formatDate(raw, Session.getScriptTimeZone(), 'yyyy-MM');
+  }
+  const text = String(raw).trim();
+  const match = text.match(/^(\d{4})[-/](\d{1,2})/);
+  if (match) return match[1] + '-' + match[2].padStart(2, '0');
+  const parsed = new Date(text);
+  if (!isNaN(parsed.getTime())) {
+    return Utilities.formatDate(parsed, Session.getScriptTimeZone(), 'yyyy-MM');
+  }
+  return text.slice(0, 7);
+}
+
+function isMonthKey_(text) {
+  return /^\d{4}-(0[1-9]|1[0-2])$/.test(String(text || '').trim());
 }
 
 function normalizeIsoDate_(raw) {

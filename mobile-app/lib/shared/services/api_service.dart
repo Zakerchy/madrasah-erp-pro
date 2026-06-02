@@ -23,6 +23,9 @@ class ApiService {
     'saveAttendance',
     'upsertExamTerm',
     'saveExamMark',
+    'upsertFeePlan',
+    'recordFeePayment',
+    'upsertFeeWaiver',
     'upsertUser',
     'setUserApprovalStatus',
   };

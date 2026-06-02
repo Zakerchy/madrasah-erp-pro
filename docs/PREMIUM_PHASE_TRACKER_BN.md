@@ -150,7 +150,7 @@ Completion note:
 
 ## Phase 3: Fee, Dues, Scholarship Automation
 
-Status: `⬜ Pending`
+Status: `🟡 In Progress`
 
 Goal:
 - Fee plan, payments, dues, waivers, and scholarship due states automate করা।

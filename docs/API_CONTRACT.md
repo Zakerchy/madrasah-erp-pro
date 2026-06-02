@@ -60,6 +60,18 @@ Headers:
 - Attendance IDs are deterministic by date/student, and marks IDs are deterministic by exam/student/subject to prevent duplicate rows.
 - Every attendance/exam/mark write uses audit log through `upsertById_`.
 
+## Fee, Dues, Scholarship Automation
+- `GET ?action=listFeePlans&class_id=`
+- `POST { action: "upsertFeePlan", user_role: "ADMIN|ACCOUNTANT", user_id: "...", payload: { id?, name, class_id?, month_from?, month_to?, amount, frequency?, status?, notes? } }`
+- `GET ?action=listFeePayments&month_key=YYYY-MM&student_id=`
+- `POST { action: "recordFeePayment", user_role: "ADMIN|ACCOUNTANT", user_id: "...", payload: { student_id, month_key, amount, payment_date?, method?, reference?, fund_type?, notes? } }`
+- `GET ?action=listFeeWaivers&month_key=YYYY-MM&student_id=`
+- `POST { action: "upsertFeeWaiver", user_role: "ADMIN|ACCOUNTANT", user_id: "...", payload: { id?, student_id, month_key, amount, reason, notes? } }`
+- `GET ?action=listFeeDues&month_key=YYYY-MM&class_id=&student_id=`
+- Fee payment creates an `IN` ledger row in `fund_transactions` with category `STUDENT_FEE`.
+- Dues are calculated as `planned - paid - waived`, capped at `0`.
+- Waiver requires a reason and writes audit through `upsertById_`.
+
 ## Reports
 - `GET ?action=monthlyReport&monthKey=YYYY-MM`
 - `GET ?action=rangeReport&from=YYYY-MM-DD&to=YYYY-MM-DD`

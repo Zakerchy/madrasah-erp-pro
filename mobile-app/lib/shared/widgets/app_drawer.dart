@@ -57,6 +57,8 @@ class AppDrawer extends StatelessWidget {
               item('হাজিরা ও ফলাফল', 'Attendance & Results', '/academic-core'),
               item('দান সংগ্রহ', 'Donations', '/donations'),
               if (role == 'ADMIN' || role == 'ACCOUNTANT')
+                item('ফি ও বকেয়া', 'Fees & Dues', '/fees'),
+              if (role == 'ADMIN' || role == 'ACCOUNTANT')
                 item('খরচ', 'Expenses', '/expenses'),
               if (role == 'ADMIN' || role == 'ACCOUNTANT')
                 item('বেতন', 'Salary', '/salary'),
