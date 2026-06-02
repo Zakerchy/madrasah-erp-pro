@@ -354,5 +354,5 @@ Acceptance checklist:
 
 Completion note:
 - Completed on 2026-06-02.
-- Implementation commit: pending commit after this tracker update.
+- Implementation commit: `84c6628` (`docs: add launch hardening package`).
 - Live GitHub Actions/Vercel/APK confirmation is a post-push action because local environment cannot confirm remote workflow success without network/API access.
