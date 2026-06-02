@@ -322,7 +322,49 @@ Columns:
 - updated_at
 - updated_by
 
-## 24) audit_log
+## 24) notices
+Columns:
+- id
+- title
+- message
+- target_role
+- target_user_id
+- target_class_id
+- priority (NORMAL|HIGH|URGENT)
+- status (PUBLISHED|DRAFT|ARCHIVED)
+- published_by
+- published_at
+- expires_at
+- created_at
+- updated_at
+- updated_by
+
+## 25) notice_reads
+Columns:
+- id
+- notice_id
+- user_id
+- read_at
+- created_at
+- updated_at
+- updated_by
+
+## 26) document_vault
+Columns:
+- id
+- title
+- doc_type
+- url
+- entity_type
+- entity_id
+- notes
+- status (ACTIVE|VOID)
+- uploaded_by
+- created_at
+- updated_at
+- updated_by
+
+## 27) audit_log
 Columns:
 - id
 - module
@@ -333,14 +375,14 @@ Columns:
 - done_by
 - done_at
 
-## 25) settings
+## 28) settings
 Columns:
 - key
 - value
 - notes
 - updated_at
 
-## 26) notifications
+## 29) notifications
 Columns:
 - id
 - category

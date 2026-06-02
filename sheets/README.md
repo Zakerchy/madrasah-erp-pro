@@ -27,10 +27,13 @@ Recommended tab names:
 - approval_rules
 - approval_requests
 - reconciliation_snapshots
+- notices
+- notice_reads
+- document_vault
 - audit_log
 - settings
 - notifications
 
-Phase 1-4 academic/fee/finance tabs are also auto-created by the Apps Script backend on first
+Phase 1-5 academic/fee/finance/communication tabs are also auto-created by the Apps Script backend on first
 `list*` or `upsert*` call if they are missing. These CSV files remain the repo
 source of truth for header order.

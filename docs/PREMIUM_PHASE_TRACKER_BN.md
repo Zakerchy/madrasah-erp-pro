@@ -262,7 +262,7 @@ Completion note:
 
 ## Phase 5: Communication & Documents
 
-Status: `⬜ Pending`
+Status: `🟡 In Progress`
 
 Goal:
 - Notices, in-app targeting, and document/voucher vault add করা।

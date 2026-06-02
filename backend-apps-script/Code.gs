@@ -29,6 +29,9 @@ const CONFIG = {
     APPROVAL_RULES: 'approval_rules',
     APPROVAL_REQUESTS: 'approval_requests',
     RECONCILIATION: 'reconciliation_snapshots',
+    NOTICES: 'notices',
+    NOTICE_READS: 'notice_reads',
+    DOCUMENTS: 'document_vault',
     AUDIT: 'audit_log',
     SETTINGS: 'settings',
     NOTIFICATIONS: 'notifications',
@@ -116,6 +119,8 @@ function handleRequest_(params) {
     if (action === 'financeControlSummary') return json(financeControlSummary_(params));
     if (action === 'listApprovalRules') return json(listApprovalRules_(params));
     if (action === 'listApprovalRequests') return json(listApprovalRequests_(params));
+    if (action === 'listNotices') return json(listNotices_(params));
+    if (action === 'listDocuments') return json(listDocuments_(params));
     if (action === 'monthlyReport') return json(monthlyReport_(params));
     if (action === 'rangeReport') return json(rangeReport_(params));
     if (action === 'datasetStats') return json(datasetStats_(params));
@@ -235,6 +240,21 @@ function handleRequest_(params) {
     if (action === 'decideApprovalRequest') {
       assertRole_(params.user_role, ['ADMIN']);
       return json(decideApprovalRequest_(params.payload, params));
+    }
+
+    if (action === 'publishNotice') {
+      assertRole_(params.user_role, ['ADMIN', 'ACCOUNTANT']);
+      return json(publishNotice_(params.payload, params));
+    }
+
+    if (action === 'markNoticeRead') {
+      assertRole_(params.user_role, ['ADMIN', 'ACCOUNTANT', 'FIELD_USER', 'VIEWER']);
+      return json(markNoticeRead_(params.payload, params));
+    }
+
+    if (action === 'upsertDocument') {
+      assertRole_(params.user_role, ['ADMIN', 'ACCOUNTANT']);
+      return json(upsertDocument_(params.payload, params));
     }
 
     if (action === 'listUsers') return json(listUsers_(params));
@@ -1634,6 +1654,114 @@ function decideApprovalRequest_(payload, params) {
   return { ok: true, data: res.after };
 }
 
+function listNotices_(params) {
+  params = params || {};
+  assertRole_(params.user_role, ['ADMIN', 'ACCOUNTANT', 'FIELD_USER', 'VIEWER']);
+  ensurePhase5Sheet_(CONFIG.SHEETS.NOTICES);
+  ensurePhase5Sheet_(CONFIG.SHEETS.NOTICE_READS);
+  const role = String(params.user_role || '');
+  const userId = String(params.user_id || '');
+  const classId = String(params.class_id || '').trim();
+  const rows = listSheetRows_(CONFIG.SHEETS.NOTICES).data || [];
+  const reads = listSheetRows_(CONFIG.SHEETS.NOTICE_READS).data || [];
+  const readMap = {};
+  reads.forEach(function (r) {
+    if (String(r.user_id || '') === userId) readMap[String(r.notice_id || '')] = true;
+  });
+  const filtered = rows.filter(function (n) {
+    if (String(n.status || 'PUBLISHED') !== 'PUBLISHED') return false;
+    const targetRole = String(n.target_role || '').trim();
+    const targetUser = String(n.target_user_id || '').trim();
+    const targetClass = String(n.target_class_id || '').trim();
+    if (!targetRole && !targetUser && !targetClass) return true;
+    if (targetUser && targetUser === userId) return true;
+    if (targetRole && targetRole === role) return true;
+    if (targetClass && targetClass === classId) return true;
+    return false;
+  });
+  filtered.sort(function (a, b) {
+    return String(b.published_at || '').localeCompare(String(a.published_at || ''));
+  });
+  return { ok: true, data: filtered.map(function (n) { return Object.assign({}, n, { read: !!readMap[String(n.id || '')] }); }) };
+}
+
+function publishNotice_(payload, params) {
+  payload = payload || {};
+  params = params || {};
+  validateRequired_(payload, ['title', 'message']);
+  ensurePhase5Sheet_(CONFIG.SHEETS.NOTICES);
+  const row = {
+    id: payload.id || uid_('notice'),
+    title: String(payload.title || '').trim(),
+    message: String(payload.message || '').trim(),
+    target_role: String(payload.target_role || '').trim().toUpperCase(),
+    target_user_id: String(payload.target_user_id || '').trim(),
+    target_class_id: String(payload.target_class_id || '').trim(),
+    priority: String(payload.priority || 'NORMAL').trim().toUpperCase(),
+    status: String(payload.status || 'PUBLISHED').trim().toUpperCase(),
+    published_by: String(params.user_id || params.user_role || 'system'),
+    published_at: payload.published_at || nowIso(),
+    expires_at: normalizeIsoDate_(payload.expires_at || ''),
+    updated_by: String(payload.updated_by || params.user_id || params.user_role || 'system'),
+  };
+  if (row.target_role) validateEnum_(row.target_role, CONFIG.ENUMS.ROLE, 'target_role');
+  return upsertById_(CONFIG.SHEETS.NOTICES, row);
+}
+
+function markNoticeRead_(payload, params) {
+  payload = payload || {};
+  params = params || {};
+  validateRequired_(payload, ['notice_id']);
+  ensurePhase5Sheet_(CONFIG.SHEETS.NOTICE_READS);
+  const userId = String(params.user_id || payload.user_id || params.user_role || 'anonymous');
+  const row = {
+    id: stableAcademicId_('read', [payload.notice_id, userId]),
+    notice_id: String(payload.notice_id || '').trim(),
+    user_id: userId,
+    read_at: nowIso(),
+    updated_by: userId,
+  };
+  return upsertById_(CONFIG.SHEETS.NOTICE_READS, row);
+}
+
+function listDocuments_(params) {
+  params = params || {};
+  assertRole_(params.user_role, ['ADMIN', 'ACCOUNTANT', 'FIELD_USER', 'VIEWER']);
+  ensurePhase5Sheet_(CONFIG.SHEETS.DOCUMENTS);
+  const entityType = String(params.entity_type || '').trim();
+  const entityId = String(params.entity_id || '').trim();
+  const rows = listSheetRows_(CONFIG.SHEETS.DOCUMENTS).data || [];
+  const filtered = rows.filter(function (d) {
+    if (entityType && String(d.entity_type || '') !== entityType) return false;
+    if (entityId && String(d.entity_id || '') !== entityId) return false;
+    return String(d.status || 'ACTIVE') !== 'VOID';
+  });
+  filtered.sort(function (a, b) {
+    return String(b.updated_at || '').localeCompare(String(a.updated_at || ''));
+  });
+  return { ok: true, data: filtered };
+}
+
+function upsertDocument_(payload, params) {
+  payload = payload || {};
+  params = params || {};
+  validateRequired_(payload, ['title', 'url', 'entity_type', 'entity_id']);
+  ensurePhase5Sheet_(CONFIG.SHEETS.DOCUMENTS);
+  const row = {
+    id: payload.id || uid_('doc'),
+    title: String(payload.title || '').trim(),
+    doc_type: String(payload.doc_type || 'DOCUMENT').trim().toUpperCase(),
+    url: String(payload.url || '').trim(),
+    entity_type: String(payload.entity_type || '').trim(),
+    entity_id: String(payload.entity_id || '').trim(),
+    notes: String(payload.notes || '').trim(),
+    status: String(payload.status || 'ACTIVE').trim().toUpperCase(),
+    uploaded_by: String(params.user_id || params.user_role || 'system'),
+    updated_by: String(payload.updated_by || params.user_id || params.user_role || 'system'),
+  };
+  return upsertById_(CONFIG.SHEETS.DOCUMENTS, row);
+}
+
 function phase1SheetHeaders_() {
   const headers = {};
   headers[CONFIG.SHEETS.STUDENTS] = [
@@ -1719,6 +1847,24 @@ function phase4SheetHeaders_() {
   return headers;
 }
 
+function phase5SheetHeaders_() {
+  const headers = {};
+  headers[CONFIG.SHEETS.NOTICES] = [
+    'id', 'title', 'message', 'target_role', 'target_user_id',
+    'target_class_id', 'priority', 'status', 'published_by', 'published_at',
+    'expires_at', 'created_at', 'updated_at', 'updated_by',
+  ];
+  headers[CONFIG.SHEETS.NOTICE_READS] = [
+    'id', 'notice_id', 'user_id', 'read_at', 'created_at', 'updated_at',
+    'updated_by',
+  ];
+  headers[CONFIG.SHEETS.DOCUMENTS] = [
+    'id', 'title', 'doc_type', 'url', 'entity_type', 'entity_id', 'notes',
+    'status', 'uploaded_by', 'created_at', 'updated_at', 'updated_by',
+  ];
+  return headers;
+}
+
 function ensurePhase1Sheet_(sheetName) {
   const headers = phase1SheetHeaders_()[sheetName];
   if (!headers) throw new Error('Unknown Phase 1 sheet: ' + sheetName);
@@ -1740,6 +1886,12 @@ function ensurePhase3Sheet_(sheetName) {
 function ensurePhase4Sheet_(sheetName) {
   const headers = phase4SheetHeaders_()[sheetName];
   if (!headers) throw new Error('Unknown Phase 4 sheet: ' + sheetName);
+  ensureSheetWithHeaders_(sheetName, headers);
+}
+
+function ensurePhase5Sheet_(sheetName) {
+  const headers = phase5SheetHeaders_()[sheetName];
+  if (!headers) throw new Error('Unknown Phase 5 sheet: ' + sheetName);
   ensureSheetWithHeaders_(sheetName, headers);
 }
 

@@ -84,6 +84,15 @@ Headers:
 - Finance control summary calculates fund opening/closing balances, actual vs planned variance, and reconciliation against dashboard totals.
 - Approval decisions create explicit audit rows.
 
+## Communication & Documents
+- `GET ?action=listNotices&user_role=&user_id=&class_id=`
+- `POST { action: "publishNotice", user_role: "ADMIN|ACCOUNTANT", user_id: "...", payload: { title, message, target_role?, target_user_id?, target_class_id?, priority?, expires_at? } }`
+- `POST { action: "markNoticeRead", user_role: "...", user_id: "...", payload: { notice_id } }`
+- `GET ?action=listDocuments&entity_type=&entity_id=`
+- `POST { action: "upsertDocument", user_role: "ADMIN|ACCOUNTANT", user_id: "...", payload: { title, url, doc_type?, entity_type, entity_id, notes? } }`
+- Notices support role/user/class targeting and read status by user.
+- Document vault links URLs to transactions/students/staff/scholarship/general records by `entity_type` and `entity_id`.
+
 ## Reports
 - `GET ?action=monthlyReport&monthKey=YYYY-MM`
 - `GET ?action=rangeReport&from=YYYY-MM-DD&to=YYYY-MM-DD`

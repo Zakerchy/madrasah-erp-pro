@@ -61,6 +61,7 @@ class AppDrawer extends StatelessWidget {
               if (role == 'ADMIN' || role == 'ACCOUNTANT')
                 item('ফাইন্যান্স কন্ট্রোল', 'Finance Control',
                     '/finance-control'),
+              item('নোটিশ ও ডকুমেন্ট', 'Notices & Documents', '/communication'),
               if (role == 'ADMIN' || role == 'ACCOUNTANT')
                 item('খরচ', 'Expenses', '/expenses'),
               if (role == 'ADMIN' || role == 'ACCOUNTANT')

@@ -30,6 +30,9 @@ class ApiService {
     'upsertApprovalRule',
     'createApprovalRequest',
     'decideApprovalRequest',
+    'publishNotice',
+    'markNoticeRead',
+    'upsertDocument',
     'upsertUser',
     'setUserApprovalStatus',
   };
