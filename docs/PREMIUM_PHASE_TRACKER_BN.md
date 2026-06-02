@@ -205,7 +205,7 @@ Completion note:
 
 ## Phase 4: Finance Control
 
-Status: `⬜ Pending`
+Status: `🟡 In Progress`
 
 Goal:
 - Budget, reconciliation, opening/closing balances, and approval workflow add করা।

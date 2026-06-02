@@ -72,6 +72,18 @@ Headers:
 - Dues are calculated as `planned - paid - waived`, capped at `0`.
 - Waiver requires a reason and writes audit through `upsertById_`.
 
+## Finance Control
+- `GET ?action=listBudgets&month_key=YYYY-MM&fund_type=`
+- `POST { action: "upsertBudget", user_role: "ADMIN|ACCOUNTANT", user_id: "...", payload: { month_key, fund_type, planned_in, planned_out, notes? } }`
+- `GET ?action=financeControlSummary&month_key=YYYY-MM`
+- `GET ?action=listApprovalRules`
+- `POST { action: "upsertApprovalRule", user_role: "ADMIN", user_id: "...", payload: { action_type, threshold_amount, approver_role?, active?, notes? } }`
+- `GET ?action=listApprovalRequests&status=`
+- `POST { action: "createApprovalRequest", user_role: "...", user_id: "...", payload: { action_type, amount, summary, entity_type?, entity_id?, payload? } }`
+- `POST { action: "decideApprovalRequest", user_role: "ADMIN", user_id: "...", payload: { id, decision: "APPROVED|REJECTED", decision_notes? } }`
+- Finance control summary calculates fund opening/closing balances, actual vs planned variance, and reconciliation against dashboard totals.
+- Approval decisions create explicit audit rows.
+
 ## Reports
 - `GET ?action=monthlyReport&monthKey=YYYY-MM`
 - `GET ?action=rangeReport&from=YYYY-MM-DD&to=YYYY-MM-DD`

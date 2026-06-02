@@ -26,6 +26,10 @@ class ApiService {
     'upsertFeePlan',
     'recordFeePayment',
     'upsertFeeWaiver',
+    'upsertBudget',
+    'upsertApprovalRule',
+    'createApprovalRequest',
+    'decideApprovalRequest',
     'upsertUser',
     'setUserApprovalStatus',
   };

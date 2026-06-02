@@ -25,6 +25,10 @@ const CONFIG = {
     FEE_PLANS: 'fee_plans',
     FEE_PAYMENTS: 'fee_payments',
     FEE_WAIVERS: 'fee_waivers',
+    BUDGETS: 'finance_budgets',
+    APPROVAL_RULES: 'approval_rules',
+    APPROVAL_REQUESTS: 'approval_requests',
+    RECONCILIATION: 'reconciliation_snapshots',
     AUDIT: 'audit_log',
     SETTINGS: 'settings',
     NOTIFICATIONS: 'notifications',
@@ -108,6 +112,10 @@ function handleRequest_(params) {
     if (action === 'listFeePayments') return json(listFeePayments_(params));
     if (action === 'listFeeWaivers') return json(listFeeWaivers_(params));
     if (action === 'listFeeDues') return json(listFeeDues_(params));
+    if (action === 'listBudgets') return json(listBudgets_(params));
+    if (action === 'financeControlSummary') return json(financeControlSummary_(params));
+    if (action === 'listApprovalRules') return json(listApprovalRules_(params));
+    if (action === 'listApprovalRequests') return json(listApprovalRequests_(params));
     if (action === 'monthlyReport') return json(monthlyReport_(params));
     if (action === 'rangeReport') return json(rangeReport_(params));
     if (action === 'datasetStats') return json(datasetStats_(params));
@@ -207,6 +215,26 @@ function handleRequest_(params) {
     if (action === 'upsertFeeWaiver') {
       assertRole_(params.user_role, ['ADMIN', 'ACCOUNTANT']);
       return json(upsertFeeWaiver_(params.payload, params));
+    }
+
+    if (action === 'upsertBudget') {
+      assertRole_(params.user_role, ['ADMIN', 'ACCOUNTANT']);
+      return json(upsertBudget_(params.payload, params));
+    }
+
+    if (action === 'upsertApprovalRule') {
+      assertRole_(params.user_role, ['ADMIN']);
+      return json(upsertApprovalRule_(params.payload, params));
+    }
+
+    if (action === 'createApprovalRequest') {
+      assertRole_(params.user_role, ['ADMIN', 'ACCOUNTANT', 'FIELD_USER']);
+      return json(createApprovalRequest_(params.payload, params));
+    }
+
+    if (action === 'decideApprovalRequest') {
+      assertRole_(params.user_role, ['ADMIN']);
+      return json(decideApprovalRequest_(params.payload, params));
     }
 
     if (action === 'listUsers') return json(listUsers_(params));
@@ -1416,6 +1444,196 @@ function listFeeDues_(params) {
   return { ok: true, data: { month_key: monthKey, rows: rows, totals: totals } };
 }
 
+function listBudgets_(params) {
+  params = params || {};
+  assertRole_(params.user_role, ['ADMIN', 'ACCOUNTANT', 'FIELD_USER', 'VIEWER']);
+  ensurePhase4Sheet_(CONFIG.SHEETS.BUDGETS);
+  const monthKey = normalizeMonthKey_(params.month_key || '');
+  const fundType = String(params.fund_type || '').trim().toUpperCase();
+  const rows = listSheetRows_(CONFIG.SHEETS.BUDGETS).data || [];
+  const filtered = rows.filter(function (r) {
+    if (monthKey && String(r.month_key || '') !== monthKey) return false;
+    if (fundType && String(r.fund_type || '').toUpperCase() !== fundType) return false;
+    return String(r.status || 'ACTIVE') !== 'VOID';
+  });
+  filtered.sort(function (a, b) {
+    return String(b.month_key || '').localeCompare(String(a.month_key || '')) ||
+      String(a.fund_type || '').localeCompare(String(b.fund_type || ''));
+  });
+  return { ok: true, data: filtered };
+}
+
+function upsertBudget_(payload, params) {
+  payload = payload || {};
+  params = params || {};
+  validateRequired_(payload, ['month_key', 'fund_type', 'planned_in', 'planned_out']);
+  ensurePhase4Sheet_(CONFIG.SHEETS.BUDGETS);
+  const monthKey = normalizeMonthKey_(payload.month_key || '');
+  if (!isMonthKey_(monthKey)) return { ok: false, message: 'month_key must be YYYY-MM' };
+  const row = {
+    id: payload.id || stableAcademicId_('budget', [monthKey, payload.fund_type]),
+    month_key: monthKey,
+    fund_type: String(payload.fund_type || '').trim().toUpperCase(),
+    planned_in: Math.max(0, normalizeNumber_(payload.planned_in)),
+    planned_out: Math.max(0, normalizeNumber_(payload.planned_out)),
+    notes: String(payload.notes || '').trim(),
+    status: String(payload.status || 'ACTIVE').trim().toUpperCase(),
+    updated_by: String(payload.updated_by || params.user_id || params.user_role || 'system'),
+  };
+  validateEnum_(row.fund_type, CONFIG.ENUMS.FUND, 'fund_type');
+  return upsertById_(CONFIG.SHEETS.BUDGETS, row);
+}
+
+function financeControlSummary_(params) {
+  params = params || {};
+  assertRole_(params.user_role, ['ADMIN', 'ACCOUNTANT', 'FIELD_USER', 'VIEWER']);
+  ensurePhase4Sheet_(CONFIG.SHEETS.BUDGETS);
+  const monthKey = normalizeMonthKey_(params.month_key || '');
+  if (!isMonthKey_(monthKey)) return { ok: false, message: 'month_key must be YYYY-MM' };
+  const from = monthKey + '-01';
+  const to = lastDayOfMonthIso_(monthKey);
+  const txns = listSheetRows_(CONFIG.SHEETS.TXN).data || [];
+  const active = txns.filter(function (t) { return String(t.status || 'ACTIVE') !== 'VOID'; });
+  const budgets = listBudgets_({ user_role: params.user_role, month_key: monthKey }).data || [];
+  const byFund = {};
+  CONFIG.ENUMS.FUND.forEach(function (fund) {
+    byFund[fund] = {
+      fund_type: fund,
+      planned_in: 0,
+      planned_out: 0,
+      actual_in: 0,
+      actual_out: 0,
+      opening_balance: 0,
+      closing_balance: 0,
+      variance_in: 0,
+      variance_out: 0,
+    };
+  });
+  budgets.forEach(function (b) {
+    const fund = String(b.fund_type || 'GENERAL').toUpperCase();
+    if (!byFund[fund]) byFund[fund] = { fund_type: fund, planned_in: 0, planned_out: 0, actual_in: 0, actual_out: 0, opening_balance: 0, closing_balance: 0, variance_in: 0, variance_out: 0 };
+    byFund[fund].planned_in += normalizeNumber_(b.planned_in);
+    byFund[fund].planned_out += normalizeNumber_(b.planned_out);
+  });
+  active.forEach(function (t) {
+    const fund = String(t.fund_type || 'GENERAL').toUpperCase();
+    if (!byFund[fund]) byFund[fund] = { fund_type: fund, planned_in: 0, planned_out: 0, actual_in: 0, actual_out: 0, opening_balance: 0, closing_balance: 0, variance_in: 0, variance_out: 0 };
+    const date = normalizeIsoDate_(t.txn_date || '');
+    const amount = normalizeNumber_(t.amount);
+    const signed = String(t.direction || '') === 'IN' ? amount : -amount;
+    if (date && date < from) byFund[fund].opening_balance += signed;
+    if (date && date >= from && date <= to) {
+      if (String(t.direction || '') === 'IN') byFund[fund].actual_in += amount;
+      else byFund[fund].actual_out += amount;
+    }
+  });
+  Object.keys(byFund).forEach(function (fund) {
+    const r = byFund[fund];
+    r.closing_balance = r.opening_balance + r.actual_in - r.actual_out;
+    r.variance_in = r.actual_in - r.planned_in;
+    r.variance_out = r.planned_out - r.actual_out;
+  });
+  const rows = Object.keys(byFund).map(function (k) { return byFund[k]; });
+  const totals = rows.reduce(function (acc, r) {
+    ['planned_in', 'planned_out', 'actual_in', 'actual_out', 'opening_balance', 'closing_balance'].forEach(function (k) {
+      acc[k] += normalizeNumber_(r[k]);
+    });
+    return acc;
+  }, { planned_in: 0, planned_out: 0, actual_in: 0, actual_out: 0, opening_balance: 0, closing_balance: 0 });
+  const dashboard = dashboardSummary_({ user_role: params.user_role, from: from, to: to, user_id: params.user_id || '' }).data || {};
+  const reconciliation = {
+    month_key: monthKey,
+    dashboard_total_in: normalizeNumber_(dashboard.totalIn),
+    dashboard_total_out: normalizeNumber_(dashboard.totalOut),
+    summary_total_in: totals.actual_in,
+    summary_total_out: totals.actual_out,
+    pass: normalizeNumber_(dashboard.totalIn) === totals.actual_in && normalizeNumber_(dashboard.totalOut) === totals.actual_out,
+  };
+  return { ok: true, data: { month_key: monthKey, from: from, to: to, rows: rows, totals: totals, reconciliation: reconciliation } };
+}
+
+function listApprovalRules_(params) {
+  params = params || {};
+  assertRole_(params.user_role, ['ADMIN', 'ACCOUNTANT', 'FIELD_USER', 'VIEWER']);
+  ensurePhase4Sheet_(CONFIG.SHEETS.APPROVAL_RULES);
+  return listSheetRows_(CONFIG.SHEETS.APPROVAL_RULES);
+}
+
+function upsertApprovalRule_(payload, params) {
+  payload = payload || {};
+  params = params || {};
+  validateRequired_(payload, ['action_type', 'threshold_amount']);
+  ensurePhase4Sheet_(CONFIG.SHEETS.APPROVAL_RULES);
+  const row = {
+    id: payload.id || stableAcademicId_('rule', [payload.action_type]),
+    action_type: String(payload.action_type || '').trim().toUpperCase(),
+    threshold_amount: Math.max(0, normalizeNumber_(payload.threshold_amount)),
+    approver_role: String(payload.approver_role || 'ADMIN').trim().toUpperCase(),
+    active: boolToSheet_(parseBool_(payload.active, true)),
+    notes: String(payload.notes || '').trim(),
+    updated_by: String(payload.updated_by || params.user_id || params.user_role || 'system'),
+  };
+  return upsertById_(CONFIG.SHEETS.APPROVAL_RULES, row);
+}
+
+function listApprovalRequests_(params) {
+  params = params || {};
+  assertRole_(params.user_role, ['ADMIN', 'ACCOUNTANT', 'FIELD_USER', 'VIEWER']);
+  ensurePhase4Sheet_(CONFIG.SHEETS.APPROVAL_REQUESTS);
+  const status = String(params.status || '').trim().toUpperCase();
+  const rows = listSheetRows_(CONFIG.SHEETS.APPROVAL_REQUESTS).data || [];
+  const filtered = rows.filter(function (r) {
+    if (status && String(r.status || '').toUpperCase() !== status) return false;
+    return true;
+  });
+  filtered.sort(function (a, b) {
+    return String(b.requested_at || '').localeCompare(String(a.requested_at || ''));
+  });
+  return { ok: true, data: filtered };
+}
+
+function createApprovalRequest_(payload, params) {
+  payload = payload || {};
+  params = params || {};
+  validateRequired_(payload, ['action_type', 'amount', 'summary']);
+  ensurePhase4Sheet_(CONFIG.SHEETS.APPROVAL_REQUESTS);
+  const row = {
+    id: payload.id || uid_('approval'),
+    action_type: String(payload.action_type || '').trim().toUpperCase(),
+    amount: normalizeNumber_(payload.amount),
+    entity_type: String(payload.entity_type || '').trim(),
+    entity_id: String(payload.entity_id || '').trim(),
+    summary: String(payload.summary || '').trim(),
+    status: 'PENDING',
+    requested_by: String(params.user_id || payload.requested_by || params.user_role || 'system'),
+    requested_at: nowIso(),
+    decided_by: '',
+    decided_at: '',
+    decision_notes: '',
+    payload_json: JSON.stringify(payload.payload || {}),
+    updated_by: String(params.user_id || params.user_role || 'system'),
+  };
+  return upsertById_(CONFIG.SHEETS.APPROVAL_REQUESTS, row);
+}
+
+function decideApprovalRequest_(payload, params) {
+  payload = payload || {};
+  params = params || {};
+  validateRequired_(payload, ['id', 'decision']);
+  ensurePhase4Sheet_(CONFIG.SHEETS.APPROVAL_REQUESTS);
+  const decision = String(payload.decision || '').trim().toUpperCase();
+  if (['APPROVED', 'REJECTED'].indexOf(decision) === -1) return { ok: false, message: 'decision must be APPROVED or REJECTED' };
+  const res = updateById_(CONFIG.SHEETS.APPROVAL_REQUESTS, payload.id, {
+    status: decision,
+    decided_by: String(params.user_id || params.user_role || 'admin'),
+    decided_at: nowIso(),
+    decision_notes: String(payload.decision_notes || '').trim(),
+    updated_by: String(params.user_id || params.user_role || 'admin'),
+  });
+  addAudit_('approval_requests', decision, payload.id, JSON.stringify(res.before), JSON.stringify(res.after), String(params.user_id || params.user_role || 'admin'));
+  return { ok: true, data: res.after };
+}
+
 function phase1SheetHeaders_() {
   const headers = {};
   headers[CONFIG.SHEETS.STUDENTS] = [
@@ -1479,6 +1697,28 @@ function phase3SheetHeaders_() {
   return headers;
 }
 
+function phase4SheetHeaders_() {
+  const headers = {};
+  headers[CONFIG.SHEETS.BUDGETS] = [
+    'id', 'month_key', 'fund_type', 'planned_in', 'planned_out', 'notes',
+    'status', 'created_at', 'updated_at', 'updated_by',
+  ];
+  headers[CONFIG.SHEETS.APPROVAL_RULES] = [
+    'id', 'action_type', 'threshold_amount', 'approver_role', 'active',
+    'notes', 'created_at', 'updated_at', 'updated_by',
+  ];
+  headers[CONFIG.SHEETS.APPROVAL_REQUESTS] = [
+    'id', 'action_type', 'amount', 'entity_type', 'entity_id', 'summary',
+    'status', 'requested_by', 'requested_at', 'decided_by', 'decided_at',
+    'decision_notes', 'payload_json', 'created_at', 'updated_at', 'updated_by',
+  ];
+  headers[CONFIG.SHEETS.RECONCILIATION] = [
+    'id', 'month_key', 'summary_json', 'pass', 'created_at', 'updated_at',
+    'updated_by',
+  ];
+  return headers;
+}
+
 function ensurePhase1Sheet_(sheetName) {
   const headers = phase1SheetHeaders_()[sheetName];
   if (!headers) throw new Error('Unknown Phase 1 sheet: ' + sheetName);
@@ -1494,6 +1734,12 @@ function ensurePhase2Sheet_(sheetName) {
 function ensurePhase3Sheet_(sheetName) {
   const headers = phase3SheetHeaders_()[sheetName];
   if (!headers) throw new Error('Unknown Phase 3 sheet: ' + sheetName);
+  ensureSheetWithHeaders_(sheetName, headers);
+}
+
+function ensurePhase4Sheet_(sheetName) {
+  const headers = phase4SheetHeaders_()[sheetName];
+  if (!headers) throw new Error('Unknown Phase 4 sheet: ' + sheetName);
   ensureSheetWithHeaders_(sheetName, headers);
 }
 
@@ -2160,6 +2406,15 @@ function normalizeMonthKey_(raw) {
 
 function isMonthKey_(text) {
   return /^\d{4}-(0[1-9]|1[0-2])$/.test(String(text || '').trim());
+}
+
+function lastDayOfMonthIso_(monthKey) {
+  const parts = String(monthKey || '').split('-');
+  const year = Number(parts[0] || 0);
+  const month = Number(parts[1] || 0);
+  if (!year || !month) return '';
+  const d = new Date(Date.UTC(year, month, 0));
+  return d.getUTCFullYear() + '-' + String(d.getUTCMonth() + 1).padStart(2, '0') + '-' + String(d.getUTCDate()).padStart(2, '0');
 }
 
 function normalizeIsoDate_(raw) {

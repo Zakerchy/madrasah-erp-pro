@@ -268,7 +268,61 @@ Columns:
 - updated_at
 - updated_by
 
-## 20) audit_log
+## 20) finance_budgets
+Columns:
+- id
+- month_key
+- fund_type (CONSTRUCTION|JAKAT|SCHOLARSHIP|GENERAL)
+- planned_in
+- planned_out
+- notes
+- status (ACTIVE|VOID)
+- created_at
+- updated_at
+- updated_by
+
+## 21) approval_rules
+Columns:
+- id
+- action_type
+- threshold_amount
+- approver_role
+- active (TRUE|FALSE)
+- notes
+- created_at
+- updated_at
+- updated_by
+
+## 22) approval_requests
+Columns:
+- id
+- action_type
+- amount
+- entity_type
+- entity_id
+- summary
+- status (PENDING|APPROVED|REJECTED)
+- requested_by
+- requested_at
+- decided_by
+- decided_at
+- decision_notes
+- payload_json
+- created_at
+- updated_at
+- updated_by
+
+## 23) reconciliation_snapshots
+Columns:
+- id
+- month_key
+- summary_json
+- pass
+- created_at
+- updated_at
+- updated_by
+
+## 24) audit_log
 Columns:
 - id
 - module
@@ -279,14 +333,14 @@ Columns:
 - done_by
 - done_at
 
-## 21) settings
+## 25) settings
 Columns:
 - key
 - value
 - notes
 - updated_at
 
-## 22) notifications
+## 26) notifications
 Columns:
 - id
 - category
