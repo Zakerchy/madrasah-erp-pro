@@ -150,34 +150,56 @@ Completion note:
 
 ## Phase 3: Fee, Dues, Scholarship Automation
 
-Status: `🟡 In Progress`
+Status: `✅ Completed`
 
 Goal:
 - Fee plan, payments, dues, waivers, and scholarship due states automate করা।
 
 Work items:
-- Fee plan and payment module.
-- Due calculation by student/month.
-- Waiver handling with audit.
-- Scholarship due/paid/partial/unpaid status upgrade.
+- Fee plan and payment module. ✅
+- Due calculation by student/month. ✅
+- Waiver handling with required reason and audit. ✅
+- Scholarship due/paid/partial/unpaid-style state via `scholarship_due_state`. ✅
 
 Files/modules touched:
-- Pending.
+- `backend-apps-script/Code.gs`
+- `mobile-app/lib/features/fees/fee_dues_screen.dart`
+- `mobile-app/lib/core/app_shell.dart`
+- `mobile-app/lib/shared/widgets/app_drawer.dart`
+- `mobile-app/lib/shared/services/api_service.dart`
+- `docs/API_CONTRACT.md`
+- `docs/SHEET_SCHEMA.md`
+- `sheets/README.md`
+- `sheets/fee_plans.csv`
+- `sheets/fee_payments.csv`
+- `sheets/fee_waivers.csv`
 
 Backend endpoints/sheets added:
-- Pending.
+- Sheets: `fee_plans`, `fee_payments`, `fee_waivers`
+- Read endpoints: `listFeePlans`, `listFeePayments`, `listFeeWaivers`, `listFeeDues`
+- Write endpoints: `upsertFeePlan`, `recordFeePayment`, `upsertFeeWaiver`
+- Ledger integration: `recordFeePayment` creates `fund_transactions` `IN` row with category `STUDENT_FEE`.
+- Audit: fee plan/payment/waiver writes route through `upsertById_`.
 
 Verification commands:
-- Pending.
+- `cp backend-apps-script/Code.gs /tmp/madrasah_phase3_code_check.js && node --check /tmp/madrasah_phase3_code_check.js` ✅
+- `HOME=/Users/zakerchy/Desktop/MadrasahApp FLUTTER_SUPPRESS_ANALYTICS=true DART_SUPPRESS_ANALYTICS=true ../.local-tools/flutter/bin/flutter analyze lib/features/fees/fee_dues_screen.dart lib/core/app_shell.dart lib/shared/widgets/app_drawer.dart lib/shared/services/api_service.dart` ✅
+- `HOME=/Users/zakerchy/Desktop/MadrasahApp FLUTTER_SUPPRESS_ANALYTICS=true DART_SUPPRESS_ANALYTICS=true ../.local-tools/flutter/bin/flutter build web --release --dart-define=APPS_SCRIPT_URL=https://script.google.com/macros/s/AKfycbzbgTChISsQWhEU_EG06UYO3kTGhH-NsEiSdd0v-PEftI3882X7sUDRWCL96224-Bui/exec` ✅
+- `HOME=/Users/zakerchy/Desktop/MadrasahApp FLUTTER_SUPPRESS_ANALYTICS=true DART_SUPPRESS_ANALYTICS=true ../.local-tools/flutter/bin/flutter test` ✅
+- Apps Script mocked endpoint smoke: fee plan, due, payment/ledger txn, waiver, recalculated due + 6 audit rows ✅
+- Static route/navigation check: `/fees`, drawer entry, and backend action names found by `rg` ✅
 
 Acceptance checklist:
-- Fee dues calculation matches expected totals.
-- Payment updates due balance.
-- Waiver requires reason and audit.
-- Scholarship reports match payment state.
+- Fee dues calculation matched expected totals: `1000 - 400 - 100 = 500`. ✅
+- Payment updates due balance and creates one ledger transaction. ✅
+- Waiver requires reason and writes audit. ✅
+- Scholarship/due state returned `PARTIAL` after partial payment/waiver. ✅
+- Existing finance modules still build through release web build. ✅
 
 Completion note:
-- Pending.
+- Completed on 2026-06-02.
+- Implementation commit: `7b86764` (`feat: add fee dues automation`).
+- Live Apps Script smoke will run automatically after GitHub deploy; local mocked smoke confirms endpoint behavior before deploy.
 
 ---
 
