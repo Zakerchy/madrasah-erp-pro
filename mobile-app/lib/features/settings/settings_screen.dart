@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 
 import '../../core/app_lang.dart';
+import '../../shared/models/app_ui_settings.dart';
 import '../../shared/models/notification_settings.dart';
 import '../../shared/services/api_service.dart';
 import '../../shared/services/session_service.dart';
 import '../../shared/widgets/base_scaffold.dart';
+import '../../shared/widgets/themed_date_picker.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -28,11 +30,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
   bool _loadingNotify = true;
   bool _savingNotify = false;
   bool _loadingNotifyEvents = false;
+  bool _loadingUiRange = true;
+  bool _savingUiRange = false;
+  bool _loadingAudit = false;
+  bool _checkingLaunch = false;
   String _health = 'Not checked';
   NotificationSettings _notify = NotificationSettings.defaults();
+  AppUiSettings _uiSettings = AppUiSettings.defaults();
 
   List<Map<String, dynamic>> _users = [];
   List<Map<String, dynamic>> _notifyEvents = [];
+  List<Map<String, dynamic>> _auditRows = [];
+  List<Map<String, dynamic>> _launchChecks = [];
 
   @override
   void initState() {
@@ -40,6 +49,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
     _loadUsers();
     _loadNotificationSettings();
     _loadNotificationEvents();
+    _loadAppUiSettings();
+    _loadAuditLog();
   }
 
   @override
@@ -148,6 +159,204 @@ class _SettingsScreenState extends State<SettingsScreen> {
     setState(() => _loadingNotifyEvents = false);
   }
 
+  String _fmtDate(DateTime dt) {
+    return '${dt.year.toString().padLeft(4, '0')}-${dt.month.toString().padLeft(2, '0')}-${dt.day.toString().padLeft(2, '0')}';
+  }
+
+  int _rangeDaysInclusive(DateTime from, DateTime to) {
+    return to.difference(from).inDays + 1;
+  }
+
+  Future<void> _loadAppUiSettings() async {
+    setState(() => _loadingUiRange = true);
+    final res = await _api.get('getAppUiSettings');
+    if (!mounted) return;
+    if (res['ok'] == true) {
+      final data = Map<String, dynamic>.from(res['data'] as Map? ?? {});
+      setState(() {
+        _uiSettings = AppUiSettings.fromApi(data);
+        _loadingUiRange = false;
+      });
+      return;
+    }
+    setState(() => _loadingUiRange = false);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          '${res['message'] ?? res['error'] ?? AppLang.t('ডিফল্ট রেঞ্জ সেটিংস লোড ব্যর্থ', 'Failed to load default range settings')}',
+        ),
+      ),
+    );
+  }
+
+  Future<void> _saveAppUiSettings() async {
+    final days = _rangeDaysInclusive(
+      _uiSettings.defaultFromDate,
+      _uiSettings.defaultToDate,
+    );
+    if (days > _uiSettings.maxRangeDays) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            AppLang.t(
+              'ডিফল্ট রেঞ্জ সর্বোচ্চ ১ বছর (${_uiSettings.maxRangeDays} দিন) হতে পারবে',
+              'Default range cannot exceed 1 year (${_uiSettings.maxRangeDays} days)',
+            ),
+          ),
+          backgroundColor: Colors.red.shade700,
+        ),
+      );
+      return;
+    }
+
+    setState(() => _savingUiRange = true);
+    final res = await _api.post(
+      'upsertAppUiSettings',
+      {
+        'user_role': SessionService.role,
+        'payload': _uiSettings.toPayload(),
+      },
+      allowQueue: false,
+    );
+    if (!mounted) return;
+    setState(() => _savingUiRange = false);
+
+    if (res['ok'] == true) {
+      final data = Map<String, dynamic>.from(res['data'] as Map? ?? {});
+      setState(() => _uiSettings = AppUiSettings.fromApi(data));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            AppLang.t('ডিফল্ট রিপোর্ট রেঞ্জ সেভ হয়েছে',
+                'Default report range saved'),
+          ),
+        ),
+      );
+      return;
+    }
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          '${res['message'] ?? res['error'] ?? AppLang.t('সেভ ব্যর্থ', 'Save failed')}',
+        ),
+      ),
+    );
+  }
+
+  Future<void> _pickDefaultRangeDate({required bool from}) async {
+    final current =
+        from ? _uiSettings.defaultFromDate : _uiSettings.defaultToDate;
+    final picked = await showThemedDatePicker(
+      context: context,
+      initialDate: current,
+      firstDate: DateTime(2000, 1, 1),
+      lastDate: DateTime(2100, 12, 31),
+    );
+    if (picked == null || !mounted) return;
+
+    setState(() {
+      if (from) {
+        final nextFrom = DateTime(picked.year, picked.month, picked.day);
+        final nextTo = _uiSettings.defaultToDate.isBefore(nextFrom)
+            ? nextFrom
+            : _uiSettings.defaultToDate;
+        _uiSettings = _uiSettings.copyWith(
+          defaultFromDate: nextFrom,
+          defaultToDate: nextTo,
+          defaultToSource: 'FIXED',
+        );
+      } else {
+        final nextTo = DateTime(picked.year, picked.month, picked.day);
+        final nextFrom = _uiSettings.defaultFromDate.isAfter(nextTo)
+            ? nextTo
+            : _uiSettings.defaultFromDate;
+        _uiSettings = _uiSettings.copyWith(
+          defaultFromDate: nextFrom,
+          defaultToDate: nextTo,
+          defaultToSource: 'FIXED',
+        );
+      }
+    });
+  }
+
+  Future<void> _loadAuditLog() async {
+    if (SessionService.role != 'ADMIN' && SessionService.role != 'ACCOUNTANT') {
+      return;
+    }
+    setState(() => _loadingAudit = true);
+    final res = await _api.get('listAuditLog', query: {'limit': 20});
+    if (!mounted) return;
+    if (res['ok'] == true) {
+      setState(() {
+        _auditRows = (res['data'] as List<dynamic>? ?? [])
+            .map((e) => Map<String, dynamic>.from(e as Map))
+            .toList();
+        _loadingAudit = false;
+      });
+      return;
+    }
+    setState(() => _loadingAudit = false);
+  }
+
+  Future<void> _runLaunchCheck() async {
+    setState(() {
+      _checkingLaunch = true;
+      _launchChecks = [];
+    });
+
+    final checks = <Map<String, dynamic>>[];
+    Future<void> addCheck(String label, Future<Map<String, dynamic>> call,
+        bool Function(Map<String, dynamic>) passWhen) async {
+      try {
+        final res = await call;
+        checks.add({
+          'label': label,
+          'ok': res['ok'] == true && passWhen(res),
+          'note': res['message'] ?? res['error'] ?? '',
+        });
+      } catch (e) {
+        checks.add({'label': label, 'ok': false, 'note': e.toString()});
+      }
+    }
+
+    await addCheck(
+      AppLang.t('API সংযোগ', 'API connection'),
+      _api.get('health'),
+      (_) => true,
+    );
+    await addCheck(
+      AppLang.t('লেনদেন ডেটা', 'Transaction data'),
+      _api.get('datasetStats'),
+      (res) {
+        final data = Map<String, dynamic>.from(res['data'] as Map? ?? {});
+        final count =
+            int.tryParse((data['txns_active_rows'] ?? '0').toString()) ?? 0;
+        return count > 0;
+      },
+    );
+    await addCheck(
+      AppLang.t('ডিফল্ট রিপোর্ট রেঞ্জ', 'Default report range'),
+      _api.get('getAppUiSettings'),
+      (res) {
+        final data = Map<String, dynamic>.from(res['data'] as Map? ?? {});
+        return (data['default_from_date'] ?? '').toString().isNotEmpty &&
+            (data['default_to_date'] ?? '').toString().isNotEmpty;
+      },
+    );
+    await addCheck(
+      AppLang.t('ব্যবহারকারী', 'Users'),
+      _api.get('listUsers'),
+      (res) => (res['data'] as List<dynamic>? ?? []).isNotEmpty,
+    );
+
+    if (!mounted) return;
+    setState(() {
+      _launchChecks = checks;
+      _checkingLaunch = false;
+    });
+  }
+
   Future<void> _createUser() async {
     final name = _name.text.trim();
     final email = _email.text.trim().toLowerCase();
@@ -188,6 +397,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       _approvalStatus = 'APPROVED';
       _active = true;
       await _loadUsers();
+      if (!mounted) return;
 
       final msg = res['queued'] == true
           ? AppLang.t(
@@ -252,6 +462,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     setState(() => _saving = false);
     if (res['ok'] == true) {
       await _loadUsers();
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
           content:
               Text('${AppLang.t('অবস্থা আপডেট', 'Status updated')}: $status')));
@@ -542,6 +753,126 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ),
               ),
             ),
+            const SizedBox(height: 12),
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.all(14),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      AppLang.t('ডিফল্ট রিপোর্ট রেঞ্জ', 'Default Report Range'),
+                      style: const TextStyle(
+                          fontWeight: FontWeight.bold, fontSize: 16),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      AppLang.t(
+                        'রিপোর্ট ও ড্যাশবোর্ডে ডিফল্ট date range এখান থেকে নির্ধারণ করুন। সর্বোচ্চ ১ বছর।',
+                        'Set default date range for reports and dashboard. Maximum 1 year.',
+                      ),
+                      style:
+                          TextStyle(color: Colors.grey.shade700, fontSize: 12),
+                    ),
+                    const SizedBox(height: 8),
+                    if (_loadingUiRange)
+                      const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 12),
+                        child: Center(child: CircularProgressIndicator()),
+                      )
+                    else ...[
+                      Row(
+                        children: [
+                          Expanded(
+                            child: OutlinedButton.icon(
+                              onPressed: _savingUiRange
+                                  ? null
+                                  : () => _pickDefaultRangeDate(from: true),
+                              icon: const Icon(Icons.calendar_month),
+                              label: Text(
+                                  '${AppLang.t('শুরু', 'From')}: ${_fmtDate(_uiSettings.defaultFromDate)}'),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: OutlinedButton.icon(
+                              onPressed: _savingUiRange
+                                  ? null
+                                  : () => _pickDefaultRangeDate(from: false),
+                              icon: const Icon(Icons.event),
+                              label: Text(
+                                  '${AppLang.t('শেষ', 'To')}: ${_fmtDate(_uiSettings.defaultToDate)}'),
+                            ),
+                          ),
+                        ],
+                      ),
+                      SwitchListTile(
+                        value: _uiSettings.defaultToSource == 'TODAY',
+                        onChanged: _savingUiRange
+                            ? null
+                            : (v) {
+                                final now = DateTime.now();
+                                final today =
+                                    DateTime(now.year, now.month, now.day);
+                                setState(() {
+                                  _uiSettings = _uiSettings.copyWith(
+                                    defaultToSource: v ? 'TODAY' : 'FIXED',
+                                    defaultToDate:
+                                        v ? today : _uiSettings.defaultToDate,
+                                  );
+                                });
+                              },
+                        contentPadding: EdgeInsets.zero,
+                        title: Text(AppLang.t('শেষ তারিখ সবসময় আজ ধরা হবে',
+                            'Always use today as end date')),
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        AppLang.t(
+                          'Range length: ${_rangeDaysInclusive(_uiSettings.defaultFromDate, _uiSettings.defaultToDate)} days (max ${_uiSettings.maxRangeDays})',
+                          'Range length: ${_rangeDaysInclusive(_uiSettings.defaultFromDate, _uiSettings.defaultToDate)} days (max ${_uiSettings.maxRangeDays})',
+                        ),
+                        style: TextStyle(
+                            color: Colors.grey.shade700, fontSize: 12),
+                      ),
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          FilledButton.icon(
+                            onPressed:
+                                _savingUiRange ? null : _saveAppUiSettings,
+                            icon: _savingUiRange
+                                ? const SizedBox(
+                                    width: 14,
+                                    height: 14,
+                                    child: CircularProgressIndicator(
+                                        strokeWidth: 2),
+                                  )
+                                : const Icon(Icons.save_outlined),
+                            label: Text(AppLang.t('সেভ করুন', 'Save')),
+                          ),
+                          const SizedBox(width: 8),
+                          OutlinedButton.icon(
+                            onPressed:
+                                _savingUiRange ? null : _loadAppUiSettings,
+                            icon: const Icon(Icons.refresh),
+                            label: Text(AppLang.t('রিফ্রেশ', 'Refresh')),
+                          ),
+                        ],
+                      ),
+                      if (_uiSettings.updatedAt.isNotEmpty) ...[
+                        const SizedBox(height: 6),
+                        Text(
+                          '${AppLang.t('সর্বশেষ আপডেট', 'Last updated')}: ${_uiSettings.updatedAt}',
+                          style: TextStyle(
+                              color: Colors.grey.shade700, fontSize: 12),
+                        ),
+                      ],
+                    ],
+                  ],
+                ),
+              ),
+            ),
             const Divider(height: 28),
             Text(AppLang.t('ব্যবহারকারী ব্যবস্থাপনা', 'Admin User Management'),
                 style:
@@ -565,7 +896,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     labelText: AppLang.t('ফোন (ঐচ্ছিক)', 'Phone (optional)'))),
             const SizedBox(height: 8),
             DropdownButtonFormField<String>(
-              value: _role,
+              initialValue: _role,
               items: const [
                 DropdownMenuItem(value: 'ADMIN', child: Text('ADMIN')),
                 DropdownMenuItem(
@@ -580,7 +911,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ),
             const SizedBox(height: 8),
             DropdownButtonFormField<String>(
-              value: _approvalStatus,
+              initialValue: _approvalStatus,
               items: const [
                 DropdownMenuItem(value: 'APPROVED', child: Text('APPROVED')),
                 DropdownMenuItem(value: 'PENDING', child: Text('PENDING')),
@@ -645,8 +976,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           children: [
                             Chip(
                               label: Text(_statusOf(u)),
-                              backgroundColor:
-                                  _statusColor(_statusOf(u)).withOpacity(0.15),
+                              backgroundColor: _statusColor(_statusOf(u))
+                                  .withValues(alpha: 0.15),
                               side:
                                   BorderSide(color: _statusColor(_statusOf(u))),
                             ),
@@ -716,16 +1047,111 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ),
               ),
             const Divider(height: 28),
-            Text(AppLang.t('সিস্টেম পরীক্ষা', 'System Check'),
-                style: const TextStyle(fontWeight: FontWeight.bold)),
-            const SizedBox(height: 8),
-            FilledButton.icon(
-                onPressed: _checkHealth,
-                icon: const Icon(Icons.health_and_safety),
-                label: Text(AppLang.t(
-                    'ডেটা সংযোগ পরীক্ষা করুন', 'Check Data Connection'))),
-            const SizedBox(height: 8),
-            Text('${AppLang.t('স্বাস্থ্য', 'Health')}: $_health'),
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.all(14),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(AppLang.t('লঞ্চ রেডিনেস', 'Launch Readiness'),
+                        style: const TextStyle(
+                            fontWeight: FontWeight.bold, fontSize: 16)),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        FilledButton.icon(
+                          onPressed: _checkingLaunch ? null : _runLaunchCheck,
+                          icon: _checkingLaunch
+                              ? const SizedBox(
+                                  width: 14,
+                                  height: 14,
+                                  child:
+                                      CircularProgressIndicator(strokeWidth: 2),
+                                )
+                              : const Icon(Icons.fact_check),
+                          label:
+                              Text(AppLang.t('লঞ্চ চেক', 'Run Launch Check')),
+                        ),
+                        const SizedBox(width: 8),
+                        OutlinedButton.icon(
+                          onPressed: _checkHealth,
+                          icon: const Icon(Icons.health_and_safety),
+                          label: Text(AppLang.t('API', 'API')),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Text('${AppLang.t('স্বাস্থ্য', 'Health')}: $_health',
+                        style: TextStyle(color: Colors.grey.shade700)),
+                    if (_launchChecks.isNotEmpty) ...[
+                      const SizedBox(height: 10),
+                      ..._launchChecks.map(
+                        (c) => ListTile(
+                          dense: true,
+                          contentPadding: EdgeInsets.zero,
+                          leading: Icon(
+                            c['ok'] == true
+                                ? Icons.check_circle
+                                : Icons.error_outline,
+                            color: c['ok'] == true
+                                ? Colors.green.shade700
+                                : Colors.red.shade700,
+                          ),
+                          title: Text((c['label'] ?? '').toString()),
+                          subtitle: (c['note'] ?? '').toString().isEmpty
+                              ? null
+                              : Text((c['note'] ?? '').toString()),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            if (SessionService.role == 'ADMIN' ||
+                SessionService.role == 'ACCOUNTANT')
+              Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(14),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Text(AppLang.t('অডিট ট্রেইল', 'Audit Trail'),
+                              style: const TextStyle(
+                                  fontWeight: FontWeight.bold, fontSize: 16)),
+                          const Spacer(),
+                          IconButton(
+                              onPressed: _loadingAudit ? null : _loadAuditLog,
+                              icon: const Icon(Icons.refresh)),
+                        ],
+                      ),
+                      if (_loadingAudit)
+                        const Padding(
+                          padding: EdgeInsets.symmetric(vertical: 12),
+                          child: Center(child: CircularProgressIndicator()),
+                        )
+                      else if (_auditRows.isEmpty)
+                        Text(AppLang.t(
+                            'অডিট লগ পাওয়া যায়নি', 'No audit rows found'))
+                      else
+                        ..._auditRows.take(10).map(
+                              (r) => ListTile(
+                                dense: true,
+                                contentPadding: EdgeInsets.zero,
+                                leading: const Icon(Icons.history),
+                                title: Text(
+                                    '${r['module'] ?? ''} • ${r['action'] ?? ''}'),
+                                subtitle: Text(
+                                    '${r['entity_id'] ?? ''} • ${r['done_by'] ?? ''} • ${r['done_at'] ?? ''}'),
+                              ),
+                            ),
+                    ],
+                  ),
+                ),
+              ),
           ],
         ),
       ),

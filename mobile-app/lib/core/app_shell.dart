@@ -40,6 +40,8 @@ class _MadrasahErpLiteAppState extends State<MadrasahErpLiteApp> {
       debugShowCheckedModeBanner: false,
       title: AppLang.t('মাদ্রাসা ERP Lite', 'Madrasah ERP Lite'),
       theme: buildTheme(),
+      darkTheme: buildDarkTheme(),
+      themeMode: ThemeMode.system,
       initialRoute: '/login',
       routes: {
         '/login': (_) => const LoginScreen(),

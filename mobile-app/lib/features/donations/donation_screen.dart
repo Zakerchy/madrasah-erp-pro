@@ -4,6 +4,7 @@ import '../../core/app_lang.dart';
 import '../../shared/services/api_service.dart';
 import '../../shared/services/session_service.dart';
 import '../../shared/widgets/base_scaffold.dart';
+import '../../shared/widgets/themed_date_picker.dart';
 
 class DonationScreen extends StatefulWidget {
   const DonationScreen({super.key});
@@ -37,9 +38,9 @@ class _DonationScreenState extends State<DonationScreen> {
   Future<void> _loadRows() async {
     setState(() => _loadingList = true);
     try {
-      final today = DateTime.now();
-      _historyTo ??= DateTime(today.year, today.month, today.day);
-      _historyFrom ??= await _resolveDefaultFromDate();
+      final defaultRange = await _resolveDefaultRange();
+      _historyFrom ??= defaultRange.$1;
+      _historyTo ??= defaultRange.$2;
 
       final res = await _api.get('listTransactions', query: {
         'direction': 'IN',
@@ -61,17 +62,30 @@ class _DonationScreenState extends State<DonationScreen> {
     return '${value.year.toString().padLeft(4, '0')}-${value.month.toString().padLeft(2, '0')}-${value.day.toString().padLeft(2, '0')}';
   }
 
-  Future<DateTime> _resolveDefaultFromDate() async {
-    final fallback = DateTime(2022, 1, 26);
+  Future<(DateTime, DateTime)> _resolveDefaultRange() async {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    DateTime from = DateTime(2022, 1, 26);
+    DateTime to = today;
     try {
-      final res = await _api.get('datasetStats');
+      final res = await _api.get('getAppUiSettings');
       if (res['ok'] == true) {
         final data = Map<String, dynamic>.from(res['data'] as Map? ?? {});
-        final parsed = _parseIsoDate('${data['first_txn_date'] ?? ''}');
-        if (parsed != null) return parsed;
+        final parsedFrom = _parseIsoDate('${data['default_from_date'] ?? ''}');
+        if (parsedFrom != null) from = parsedFrom;
+        final source =
+            (data['default_to_source'] ?? 'TODAY').toString().toUpperCase();
+        if (source == 'TODAY') {
+          to = today;
+        } else {
+          final parsedTo = _parseIsoDate('${data['default_to_date'] ?? ''}');
+          if (parsedTo != null) to = parsedTo.isAfter(today) ? today : parsedTo;
+        }
       }
     } catch (_) {}
-    return fallback;
+
+    if (to.isBefore(from)) from = to;
+    return (from, to);
   }
 
   Future<void> _pickHistoryDate({required bool from}) async {
@@ -79,7 +93,7 @@ class _DonationScreenState extends State<DonationScreen> {
     final current = from
         ? (_historyFrom ?? DateTime(now.year, 1, 1))
         : (_historyTo ?? DateTime(now.year, now.month, now.day));
-    final picked = await showDatePicker(
+    final picked = await showThemedDatePicker(
       context: context,
       initialDate: current,
       firstDate: DateTime(2000),
@@ -114,7 +128,7 @@ class _DonationScreenState extends State<DonationScreen> {
 
   Future<void> _pickDate() async {
     final initial = _parseIsoDate(_date.text) ?? DateTime.now();
-    final picked = await showDatePicker(
+    final picked = await showThemedDatePicker(
       context: context,
       initialDate: initial,
       firstDate: DateTime(2000),

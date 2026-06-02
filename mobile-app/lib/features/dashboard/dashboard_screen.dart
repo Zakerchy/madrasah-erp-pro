@@ -8,6 +8,7 @@ import '../../shared/services/api_service.dart';
 import '../../shared/services/local_store_service.dart';
 import '../../shared/services/pwa_runtime_service.dart';
 import '../../shared/services/session_service.dart';
+import '../../shared/widgets/themed_date_picker.dart';
 import 'fund_detail_page.dart';
 
 class DashboardScreen extends StatefulWidget {
@@ -83,6 +84,28 @@ class _DashboardScreenState extends State<DashboardScreen> {
       String toKey = todayKey;
 
       try {
+        final uiRes = await _api.get('getAppUiSettings');
+        if (uiRes['ok'] == true) {
+          final ui = Map<String, dynamic>.from(uiRes['data'] as Map? ?? {});
+          final fromParsed = _parseIsoDate(ui['default_from_date']);
+          final toParsed = _parseIsoDate(ui['default_to_date']);
+          final toSource =
+              (ui['default_to_source'] ?? 'TODAY').toString().toUpperCase();
+
+          if (fromParsed != null) fromKey = _dateKey(fromParsed);
+          if (toSource == 'TODAY') {
+            toKey = todayKey;
+          } else if (toParsed != null) {
+            final capped = toParsed.isAfter(now) ? now : toParsed;
+            toKey = _dateKey(capped);
+          }
+          _offline = _offline || (uiRes['offline'] == true);
+        }
+      } catch (_) {
+        // Fallback to built-in defaults.
+      }
+
+      try {
         final statsRes = await _api.get('datasetStats');
         if (statsRes['ok'] == true) {
           final stats =
@@ -91,7 +114,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
           final lastDate = _parseIsoDate(stats['last_txn_date']);
           if (firstDate != null) {
             _firstDataMonth = DateTime(firstDate.year, firstDate.month);
-            fromKey = _dateKey(firstDate);
           }
           if (lastDate != null) {
             final cappedLast = lastDate.isAfter(now) ? now : lastDate;
@@ -322,8 +344,41 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 children: [
                   TextFormField(
                     controller: dateCtrl,
-                    decoration:
-                        const InputDecoration(labelText: 'তারিখ (YYYY-MM-DD)'),
+                    readOnly: true,
+                    decoration: InputDecoration(
+                      labelText: 'তারিখ (YYYY-MM-DD)',
+                      suffixIcon: IconButton(
+                        icon: const Icon(Icons.calendar_month),
+                        onPressed: () async {
+                          final initial =
+                              _parseIsoDate(dateCtrl.text) ?? DateTime.now();
+                          final picked = await showThemedDatePicker(
+                            context: ctx,
+                            initialDate: initial,
+                            firstDate: DateTime(2000, 1, 1),
+                            lastDate: DateTime(2100, 12, 31),
+                          );
+                          if (picked == null) return;
+                          final normalized =
+                              '${picked.year.toString().padLeft(4, '0')}-${picked.month.toString().padLeft(2, '0')}-${picked.day.toString().padLeft(2, '0')}';
+                          setD(() => dateCtrl.text = normalized);
+                        },
+                      ),
+                    ),
+                    onTap: () async {
+                      final initial =
+                          _parseIsoDate(dateCtrl.text) ?? DateTime.now();
+                      final picked = await showThemedDatePicker(
+                        context: ctx,
+                        initialDate: initial,
+                        firstDate: DateTime(2000, 1, 1),
+                        lastDate: DateTime(2100, 12, 31),
+                      );
+                      if (picked == null) return;
+                      final normalized =
+                          '${picked.year.toString().padLeft(4, '0')}-${picked.month.toString().padLeft(2, '0')}-${picked.day.toString().padLeft(2, '0')}';
+                      setD(() => dateCtrl.text = normalized);
+                    },
                     validator: (v) =>
                         (v?.trim().isEmpty ?? true) ? 'দিন' : null,
                   ),

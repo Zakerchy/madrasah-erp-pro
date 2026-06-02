@@ -36,6 +36,15 @@ Headers:
 
 ## Reports
 - `GET ?action=monthlyReport&monthKey=YYYY-MM`
+- `GET ?action=rangeReport&from=YYYY-MM-DD&to=YYYY-MM-DD`
+- Range reports are limited to 366 days.
+
+## App UI Settings
+- `GET ?action=getAppUiSettings&user_role=ADMIN`
+- `POST { action: "upsertAppUiSettings", user_role: "ADMIN", payload: { default_from_date, default_to_date, default_to_mode } }`
+
+## Audit Log
+- `GET ?action=listAuditLog&user_role=ADMIN&limit=80`
 
 ## Notification Settings (ADMIN)
 - `GET ?action=getNotificationSettings&user_role=ADMIN`

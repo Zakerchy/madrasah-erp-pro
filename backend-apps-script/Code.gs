@@ -85,7 +85,10 @@ function handleRequest_(params) {
     if (action === 'listSalaryPayments') return json(listSalaryPayments_(params));
     if (action === 'listScholarshipByMonth') return json(listScholarshipByMonth_(params));
     if (action === 'monthlyReport') return json(monthlyReport_(params));
+    if (action === 'rangeReport') return json(rangeReport_(params));
     if (action === 'datasetStats') return json(datasetStats_(params));
+    if (action === 'getAppUiSettings') return json(getAppUiSettings_(params));
+    if (action === 'listAuditLog') return json(listAuditLog_(params));
     if (action === 'getNotificationSettings') {
       assertRole_(params.user_role, ['ADMIN']);
       return json(getNotificationSettings_(params));
@@ -147,6 +150,11 @@ function handleRequest_(params) {
     if (action === 'upsertNotificationSettings') {
       assertRole_(params.user_role, ['ADMIN']);
       return json(upsertNotificationSettings_(params.payload, params));
+    }
+
+    if (action === 'upsertAppUiSettings') {
+      assertRole_(params.user_role, ['ADMIN']);
+      return json(upsertAppUiSettings_(params.payload, params));
     }
 
     if (action === 'createNotificationEvent') {
@@ -424,6 +432,88 @@ function monthlyReport_(params) {
   return { ok: true, data: { monthKey, totalIn, totalOut, balance: totalIn - totalOut, rows } };
 }
 
+function rangeReport_(params) {
+  params = params || {};
+  assertRole_(params.user_role, ['ADMIN', 'ACCOUNTANT', 'FIELD_USER', 'VIEWER']);
+  const role = String(params.user_role || '');
+  const userId = String(params.user_id || '');
+  requireUserIdIfFieldRole_(role, userId);
+
+  const from = normalizeIsoDate_(params.from || '');
+  const to = normalizeIsoDate_(params.to || '');
+  if (!isIsoDateText_(from) || !isIsoDateText_(to)) {
+    return { ok: false, message: 'from/to must be valid YYYY-MM-DD' };
+  }
+  if (from > to) return { ok: false, message: 'from date cannot be after to date' };
+
+  const maxDays = 366;
+  const days = rangeDaysInclusive_(from, to);
+  if (days > maxDays) {
+    return { ok: false, message: 'Maximum report range is 1 year (366 days)', max_range_days: maxDays };
+  }
+
+  const txns = listSheetRows_(CONFIG.SHEETS.TXN).data || [];
+  const filtered = txns.filter(function (t) {
+    if (!String(t.txn_date || '')) return false;
+    if (String(t.status || 'ACTIVE') === 'VOID') return false;
+    if (String(t.txn_date || '') < from) return false;
+    if (String(t.txn_date || '') > to) return false;
+    if (role === 'FIELD_USER' && !isVisibleToFieldUser_(t, userId)) return false;
+    return true;
+  });
+
+  filtered.sort(function (a, b) {
+    return String(b.txn_date || '').localeCompare(String(a.txn_date || ''));
+  });
+
+  let totalIn = 0;
+  let totalOut = 0;
+  const byFund = {};
+  const byMonth = {};
+
+  filtered.forEach(function (t) {
+    const amt = normalizeNumber_(t.amount);
+    const dir = String(t.direction || '');
+    const fund = String(t.fund_type || 'UNKNOWN');
+    const monthKey = String(t.txn_date || '').slice(0, 7);
+    if (!byFund[fund]) byFund[fund] = { in: 0, out: 0, balance: 0 };
+    if (!byMonth[monthKey]) byMonth[monthKey] = { in: 0, out: 0, balance: 0 };
+
+    if (dir === 'IN') {
+      totalIn += amt;
+      byFund[fund].in += amt;
+      byMonth[monthKey].in += amt;
+    } else {
+      totalOut += amt;
+      byFund[fund].out += amt;
+      byMonth[monthKey].out += amt;
+    }
+  });
+
+  Object.keys(byFund).forEach(function (k) {
+    byFund[k].balance = byFund[k].in - byFund[k].out;
+  });
+  Object.keys(byMonth).forEach(function (k) {
+    byMonth[k].balance = byMonth[k].in - byMonth[k].out;
+  });
+
+  return {
+    ok: true,
+    data: {
+      from: from,
+      to: to,
+      range_days: days,
+      max_range_days: maxDays,
+      totalIn: totalIn,
+      totalOut: totalOut,
+      balance: totalIn - totalOut,
+      rows: filtered,
+      byFund: byFund,
+      byMonth: byMonth,
+    },
+  };
+}
+
 function listTransactions_(params) {
   params = params || {};
   assertRole_(params.user_role, ['ADMIN', 'ACCOUNTANT', 'FIELD_USER', 'VIEWER']);
@@ -633,6 +723,32 @@ function addAudit_(module, action, entityId, beforeJson, afterJson, doneBy) {
   appendRow_(CONFIG.SHEETS.AUDIT, row);
 }
 
+function listAuditLog_(params) {
+  params = params || {};
+  assertRole_(params.user_role, ['ADMIN', 'ACCOUNTANT']);
+
+  const rows = listSheetRows_(CONFIG.SHEETS.AUDIT).data || [];
+  const moduleFilter = String(params.module || '').trim();
+  const actionFilter = String(params.audit_action || '').trim();
+  const from = normalizeIsoDate_(params.from || '');
+  const to = normalizeIsoDate_(params.to || '');
+  const limit = Math.max(1, Math.min(200, Number(params.limit || 80)));
+
+  const filtered = rows.filter(function (r) {
+    if (moduleFilter && String(r.module || '') !== moduleFilter) return false;
+    if (actionFilter && String(r.action || '') !== actionFilter) return false;
+    const doneDay = normalizeIsoDate_(r.done_at || '');
+    if (from && doneDay < from) return false;
+    if (to && doneDay > to) return false;
+    return true;
+  });
+
+  filtered.sort(function (a, b) {
+    return String(b.done_at || '').localeCompare(String(a.done_at || ''));
+  });
+  return { ok: true, data: filtered.slice(0, limit) };
+}
+
 function notificationSettingDefs_() {
   return [
     { key: 'notify.in_app.enabled', defaultValue: 'TRUE', notes: 'In-app notifications always enabled' },
@@ -735,6 +851,125 @@ function readNotificationSettings_() {
 
 function getNotificationSettings_() {
   return { ok: true, data: readNotificationSettings_() };
+}
+
+function appUiSettingDefs_() {
+  return [
+    { key: 'report.default_from_date', defaultValue: '2022-01-26', notes: 'Default report range start date (YYYY-MM-DD)' },
+    { key: 'report.default_to_date', defaultValue: 'TODAY', notes: 'Default report range end date (YYYY-MM-DD or TODAY)' },
+    { key: 'report.max_range_days', defaultValue: '366', notes: 'Guard rail: max report span in days' },
+  ];
+}
+
+function upsertSettingTextByKey_(key, value, notes) {
+  const sheet = getSheet_(CONFIG.SHEETS.SETTINGS);
+  const values = sheet.getDataRange().getValues();
+  if (!values.length) throw new Error('settings sheet header missing');
+
+  const headers = values[0].map(String);
+  const keyIdx = headers.indexOf('key');
+  const valueIdx = headers.indexOf('value');
+  const notesIdx = headers.indexOf('notes');
+  const updatedAtIdx = headers.indexOf('updated_at');
+  if (keyIdx === -1 || valueIdx === -1) {
+    throw new Error('settings sheet must contain key and value columns');
+  }
+
+  const now = nowIso();
+  const nextValue = String(value === undefined || value === null ? '' : value).trim();
+  for (let i = 1; i < values.length; i++) {
+    if (String(values[i][keyIdx] || '').trim() !== key) continue;
+    sheet.getRange(i + 1, valueIdx + 1).setValue(nextValue);
+    if (notesIdx >= 0 && notes !== undefined) sheet.getRange(i + 1, notesIdx + 1).setValue(notes || '');
+    if (updatedAtIdx >= 0) sheet.getRange(i + 1, updatedAtIdx + 1).setValue(now);
+    return { mode: 'update', before: values[i][valueIdx], after: nextValue, updated_at: now };
+  }
+
+  const rowObj = {
+    key: key,
+    value: nextValue,
+    notes: notes || '',
+    updated_at: now,
+  };
+  const writeRow = headers.map(function (h) {
+    return rowObj[h] !== undefined ? rowObj[h] : '';
+  });
+  sheet.appendRow(writeRow);
+  return { mode: 'create', before: '', after: nextValue, updated_at: now };
+}
+
+function ensureAppUiDefaults_() {
+  const defs = appUiSettingDefs_();
+  const byKey = getSettingsMapByKey_();
+  defs.forEach(function (d) {
+    if (!byKey[d.key]) upsertSettingTextByKey_(d.key, d.defaultValue, d.notes);
+  });
+}
+
+function readAppUiSettings_() {
+  ensureAppUiDefaults_();
+  const byKey = getSettingsMapByKey_();
+  const fromRaw = String((byKey['report.default_from_date'] || {}).value || '2022-01-26').trim();
+  const toRaw = String((byKey['report.default_to_date'] || {}).value || 'TODAY').trim().toUpperCase();
+  const maxRaw = String((byKey['report.max_range_days'] || {}).value || '366').trim();
+
+  const from = isIsoDateText_(fromRaw) ? fromRaw : '2022-01-26';
+  const to = toRaw === 'TODAY' ? todayIso_() : (isIsoDateText_(toRaw) ? toRaw : todayIso_());
+  const maxDays = Math.max(1, Math.min(366, parseInt(maxRaw, 10) || 366));
+  const updatedCandidates = appUiSettingDefs_()
+    .map(function (d) { return String((byKey[d.key] || {}).updated_at || ''); })
+    .filter(function (v) { return !!v; });
+
+  return {
+    default_from_date: from,
+    default_to_date: to,
+    default_to_source: toRaw === 'TODAY' ? 'TODAY' : 'FIXED',
+    max_range_days: maxDays,
+    updated_at: updatedCandidates.length ? updatedCandidates.sort().slice(-1)[0] : '',
+  };
+}
+
+function getAppUiSettings_(params) {
+  params = params || {};
+  assertRole_(params.user_role, ['ADMIN', 'ACCOUNTANT', 'FIELD_USER', 'VIEWER']);
+  return { ok: true, data: readAppUiSettings_() };
+}
+
+function upsertAppUiSettings_(payload, params) {
+  payload = payload || {};
+  params = params || {};
+
+  const before = readAppUiSettings_();
+  const from = normalizeIsoDate_(String(payload.default_from_date || before.default_from_date));
+  const toToken = String(payload.default_to_mode || '').trim().toUpperCase();
+  const toInputRaw = String(payload.default_to_date || before.default_to_date).trim();
+  const to = toToken === 'TODAY' ? 'TODAY' : normalizeIsoDate_(toInputRaw);
+
+  if (!isIsoDateText_(from)) return { ok: false, message: 'default_from_date must be YYYY-MM-DD' };
+  if (to !== 'TODAY' && !isIsoDateText_(to)) {
+    return { ok: false, message: 'default_to_date must be YYYY-MM-DD or TODAY mode' };
+  }
+
+  const resolvedTo = to === 'TODAY' ? todayIso_() : to;
+  const days = rangeDaysInclusive_(from, resolvedTo);
+  if (days > 366) {
+    return { ok: false, message: 'Default range cannot exceed 1 year (366 days)' };
+  }
+
+  upsertSettingTextByKey_('report.default_from_date', from, 'Default report range start date (YYYY-MM-DD)');
+  upsertSettingTextByKey_('report.default_to_date', to, 'Default report range end date (YYYY-MM-DD or TODAY)');
+  upsertSettingTextByKey_('report.max_range_days', '366', 'Guard rail: max report span in days');
+
+  const after = readAppUiSettings_();
+  addAudit_(
+    'settings',
+    'APP_UI_RANGE_UPDATE',
+    'report.default.range',
+    JSON.stringify(before),
+    JSON.stringify(after),
+    String(params.user_id || params.user_role || 'admin')
+  );
+  return { ok: true, data: after };
 }
 
 function getEmailToggleByCategory_(settings, category) {
@@ -995,6 +1230,17 @@ function normalizeIsoDate_(raw) {
     return Utilities.formatDate(parsed, Session.getScriptTimeZone(), 'yyyy-MM-dd');
   }
   return text.slice(0, 10);
+}
+
+function isIsoDateText_(text) {
+  return /^\d{4}-\d{2}-\d{2}$/.test(String(text || '').trim());
+}
+
+function rangeDaysInclusive_(fromIso, toIso) {
+  const from = new Date(fromIso + 'T00:00:00Z');
+  const to = new Date(toIso + 'T00:00:00Z');
+  if (isNaN(from.getTime()) || isNaN(to.getTime())) return 0;
+  return Math.floor((to.getTime() - from.getTime()) / 86400000) + 1;
 }
 
 function normalizeNumber_(raw) {

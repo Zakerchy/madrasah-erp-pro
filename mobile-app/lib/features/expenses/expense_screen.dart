@@ -4,6 +4,7 @@ import '../../core/app_lang.dart';
 import '../../shared/services/api_service.dart';
 import '../../shared/services/session_service.dart';
 import '../../shared/widgets/base_scaffold.dart';
+import '../../shared/widgets/themed_date_picker.dart';
 
 class ExpenseScreen extends StatefulWidget {
   const ExpenseScreen({super.key});
@@ -36,13 +37,41 @@ class _ExpenseScreenState extends State<ExpenseScreen> {
   Future<void> _loadRows() async {
     setState(() => _loadingList = true);
     try {
-      final res = await _api.get('listTransactions', query: {'direction': 'OUT'});
+      final res =
+          await _api.get('listTransactions', query: {'direction': 'OUT'});
       if (res['ok'] == true) {
         final data = (res['data'] as List<dynamic>? ?? []);
-        _rows = data.take(30).map((e) => Map<String, dynamic>.from(e as Map)).toList();
+        _rows = data
+            .take(30)
+            .map((e) => Map<String, dynamic>.from(e as Map))
+            .toList();
       }
     } catch (_) {}
     if (mounted) setState(() => _loadingList = false);
+  }
+
+  DateTime? _parseIsoDate(String value) {
+    final trimmed = value.trim();
+    if (!RegExp(r'^\d{4}-\d{2}-\d{2}$').hasMatch(trimmed)) return null;
+    final dt = DateTime.tryParse(trimmed);
+    if (dt == null) return null;
+    final normalized =
+        '${dt.year.toString().padLeft(4, '0')}-${dt.month.toString().padLeft(2, '0')}-${dt.day.toString().padLeft(2, '0')}';
+    return normalized == trimmed ? dt : null;
+  }
+
+  Future<void> _pickDate() async {
+    final initial = _parseIsoDate(_date.text) ?? DateTime.now();
+    final picked = await showThemedDatePicker(
+      context: context,
+      initialDate: initial,
+      firstDate: DateTime(2000),
+      lastDate: DateTime(2100),
+    );
+    if (picked == null) return;
+    _date.text =
+        '${picked.year.toString().padLeft(4, '0')}-${picked.month.toString().padLeft(2, '0')}-${picked.day.toString().padLeft(2, '0')}';
+    if (mounted) setState(() {});
   }
 
   Future<void> _submit() async {
@@ -57,7 +86,8 @@ class _ExpenseScreenState extends State<ExpenseScreen> {
           'direction': 'OUT',
           'fund_type': _fundType,
           'amount': double.tryParse(_amount.text.trim()) ?? 0,
-          'source_or_vendor': _vendor.text.trim().isEmpty ? 'Expense' : _vendor.text.trim(),
+          'source_or_vendor':
+              _vendor.text.trim().isEmpty ? 'Expense' : _vendor.text.trim(),
           'category': _head.text.trim(),
           'notes': _note.text.trim(),
           'created_by': SessionService.userId,
@@ -71,16 +101,21 @@ class _ExpenseScreenState extends State<ExpenseScreen> {
         _head.clear();
         _note.clear();
         await _loadRows();
+        if (!mounted) return;
         final msg = res['queued'] == true
-            ? AppLang.t('অফলাইনে সংরক্ষিত। সংযোগে এলে পাঠানো হবে।', 'Offline saved. Will sync automatically.')
+            ? AppLang.t('অফলাইনে সংরক্ষিত। সংযোগে এলে পাঠানো হবে।',
+                'Offline saved. Will sync automatically.')
             : AppLang.t('খরচ সফলভাবে সংরক্ষিত', 'Expense saved successfully');
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(msg)));
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('${res['message'] ?? res['error']}')));
+        ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('${res['message'] ?? res['error']}')));
       }
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('${AppLang.t('ত্রুটি', 'Error')}: $e')));
+      ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('${AppLang.t('ত্রুটি', 'Error')}: $e')));
     }
 
     if (mounted) setState(() => _saving = false);
@@ -101,48 +136,89 @@ class _ExpenseScreenState extends State<ExpenseScreen> {
                 children: [
                   TextFormField(
                     controller: _date,
-                    decoration: InputDecoration(labelText: AppLang.t('তারিখ (YYYY-MM-DD)', 'Date (YYYY-MM-DD)')),
-                    validator: (v) => (v == null || v.trim().isEmpty) ? AppLang.t('তারিখ দিন', 'Date required') : null,
+                    readOnly: true,
+                    decoration: InputDecoration(
+                      labelText:
+                          AppLang.t('তারিখ (YYYY-MM-DD)', 'Date (YYYY-MM-DD)'),
+                      suffixIcon: IconButton(
+                        tooltip: AppLang.t('তারিখ নির্বাচন', 'Select date'),
+                        onPressed: _pickDate,
+                        icon: const Icon(Icons.calendar_month),
+                      ),
+                    ),
+                    onTap: _pickDate,
+                    validator: (v) {
+                      final value = (v ?? '').trim();
+                      if (value.isEmpty) {
+                        return AppLang.t('তারিখ দিন', 'Date required');
+                      }
+                      if (_parseIsoDate(value) == null) {
+                        return AppLang.t('বৈধ তারিখ দিন YYYY-MM-DD',
+                            'Use valid date YYYY-MM-DD');
+                      }
+                      return null;
+                    },
                   ),
                   const SizedBox(height: 12),
                   DropdownButtonFormField<String>(
-                    value: _fundType,
+                    initialValue: _fundType,
                     items: [
-                      DropdownMenuItem(value: 'CONSTRUCTION', child: Text(AppLang.t('নির্মাণ', 'Construction'))),
-                      DropdownMenuItem(value: 'JAKAT', child: Text(AppLang.t('যাকাত', 'Jakat'))),
-                      DropdownMenuItem(value: 'SCHOLARSHIP', child: Text(AppLang.t('বৃত্তি', 'Scholarship'))),
-                      DropdownMenuItem(value: 'GENERAL', child: Text(AppLang.t('সাধারণ', 'General'))),
+                      DropdownMenuItem(
+                          value: 'CONSTRUCTION',
+                          child: Text(AppLang.t('নির্মাণ', 'Construction'))),
+                      DropdownMenuItem(
+                          value: 'JAKAT',
+                          child: Text(AppLang.t('যাকাত', 'Jakat'))),
+                      DropdownMenuItem(
+                          value: 'SCHOLARSHIP',
+                          child: Text(AppLang.t('বৃত্তি', 'Scholarship'))),
+                      DropdownMenuItem(
+                          value: 'GENERAL',
+                          child: Text(AppLang.t('সাধারণ', 'General'))),
                     ],
-                    onChanged: (v) => setState(() => _fundType = v ?? 'CONSTRUCTION'),
-                    decoration: InputDecoration(labelText: AppLang.t('ফান্ড ধরন', 'Fund Type')),
+                    onChanged: (v) =>
+                        setState(() => _fundType = v ?? 'CONSTRUCTION'),
+                    decoration: InputDecoration(
+                        labelText: AppLang.t('ফান্ড ধরন', 'Fund Type')),
                   ),
                   const SizedBox(height: 12),
                   TextFormField(
                     controller: _amount,
-                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                    decoration: InputDecoration(labelText: AppLang.t('পরিমাণ', 'Amount')),
+                    keyboardType:
+                        const TextInputType.numberWithOptions(decimal: true),
+                    decoration: InputDecoration(
+                        labelText: AppLang.t('পরিমাণ', 'Amount')),
                     validator: (v) {
                       final n = double.tryParse((v ?? '').trim()) ?? 0;
-                      return n <= 0 ? AppLang.t('পরিমাণ ০ এর বেশি হতে হবে', 'Amount must be > 0') : null;
+                      return n <= 0
+                          ? AppLang.t(
+                              'পরিমাণ ০ এর বেশি হতে হবে', 'Amount must be > 0')
+                          : null;
                     },
                   ),
                   const SizedBox(height: 12),
                   TextFormField(
                     controller: _head,
-                    decoration: InputDecoration(labelText: AppLang.t('খরচের খাত', 'Expense Head')),
-                    validator: (v) => (v == null || v.trim().isEmpty) ? AppLang.t('খরচের খাত দিন', 'Expense head required') : null,
+                    decoration: InputDecoration(
+                        labelText: AppLang.t('খরচের খাত', 'Expense Head')),
+                    validator: (v) => (v == null || v.trim().isEmpty)
+                        ? AppLang.t('খরচের খাত দিন', 'Expense head required')
+                        : null,
                   ),
                   const SizedBox(height: 12),
                   TextFormField(
                     controller: _vendor,
-                    decoration: InputDecoration(labelText: AppLang.t('বিক্রেতা/প্রাপক (ঐচ্ছিক)', 'Vendor/Receiver (optional)')),
+                    decoration: InputDecoration(
+                        labelText: AppLang.t('বিক্রেতা/প্রাপক (ঐচ্ছিক)',
+                            'Vendor/Receiver (optional)')),
                   ),
                   const SizedBox(height: 12),
                   TextFormField(
                     controller: _note,
                     minLines: 2,
                     maxLines: 4,
-                    decoration: InputDecoration(labelText: AppLang.t('মন্তব্য', 'Notes')),
+                    decoration: InputDecoration(
+                        labelText: AppLang.t('মন্তব্য', 'Notes')),
                   ),
                   const SizedBox(height: 16),
                   SizedBox(
@@ -150,9 +226,14 @@ class _ExpenseScreenState extends State<ExpenseScreen> {
                     child: FilledButton.icon(
                       onPressed: _saving ? null : _submit,
                       icon: _saving
-                          ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                          ? const SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(strokeWidth: 2))
                           : const Icon(Icons.save),
-                      label: Text(_saving ? AppLang.t('সংরক্ষণ হচ্ছে...', 'Saving...') : AppLang.t('খরচ সংরক্ষণ', 'Save Expense')),
+                      label: Text(_saving
+                          ? AppLang.t('সংরক্ষণ হচ্ছে...', 'Saving...')
+                          : AppLang.t('খরচ সংরক্ষণ', 'Save Expense')),
                     ),
                   ),
                 ],
@@ -161,9 +242,11 @@ class _ExpenseScreenState extends State<ExpenseScreen> {
             const SizedBox(height: 20),
             Row(
               children: [
-                Text(AppLang.t('সাম্প্রতিক খরচ', 'Recent Expenses'), style: const TextStyle(fontWeight: FontWeight.bold)),
+                Text(AppLang.t('সাম্প্রতিক খরচ', 'Recent Expenses'),
+                    style: const TextStyle(fontWeight: FontWeight.bold)),
                 const Spacer(),
-                IconButton(onPressed: _loadRows, icon: const Icon(Icons.refresh)),
+                IconButton(
+                    onPressed: _loadRows, icon: const Icon(Icons.refresh)),
               ],
             ),
             if (_loadingList)
@@ -174,8 +257,10 @@ class _ExpenseScreenState extends State<ExpenseScreen> {
             else
               ..._rows.map((r) => Card(
                     child: ListTile(
-                      title: Text('${r['category'] ?? AppLang.t('খরচ', 'Expense')} • ৳${r['amount'] ?? 0}'),
-                      subtitle: Text('${r['fund_type'] ?? ''} • ${r['txn_date'] ?? ''} • ${r['source_or_vendor'] ?? ''}'),
+                      title: Text(
+                          '${r['category'] ?? AppLang.t('খরচ', 'Expense')} • ৳${r['amount'] ?? 0}'),
+                      subtitle: Text(
+                          '${r['fund_type'] ?? ''} • ${r['txn_date'] ?? ''} • ${r['source_or_vendor'] ?? ''}'),
                     ),
                   )),
           ],

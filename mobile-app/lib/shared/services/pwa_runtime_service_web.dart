@@ -37,31 +37,39 @@ class _WebPwaRuntimeService implements PwaRuntimeService {
     _standaloneMode.value = _detectStandaloneMode();
     _onlineStatus.value = html.window.navigator.onLine ?? true;
 
-    final media = html.window.matchMedia('(display-mode: standalone)');
-    _displayModeSub = media.onChange.listen((_) {
-      _standaloneMode.value = _detectStandaloneMode();
-    });
+    try {
+      final media = html.window.matchMedia('(display-mode: standalone)');
+      _displayModeSub = media.onChange.listen((_) {
+        _standaloneMode.value = _detectStandaloneMode();
+      });
+    } catch (_) {}
 
-    _onlineSub = html.window.onOnline.listen((_) {
-      _onlineStatus.value = true;
-    });
-    _offlineSub = html.window.onOffline.listen((_) {
-      _onlineStatus.value = false;
-    });
+    try {
+      _onlineSub = html.window.onOnline.listen((_) {
+        _onlineStatus.value = true;
+      });
+      _offlineSub = html.window.onOffline.listen((_) {
+        _onlineStatus.value = false;
+      });
+    } catch (_) {}
 
-    _beforeInstallSub = html.window.on['beforeinstallprompt'].listen((event) {
-      if (event is html.BeforeInstallPromptEvent) {
-        event.preventDefault();
-        _deferredPrompt = event;
-        _installAvailable.value = true;
-      }
-    });
+    try {
+      _beforeInstallSub = html.window.on['beforeinstallprompt'].listen((event) {
+        if (event is html.BeforeInstallPromptEvent) {
+          event.preventDefault();
+          _deferredPrompt = event;
+          _installAvailable.value = true;
+        }
+      });
+    } catch (_) {}
 
-    _appInstalledSub = html.window.on['appinstalled'].listen((_) {
-      _deferredPrompt = null;
-      _installAvailable.value = false;
-      _standaloneMode.value = true;
-    });
+    try {
+      _appInstalledSub = html.window.on['appinstalled'].listen((_) {
+        _deferredPrompt = null;
+        _installAvailable.value = false;
+        _standaloneMode.value = true;
+      });
+    } catch (_) {}
   }
 
   @override
@@ -82,12 +90,11 @@ class _WebPwaRuntimeService implements PwaRuntimeService {
   }
 
   bool _detectStandaloneMode() {
-    final mediaStandalone =
-        html.window.matchMedia('(display-mode: standalone)').matches;
-    final nav = html.window.navigator;
-    final iosStandalone =
-        (nav as dynamic).standalone == true; // iOS Safari specific.
-    return mediaStandalone || iosStandalone;
+    try {
+      return html.window.matchMedia('(display-mode: standalone)').matches;
+    } catch (_) {
+      return false;
+    }
   }
 
   bool _isIosSafari() {

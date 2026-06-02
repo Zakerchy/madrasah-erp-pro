@@ -10,7 +10,11 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await AppLang.init();
   await SessionService.bootstrap();
-  await pwaRuntimeService.init();
+  try {
+    await pwaRuntimeService.init();
+  } catch (_) {
+    // Never block app boot because of optional web runtime hooks.
+  }
   await SyncOrchestratorService.start();
   runApp(const MadrasahErpLiteApp());
 }
