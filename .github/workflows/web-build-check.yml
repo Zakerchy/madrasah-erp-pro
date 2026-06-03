@@ -48,5 +48,5 @@ jobs:
       - name: Upload web artifact
         uses: actions/upload-artifact@v4
         with:
-          name: madrasah-erp-web-build
+          name: madrasah-erp-pro-web-build
           path: mobile-app/build/web

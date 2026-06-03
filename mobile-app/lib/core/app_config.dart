@@ -56,4 +56,10 @@ class AppConfig {
     'ENABLE_DEBUG_LOGS',
     defaultValue: true,
   );
+
+  static const String apkDownloadUrl = String.fromEnvironment(
+    'APK_DOWNLOAD_URL',
+    defaultValue:
+        'https://github.com/Zakerchy/madrasah-erp-pro/releases/download/latest-apk/app-debug.apk',
+  );
 }

@@ -1,13 +1,13 @@
 {
-    "name": "Madrasah App Lite",
-    "short_name": "Madrasah",
+    "name": "Madrasah ERP Pro",
+    "short_name": "ERP Pro",
     "start_url": "/",
     "scope": "/",
     "display": "standalone",
     "display_override": ["fullscreen", "standalone", "minimal-ui"],
     "background_color": "#0175C2",
     "theme_color": "#0175C2",
-    "description": "Madrasah App Lite web portal for fund management.",
+    "description": "Madrasah ERP Pro web portal for finance, academic, and operations management.",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

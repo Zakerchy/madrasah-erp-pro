@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../core/app_config.dart';
 import '../../shared/models/dashboard_summary.dart';
 import '../../shared/models/notification_settings.dart';
 import '../../shared/services/api_service.dart';
@@ -21,7 +22,7 @@ class DashboardScreen extends StatefulWidget {
 class _DashboardScreenState extends State<DashboardScreen> {
   final _api = ApiService();
   static final Uri _apkDownloadUri = Uri.parse(
-    'https://github.com/Zakerchy/madrasah-erp-lite/releases/download/latest-apk/app-debug.apk',
+    AppConfig.apkDownloadUrl,
   );
   bool _loading = true;
   bool _offline = false;
