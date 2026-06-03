@@ -120,6 +120,7 @@ class _LoginScreenState extends State<LoginScreen> {
                           );
                           return;
                         }
+                        final messenger = ScaffoldMessenger.of(context);
                         setS(() => sending = true);
                         final res = await _api.post(
                           'requestPinReset',
@@ -128,7 +129,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         );
                         if (!ctx.mounted) return;
                         Navigator.pop(ctx);
-                        ScaffoldMessenger.of(context).showSnackBar(
+                        messenger.showSnackBar(
                           SnackBar(
                             content: Text(res['message'] ?? (res['ok'] == true
                                 ? 'রিসেট লিংক পাঠানো হয়েছে'

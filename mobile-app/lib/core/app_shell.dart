@@ -17,14 +17,14 @@ import '../features/settings/settings_screen.dart';
 import 'app_lang.dart';
 import 'theme.dart';
 
-class MadrasahErpLiteApp extends StatefulWidget {
-  const MadrasahErpLiteApp({super.key});
+class MadrasahErpProApp extends StatefulWidget {
+  const MadrasahErpProApp({super.key});
 
   @override
-  State<MadrasahErpLiteApp> createState() => _MadrasahErpLiteAppState();
+  State<MadrasahErpProApp> createState() => _MadrasahErpProAppState();
 }
 
-class _MadrasahErpLiteAppState extends State<MadrasahErpLiteApp> {
+class _MadrasahErpProAppState extends State<MadrasahErpProApp> {
   @override
   void initState() {
     super.initState();
@@ -43,7 +43,7 @@ class _MadrasahErpLiteAppState extends State<MadrasahErpLiteApp> {
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-      title: AppLang.t('মাদ্রাসা ERP Lite', 'Madrasah ERP Lite'),
+      title: AppLang.t('মাদ্রাসা ERP Pro', 'Madrasah ERP Pro'),
       theme: buildTheme(),
       darkTheme: buildDarkTheme(),
       themeMode: ThemeMode.system,

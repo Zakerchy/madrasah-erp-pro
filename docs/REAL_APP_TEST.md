@@ -16,7 +16,7 @@ Repository -> Settings -> Secrets and variables -> Actions -> New repository sec
 Repository -> Actions -> `build-android-apk` -> Run workflow
 
 Build শেষ হলে artifact পাবেন:
-- `madrasah-erp-lite-debug-apk`
+- `madrasah-erp-pro-debug-apk`
 
 Artifact download করে unzip দিলে `app-debug.apk` পাবেন.
 

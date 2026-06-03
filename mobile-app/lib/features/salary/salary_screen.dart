@@ -75,8 +75,9 @@ class _SalaryScreenState extends State<SalaryScreen> {
   }
 
   Future<void> _saveStaff() async {
+    final messenger = ScaffoldMessenger.of(context);
     if (_staffName.text.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(AppLang.t('কর্মীর নাম দিন', 'Staff name required'))));
+      messenger.showSnackBar(SnackBar(content: Text(AppLang.t('কর্মীর নাম দিন', 'Staff name required'))));
       return;
     }
 
@@ -100,18 +101,20 @@ class _SalaryScreenState extends State<SalaryScreen> {
       _staffRole.clear();
       _staffSalary.clear();
       await _loadAll();
+      if (!mounted) return;
       final msg = res['queued'] == true
           ? AppLang.t('অফলাইনে সংরক্ষিত।', 'Offline saved. Will sync automatically.')
           : AppLang.t('কর্মী সংরক্ষিত', 'Staff saved');
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+      messenger.showSnackBar(SnackBar(content: Text(msg)));
     } else {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('${res['message'] ?? res['error']}')));
+      messenger.showSnackBar(SnackBar(content: Text('${res['message'] ?? res['error']}')));
     }
   }
 
   Future<void> _recordPayment() async {
+    final messenger = ScaffoldMessenger.of(context);
     if (_selectedStaffId.isEmpty || _paidAmount.text.trim().isEmpty || _monthKey.text.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(AppLang.t('কর্মী, মাস ও প্রদত্ত পরিমাণ দিন', 'Staff, month, and paid amount required'))));
+      messenger.showSnackBar(SnackBar(content: Text(AppLang.t('কর্মী, মাস ও প্রদত্ত পরিমাণ দিন', 'Staff, month, and paid amount required'))));
       return;
     }
 
@@ -139,12 +142,13 @@ class _SalaryScreenState extends State<SalaryScreen> {
       _payableAmount.clear();
       _dueAmount.text = '0';
       await _loadAll();
+      if (!mounted) return;
       final msg = res['queued'] == true
           ? AppLang.t('অফলাইনে সংরক্ষিত।', 'Offline saved. Will sync automatically.')
           : AppLang.t('বেতন পরিশোধ নথিভুক্ত হয়েছে', 'Salary payment recorded');
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+      messenger.showSnackBar(SnackBar(content: Text(msg)));
     } else {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('${res['message'] ?? res['error']}')));
+      messenger.showSnackBar(SnackBar(content: Text('${res['message'] ?? res['error']}')));
     }
   }
 
@@ -172,7 +176,7 @@ class _SalaryScreenState extends State<SalaryScreen> {
                   Text(AppLang.t('বেতন প্রদান নথিভুক্ত করুন', 'Record Salary Payment'), style: const TextStyle(fontWeight: FontWeight.bold)),
                   const SizedBox(height: 8),
                   DropdownButtonFormField<String>(
-                    value: _selectedStaffId.isEmpty ? null : _selectedStaffId,
+                    initialValue: _selectedStaffId.isEmpty ? null : _selectedStaffId,
                     items: _staff
                         .map((s) => DropdownMenuItem(
                               value: s['id'].toString(),
@@ -193,7 +197,7 @@ class _SalaryScreenState extends State<SalaryScreen> {
                   ),
                   const SizedBox(height: 8),
                   DropdownButtonFormField<String>(
-                    value: _fundType,
+                    initialValue: _fundType,
                     items: [
                       DropdownMenuItem(value: 'GENERAL', child: Text(AppLang.t('সাধারণ', 'General'))),
                       DropdownMenuItem(value: 'CONSTRUCTION', child: Text(AppLang.t('নির্মাণ', 'Construction'))),

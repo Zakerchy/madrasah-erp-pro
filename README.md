@@ -1,4 +1,4 @@
-# Madrasah ERP Lite
+# Madrasah ERP Pro
 
 A zero-cost, Google-Sheet-connected, Android-first native app plan and implementation scaffold for madrasah management.
 

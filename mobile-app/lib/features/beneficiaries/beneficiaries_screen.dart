@@ -42,8 +42,9 @@ class _BeneficiariesScreenState extends State<BeneficiariesScreen> {
   }
 
   Future<void> _save() async {
+    final messenger = ScaffoldMessenger.of(context);
     if (_name.text.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(AppLang.t('নাম প্রয়োজন', 'Name is required'))));
+      messenger.showSnackBar(SnackBar(content: Text(AppLang.t('নাম প্রয়োজন', 'Name is required'))));
       return;
     }
 
@@ -71,12 +72,13 @@ class _BeneficiariesScreenState extends State<BeneficiariesScreen> {
       _guardianStatus.clear();
       _monthlyAmount.clear();
       await _load();
+      if (!mounted) return;
       final msg = res['queued'] == true
           ? AppLang.t('অফলাইনে সংরক্ষিত।', 'Offline saved. Will sync automatically.')
           : AppLang.t('সুবিধাভোগী সংরক্ষিত', 'Beneficiary saved');
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+      messenger.showSnackBar(SnackBar(content: Text(msg)));
     } else {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('${res['message'] ?? res['error']}')));
+      messenger.showSnackBar(SnackBar(content: Text('${res['message'] ?? res['error']}')));
     }
   }
 

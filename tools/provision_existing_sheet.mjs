@@ -11,7 +11,7 @@ try {
   ({ google } = require('/Users/zakerchy/Desktop/TravERPPro2/node_modules/googleapis'));
 }
 
-const ROOT = '/Users/zakerchy/Desktop/MadrasahApp/madrasah-erp-lite';
+const ROOT = '/Users/zakerchy/Desktop/MadrasahApp/madrasah-erp-pro';
 const ENV_PATH = '/Users/zakerchy/Desktop/TravERPPro2/.env.local';
 const SHEETS_DIR = path.join(ROOT, 'sheets');
 const OUT_DIR = path.join(ROOT, 'tools', 'output');

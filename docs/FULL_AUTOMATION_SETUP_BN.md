@@ -10,9 +10,9 @@
 
 ## ধাপ 1) Apps Script project তৈরি (শুধু একবার)
 1. `script.google.com` -> `New project`
-2. project name দিন: `Madrasah ERP Lite Backend`
+2. project name দিন: `Madrasah ERP Pro Backend`
 3. `Project Settings` থেকে `Script ID` কপি করুন (পরে secret এ লাগবে)
-4. `Code.gs` এ [backend-apps-script/Code.gs](/Users/zakerchy/Desktop/MadrasahApp/madrasah-erp-lite/backend-apps-script/Code.gs) paste করুন
+4. `Code.gs` এ [backend-apps-script/Code.gs](/Users/zakerchy/Desktop/MadrasahApp/madrasah-erp-pro/backend-apps-script/Code.gs) paste করুন
 5. `Code.gs` এ placeholder রেখেই দিন (CI থেকে secret দিয়ে auto bind হবে)
 6. `Deploy -> New deployment -> Web app` করুন
 7. deployment create হলে `Deployment ID` আর `Web app URL` কপি করুন
@@ -58,7 +58,7 @@ Repo -> `Settings` -> `Secrets and variables` -> `Actions` -> `New repository se
 
 ## Useful commands
 ```bash
-cd /Users/zakerchy/Desktop/MadrasahApp/madrasah-erp-lite
+cd /Users/zakerchy/Desktop/MadrasahApp/madrasah-erp-pro
 git add .
 git commit -m "update: <message>"
 git push

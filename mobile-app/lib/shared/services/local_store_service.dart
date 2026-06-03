@@ -39,10 +39,12 @@ class LocalStoreService {
   static Map<String, dynamic>? readCachedGetResponse(String cacheKey) {
     final bucket = _getCacheMap();
     final raw = bucket[cacheKey];
-    if (raw is Map<String, dynamic>)
+    if (raw is Map<String, dynamic>) {
       return _parseCachedGet(raw, bucket, cacheKey);
-    if (raw is Map)
+    }
+    if (raw is Map) {
       return _parseCachedGet(Map<String, dynamic>.from(raw), bucket, cacheKey);
+    }
     return null;
   }
 

@@ -1,5 +1,5 @@
 /**
- * Madrasah ERP Lite - Apps Script Backend
+ * Madrasah ERP Pro - Apps Script Backend
  * Deploy as Web App (Execute as Me)
  */
 

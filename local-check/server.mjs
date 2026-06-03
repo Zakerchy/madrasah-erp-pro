@@ -203,11 +203,11 @@ const server = http.createServer(async (req, res) => {
     return sendHtml(res, page());
   }
 
-  if (parsed.pathname === '/api/local/health') {
+  if (parsed.pathname === '/api/health' || parsed.pathname === '/api/local/health') {
     return sendJson(res, { ok: true, mode: 'local', message: 'local-check server running', ts: new Date().toISOString() });
   }
 
-  if (parsed.pathname === '/api/local/dashboard-summary') {
+  if (parsed.pathname === '/api/dashboard-summary' || parsed.pathname === '/api/local/dashboard-summary') {
     const txns = readRows(TXN_CSV);
     const ben = readRows(BEN_CSV);
     const sch = readRows(SCH_CSV);
@@ -225,7 +225,7 @@ const server = http.createServer(async (req, res) => {
     });
   }
 
-  if (parsed.pathname === '/api/local/monthly-report') {
+  if (parsed.pathname === '/api/monthly-report' || parsed.pathname === '/api/local/monthly-report') {
     const monthKey = parsed.searchParams.get('monthKey') || '';
     const txns = readRows(TXN_CSV);
     return sendJson(res, { ok: true, mode: 'local', data: txnSummary(txns, monthKey) });

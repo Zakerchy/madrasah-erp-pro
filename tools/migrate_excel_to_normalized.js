@@ -11,7 +11,7 @@ try {
 }
 
 const ROOT = '/Users/zakerchy/Desktop/MadrasahApp';
-const PROJECT = '/Users/zakerchy/Desktop/MadrasahApp/madrasah-erp-lite';
+const PROJECT = '/Users/zakerchy/Desktop/MadrasahApp/madrasah-erp-pro';
 const DONATION_FILE = path.join(ROOT, 'কম_প্লে_ক্সের দা_নের হিসাব.xlsx');
 const SCHOLAR_FILE = path.join(ROOT, 'Helpless girls students.xlsx');
 const OUT_DIR = path.join(PROJECT, 'tools/output');

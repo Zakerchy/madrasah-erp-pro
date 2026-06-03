@@ -64,8 +64,9 @@ class _ScholarshipScreenState extends State<ScholarshipScreen> {
   double _n(TextEditingController c) => double.tryParse(c.text.trim()) ?? 0;
 
   Future<void> _savePayment() async {
+    final messenger = ScaffoldMessenger.of(context);
     if (_selectedBeneficiaryId.isEmpty || _monthKey.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(AppLang.t('সুবিধাভোগী ও মাস প্রয়োজন', 'Beneficiary and month are required'))));
+      messenger.showSnackBar(SnackBar(content: Text(AppLang.t('সুবিধাভোগী ও মাস প্রয়োজন', 'Beneficiary and month are required'))));
       return;
     }
 
@@ -99,12 +100,13 @@ class _ScholarshipScreenState extends State<ScholarshipScreen> {
       _other.text = '0';
       _remaining.text = '0';
       await _loadAll();
+      if (!mounted) return;
       final msg = res['queued'] == true
           ? AppLang.t('অফলাইনে সংরক্ষিত।', 'Offline saved. Will sync automatically.')
           : AppLang.t('বৃত্তি পরিশোধ সংরক্ষিত', 'Scholarship payment saved');
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+      messenger.showSnackBar(SnackBar(content: Text(msg)));
     } else {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('${res['message'] ?? res['error']}')));
+      messenger.showSnackBar(SnackBar(content: Text('${res['message'] ?? res['error']}')));
     }
   }
 
@@ -128,7 +130,7 @@ class _ScholarshipScreenState extends State<ScholarshipScreen> {
                   ),
                   const SizedBox(height: 8),
                   DropdownButtonFormField<String>(
-                    value: _selectedBeneficiaryId.isEmpty ? null : _selectedBeneficiaryId,
+                    initialValue: _selectedBeneficiaryId.isEmpty ? null : _selectedBeneficiaryId,
                     items: _beneficiaries
                         .map((b) => DropdownMenuItem(
                               value: b['id'].toString(),
@@ -158,7 +160,7 @@ class _ScholarshipScreenState extends State<ScholarshipScreen> {
                   TextField(controller: _remaining, keyboardType: TextInputType.number, decoration: InputDecoration(labelText: AppLang.t('বাকি পরিমাণ', 'Remaining Amount'))),
                   const SizedBox(height: 8),
                   DropdownButtonFormField<String>(
-                    value: _status,
+                    initialValue: _status,
                     items: [
                       DropdownMenuItem(value: 'PAID', child: Text(AppLang.t('পরিশোধিত', 'PAID'))),
                       DropdownMenuItem(value: 'PARTIAL', child: Text(AppLang.t('আংশিক', 'PARTIAL'))),
@@ -169,7 +171,7 @@ class _ScholarshipScreenState extends State<ScholarshipScreen> {
                   ),
                   const SizedBox(height: 8),
                   DropdownButtonFormField<String>(
-                    value: _fundType,
+                    initialValue: _fundType,
                     items: [
                       DropdownMenuItem(value: 'SCHOLARSHIP', child: Text(AppLang.t('বৃত্তি ফান্ড', 'Scholarship Fund'))),
                       DropdownMenuItem(value: 'JAKAT', child: Text(AppLang.t('যাকাত ফান্ড', 'Jakat Fund'))),

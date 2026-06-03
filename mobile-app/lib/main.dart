@@ -16,5 +16,5 @@ Future<void> main() async {
     // Never block app boot because of optional web runtime hooks.
   }
   await SyncOrchestratorService.start();
-  runApp(const MadrasahErpLiteApp());
+  runApp(const MadrasahErpProApp());
 }

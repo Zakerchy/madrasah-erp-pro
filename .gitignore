@@ -22,4 +22,5 @@ tools/output/*.csv
 .env.production.local
 
 # Local SDK / runtime cache
+.local-tools
 .local-tools/

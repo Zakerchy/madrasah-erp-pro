@@ -1,4 +1,4 @@
-# Implementation Phases - Madrasah ERP Lite
+# Implementation Phases - Madrasah ERP Pro
 
 ## Phase 0 - Foundation Setup
 - [x] Create full project directory structure

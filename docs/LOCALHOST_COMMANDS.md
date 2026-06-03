@@ -1,7 +1,7 @@
 # Localhost Check Commands
 
 Run from:
-`/Users/zakerchy/Desktop/MadrasahApp/madrasah-erp-lite`
+`/Users/zakerchy/Desktop/MadrasahApp/madrasah-erp-pro`
 
 ## 1) Regenerate normalized data from Excel
 ```bash

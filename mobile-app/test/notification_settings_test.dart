@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:madrasah_erp_lite/shared/models/notification_settings.dart';
+import 'package:madrasah_erp_pro/shared/models/notification_settings.dart';
 
 void main() {
   test('defaults keep in-app enabled and email toggles off', () {

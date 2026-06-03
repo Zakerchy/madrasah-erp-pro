@@ -11,7 +11,7 @@ try {
   ({ google } = require('/Users/zakerchy/Desktop/TravERPPro2/node_modules/googleapis'));
 }
 
-const ROOT = '/Users/zakerchy/Desktop/MadrasahApp/madrasah-erp-lite';
+const ROOT = '/Users/zakerchy/Desktop/MadrasahApp/madrasah-erp-pro';
 const ENV_PATH = '/Users/zakerchy/Desktop/TravERPPro2/.env.local';
 const SHEETS_DIR = path.join(ROOT, 'sheets');
 const OUT_DIR = path.join(ROOT, 'tools', 'output');
@@ -107,7 +107,7 @@ const tabCsvFiles = [
 
 const tabNames = tabCsvFiles.map((f) => path.basename(f, '.csv'));
 
-const title = `Madrasah ERP Lite DB ${new Date().toISOString().slice(0, 10)}`;
+const title = `Madrasah ERP Pro DB ${new Date().toISOString().slice(0, 10)}`;
 const createRes = await sheets.spreadsheets.create({
   requestBody: { properties: { title } },
 });

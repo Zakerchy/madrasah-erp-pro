@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-ROOT="/Users/zakerchy/Desktop/MadrasahApp/madrasah-erp-lite"
+ROOT="/Users/zakerchy/Desktop/MadrasahApp/madrasah-erp-pro"
 
 ok(){ printf "[OK] %s\n" "$1"; }
 warn(){ printf "[WARN] %s\n" "$1"; }

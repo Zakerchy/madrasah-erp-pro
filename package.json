@@ -1,8 +1,8 @@
 {
-  "name": "madrasah-erp-lite",
+  "name": "madrasah-erp-pro",
   "private": true,
   "version": "0.2.0",
-  "description": "Madrasah ERP Lite - implementation workspace",
+  "description": "Madrasah ERP Pro - implementation workspace",
   "type": "module",
   "scripts": {
     "migrate": "node tools/migrate_excel_to_normalized.js",
