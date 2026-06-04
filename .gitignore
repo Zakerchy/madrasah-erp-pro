@@ -13,6 +13,7 @@ node_modules/
 
 # Tool outputs
 tools/output/*.csv
+tools/output/live_repair_backup_*.json
 
 # Local environment variables (never commit secrets)
 .env

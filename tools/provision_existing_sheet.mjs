@@ -1,7 +1,15 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import crypto from 'node:crypto';
 import { createRequire } from 'node:module';
+import {
+  buildBeneficiaryRecords,
+  buildFundTransactionRecords,
+  buildScholarshipPaymentRecords,
+  hashPin,
+  parseCsvFile,
+  readCsvObjects,
+  rowsForHeaders,
+} from './migrated_sheet_utils.mjs';
 
 const require = createRequire(import.meta.url);
 let google;
@@ -27,37 +35,6 @@ function loadEnv(filePath) {
     out[m[1]] = v;
   });
   return out;
-}
-
-function parseCsvLine(line) {
-  const out = [];
-  let cur = '';
-  let q = false;
-  for (let i = 0; i < line.length; i++) {
-    const ch = line[i];
-    const nx = line[i + 1];
-    if (ch === '"') {
-      if (q && nx === '"') { cur += '"'; i++; } else { q = !q; }
-      continue;
-    }
-    if (ch === ',' && !q) { out.push(cur); cur = ''; continue; }
-    cur += ch;
-  }
-  out.push(cur);
-  return out;
-}
-
-function parseCsvFile(filePath) {
-  const txt = fs.readFileSync(filePath, 'utf8').trim();
-  if (!txt) return { headers: [], rows: [] };
-  const lines = txt.split(/\r?\n/);
-  const headers = parseCsvLine(lines[0]);
-  const rows = lines.slice(1).filter(Boolean).map(parseCsvLine);
-  return { headers, rows };
-}
-
-function hashPin(pin) {
-  return crypto.createHash('sha256').update(String(pin), 'utf8').digest('hex');
 }
 
 const env = loadEnv(ENV_PATH);
@@ -106,20 +83,51 @@ const imports = [
   { src: 'migrated_scholarship_payments.csv', tab: 'scholarship_payments' },
 ];
 
-for (const item of imports) {
-  const p = path.join(OUT_DIR, item.src);
-  if (!fs.existsSync(p)) continue;
-  const { rows } = parseCsvFile(p);
+const txnHeaders = parseCsvFile(path.join(SHEETS_DIR, 'fund_transactions.csv')).headers;
+const beneficiaryHeaders = parseCsvFile(path.join(SHEETS_DIR, 'beneficiaries.csv')).headers;
+const scholarshipHeaders = parseCsvFile(path.join(SHEETS_DIR, 'scholarship_payments.csv')).headers;
 
+const migratedTransactions = fs.existsSync(path.join(OUT_DIR, 'migrated_fund_transactions.csv'))
+  ? readCsvObjects(path.join(OUT_DIR, 'migrated_fund_transactions.csv'))
+  : [];
+const migratedBeneficiaries = fs.existsSync(path.join(OUT_DIR, 'migrated_beneficiaries.csv'))
+  ? readCsvObjects(path.join(OUT_DIR, 'migrated_beneficiaries.csv'))
+  : [];
+const migratedScholarship = fs.existsSync(path.join(OUT_DIR, 'migrated_scholarship_payments.csv'))
+  ? readCsvObjects(path.join(OUT_DIR, 'migrated_scholarship_payments.csv'))
+  : [];
+
+const repairedBeneficiaries = buildBeneficiaryRecords(migratedBeneficiaries);
+const repairedTransactions = buildFundTransactionRecords(migratedTransactions);
+const repairedScholarship = buildScholarshipPaymentRecords(
+  migratedScholarship,
+  repairedBeneficiaries
+);
+
+const alignedImports = [
+  {
+    tab: 'fund_transactions',
+    values: rowsForHeaders(txnHeaders, repairedTransactions),
+  },
+  {
+    tab: 'beneficiaries',
+    values: rowsForHeaders(beneficiaryHeaders, repairedBeneficiaries),
+  },
+  {
+    tab: 'scholarship_payments',
+    values: rowsForHeaders(scholarshipHeaders, repairedScholarship),
+  },
+];
+
+for (const item of alignedImports) {
   await sheets.spreadsheets.values.clear({ spreadsheetId, range: `${item.tab}!A2:ZZ` });
-  if (rows.length) {
-    await sheets.spreadsheets.values.update({
-      spreadsheetId,
-      range: `${item.tab}!A2`,
-      valueInputOption: 'RAW',
-      requestBody: { values: rows },
-    });
-  }
+  if (!item.values.length) continue;
+  await sheets.spreadsheets.values.update({
+    spreadsheetId,
+    range: `${item.tab}!A2`,
+    valueInputOption: 'RAW',
+    requestBody: { values: item.values },
+  });
 }
 
 // seed admin only if not exists
