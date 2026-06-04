@@ -489,10 +489,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
         if (!didPop) await _onWillPop();
       },
       child: Scaffold(
-        backgroundColor: const Color(0xFFF0FDF4),
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         appBar: AppBar(
-          backgroundColor: Theme.of(context).colorScheme.primary,
-          foregroundColor: Colors.white,
           title: const Text('মাদ্রাসা ERP',
               style: TextStyle(fontWeight: FontWeight.bold)),
           actions: [
@@ -618,7 +616,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     child: Text(
                       'ডিফল্ট রেঞ্জ: ${_summaryFrom.isEmpty ? 'শুরু' : _summaryFrom} থেকে ${_summaryTo.isEmpty ? 'আজ' : _summaryTo}',
                       style: TextStyle(
-                        color: Colors.grey.shade700,
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
                         fontSize: 12,
                         fontWeight: FontWeight.w500,
                       ),
@@ -750,10 +748,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
 class _GreetingCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     return Card(
-      elevation: 0,
-      color: Colors.white,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+      color: scheme.surfaceContainerLow,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(14),
+        side: BorderSide(color: scheme.outlineVariant),
+      ),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         child: Row(
@@ -775,8 +776,10 @@ class _GreetingCard extends StatelessWidget {
                 Text('আস-সালামু আলাইকুম, ${SessionService.userName}',
                     style: const TextStyle(fontWeight: FontWeight.w600)),
                 Text('ভূমিকা: ${_roleLabel(SessionService.role)}',
-                    style:
-                        TextStyle(fontSize: 12, color: Colors.grey.shade600)),
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: scheme.onSurfaceVariant,
+                    )),
               ],
             ),
           ],
@@ -819,7 +822,7 @@ class _TotalSummaryCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('মোট সংগ্রহ',
+            const Text('মোট সংগ্রহ (ডিফল্ট রেঞ্জ)',
                 style: TextStyle(color: Colors.white70, fontSize: 13)),
             const SizedBox(height: 4),
             Text(
@@ -912,6 +915,7 @@ class _FundCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(14),
@@ -945,7 +949,7 @@ class _FundCard extends StatelessWidget {
             ),
             const SizedBox(height: 8),
             Text('সংগ্রহ',
-                style: TextStyle(fontSize: 11, color: Colors.grey.shade600)),
+                style: TextStyle(fontSize: 11, color: scheme.onSurfaceVariant)),
             Text(fmt(fund.incoming),
                 style:
                     const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
@@ -958,7 +962,7 @@ class _FundCard extends StatelessWidget {
                   children: [
                     Text('ব্যয়',
                         style: TextStyle(
-                            fontSize: 10, color: Colors.grey.shade500)),
+                            fontSize: 10, color: scheme.onSurfaceVariant)),
                     Text(fmt(fund.outgoing),
                         style: TextStyle(
                             fontSize: 12,
@@ -971,7 +975,7 @@ class _FundCard extends StatelessWidget {
                   children: [
                     Text('ব্যালেন্স',
                         style: TextStyle(
-                            fontSize: 10, color: Colors.grey.shade500)),
+                            fontSize: 10, color: scheme.onSurfaceVariant)),
                     Text(
                       fmt(fund.balance),
                       style: TextStyle(
@@ -1003,15 +1007,15 @@ class _SeparationCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     final zakatIn = summary.fund('JAKAT').incoming;
     final scholarshipIn = summary.fund('SCHOLARSHIP').incoming;
 
     return Card(
-      elevation: 0,
-      color: Colors.white,
+      color: scheme.surfaceContainerLow,
       shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(14),
-          side: BorderSide(color: Colors.grey.shade200)),
+          side: BorderSide(color: scheme.outlineVariant)),
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -1062,7 +1066,7 @@ class _SeparationCard extends StatelessWidget {
             const SizedBox(height: 4),
             Text(
               '← ডান দিকের তীর চিহ্নে চাপলে বিস্তারিত দেখতে পারবেন',
-              style: TextStyle(fontSize: 11, color: Colors.grey.shade500),
+              style: TextStyle(fontSize: 11, color: scheme.onSurfaceVariant),
             ),
           ],
         ),
@@ -1094,15 +1098,16 @@ class _SepRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     final labelStyle = TextStyle(
       fontSize: isTotal ? 14 : 13,
       fontWeight: isTotal || isSubtotal ? FontWeight.bold : FontWeight.normal,
-      color: color ?? (isTotal ? Colors.black87 : Colors.grey.shade800),
+      color: color ?? (isTotal ? scheme.onSurface : scheme.onSurfaceVariant),
     );
     final valueStyle = TextStyle(
       fontSize: isTotal ? 15 : 13,
       fontWeight: FontWeight.bold,
-      color: color ?? (isSubtotal ? const Color(0xFF0F766E) : Colors.black87),
+      color: color ?? (isSubtotal ? scheme.primary : scheme.onSurface),
     );
 
     return Padding(
@@ -1116,8 +1121,8 @@ class _SepRow extends StatelessWidget {
                 Text(label, style: labelStyle),
                 if (sublabel != null)
                   Text(sublabel!,
-                      style:
-                          TextStyle(fontSize: 10, color: Colors.grey.shade500)),
+                      style: TextStyle(
+                          fontSize: 10, color: scheme.onSurfaceVariant)),
               ],
             ),
           ),
@@ -1127,7 +1132,8 @@ class _SepRow extends StatelessWidget {
             InkWell(
               onTap: onTap,
               child: Icon(Icons.arrow_forward_ios,
-                  size: 14, color: Colors.grey.shade400),
+                  size: 14,
+                  color: scheme.onSurfaceVariant.withValues(alpha: 0.65)),
             ),
           ],
         ],
@@ -1153,12 +1159,14 @@ class _PwaModeCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final borderColor =
-        isStandalonePwa ? const Color(0xFF99F6E4) : const Color(0xFFBFDBFE);
-    final bgColor =
-        isStandalonePwa ? const Color(0xFFF0FDFA) : const Color(0xFFEFF6FF);
-    final iconColor =
-        isStandalonePwa ? const Color(0xFF0F766E) : const Color(0xFF1D4ED8);
+    final scheme = Theme.of(context).colorScheme;
+    final borderColor = isStandalonePwa
+        ? scheme.primary.withValues(alpha: 0.35)
+        : scheme.secondary.withValues(alpha: 0.35);
+    final bgColor = isStandalonePwa
+        ? scheme.primary.withValues(alpha: 0.12)
+        : scheme.secondary.withValues(alpha: 0.10);
+    final iconColor = isStandalonePwa ? scheme.primary : scheme.secondary;
 
     return Card(
       elevation: 0,
@@ -1201,7 +1209,7 @@ class _PwaModeCard extends StatelessWidget {
               isStandalonePwa
                   ? 'URL bar ছাড়া app-mode এ চলছে।'
                   : 'Real app feel পেতে Install Web App ব্যবহার করুন।',
-              style: TextStyle(color: Colors.grey.shade700),
+              style: TextStyle(color: scheme.onSurfaceVariant),
             ),
             if (!isStandalonePwa) ...[
               const SizedBox(height: 10),
@@ -1214,7 +1222,7 @@ class _PwaModeCard extends StatelessWidget {
               if (onInstallPwa == null || !canInstallPwa)
                 Text(
                   installHelpText,
-                  style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
+                  style: TextStyle(fontSize: 12, color: scheme.onSurfaceVariant),
                 ),
             ],
           ],
@@ -1302,12 +1310,12 @@ class _QuickActionsRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     return Card(
-      elevation: 0,
-      color: Colors.white,
+      color: scheme.surfaceContainerLow,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(14),
-        side: BorderSide(color: Colors.grey.shade200),
+        side: BorderSide(color: scheme.outlineVariant),
       ),
       child: Padding(
         padding: const EdgeInsets.all(12),
@@ -1377,14 +1385,14 @@ class _ControlBarCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     final monthLabel = DateFormat('MMMM yyyy', 'en_US').format(selectedMonth);
 
     return Card(
-      elevation: 0,
-      color: const Color(0xFFEFF6FF),
+      color: scheme.surfaceContainerHigh,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(14),
-        side: BorderSide(color: Colors.blue.shade100),
+        side: BorderSide(color: scheme.outlineVariant),
       ),
       child: Padding(
         padding: const EdgeInsets.all(14),
@@ -1414,6 +1422,14 @@ class _ControlBarCard extends StatelessWidget {
                   tooltip: 'Next month',
                 ),
               ],
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'নিচের আয়/ব্যয়/ব্যালেন্স শুধু নির্বাচিত মাসের জন্য। উপরের মোট কার্ড ডিফল্ট রেঞ্জ ধরে হিসাব করে।',
+              style: TextStyle(
+                color: scheme.onSurfaceVariant,
+                fontSize: 12,
+              ),
             ),
             const SizedBox(height: 8),
             if (loadingMonthly)
@@ -1465,12 +1481,12 @@ class _RecentTransactionsCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     return Card(
-      elevation: 0,
-      color: Colors.white,
+      color: scheme.surfaceContainerLow,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(14),
-        side: BorderSide(color: Colors.grey.shade200),
+        side: BorderSide(color: scheme.outlineVariant),
       ),
       child: Padding(
         padding: const EdgeInsets.all(14),
@@ -1493,7 +1509,7 @@ class _RecentTransactionsCard extends StatelessWidget {
             else if (rows.isEmpty)
               Text(
                 'এই মাসে কোনো transaction data পাওয়া যায়নি।',
-                style: TextStyle(color: Colors.grey.shade600),
+                style: TextStyle(color: scheme.onSurfaceVariant),
               )
             else
               SingleChildScrollView(
@@ -1568,12 +1584,12 @@ class _PremiumStatusCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     return Card(
-      elevation: 0,
-      color: Colors.white,
+      color: scheme.surfaceContainerLow,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(14),
-        side: BorderSide(color: Colors.grey.shade200),
+        side: BorderSide(color: scheme.outlineVariant),
       ),
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -1605,7 +1621,7 @@ class _PremiumStatusCard extends StatelessWidget {
                     icon: Icons.notifications_active_outlined,
                     color: settings.inAppEnabled
                         ? const Color(0xFF166534)
-                        : Colors.grey,
+                        : scheme.onSurfaceVariant,
                   ),
                   _MiniStat(
                     title: 'Email Toggles',
@@ -1613,7 +1629,7 @@ class _PremiumStatusCard extends StatelessWidget {
                     icon: Icons.email_outlined,
                     color: _emailToggleOnCount > 0
                         ? const Color(0xFF0F766E)
-                        : Colors.grey,
+                        : scheme.onSurfaceVariant,
                   ),
                   ValueListenableBuilder<int>(
                     valueListenable: LocalStoreService.pendingCount,
@@ -1635,7 +1651,7 @@ class _PremiumStatusCard extends StatelessWidget {
               if (recentEvents.isEmpty)
                 Text(
                   'এখনো কোনো notification event নেই',
-                  style: TextStyle(color: Colors.grey.shade600, fontSize: 12),
+                  style: TextStyle(color: scheme.onSurfaceVariant, fontSize: 12),
                 )
               else
                 ...recentEvents.map(

@@ -46,7 +46,7 @@ class _MadrasahErpProAppState extends State<MadrasahErpProApp> {
       title: AppLang.t('মাদ্রাসা ERP Pro', 'Madrasah ERP Pro'),
       theme: buildTheme(),
       darkTheme: buildDarkTheme(),
-      themeMode: ThemeMode.system,
+      themeMode: ThemeMode.dark,
       initialRoute: '/login',
       routes: {
         '/login': (_) => const LoginScreen(),

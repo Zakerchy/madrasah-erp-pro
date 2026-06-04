@@ -19,7 +19,7 @@ class AppUiSettings {
       defaultFromDate: DateTime(2022, 1, 26),
       defaultToDate: DateTime(now.year, now.month, now.day),
       defaultToSource: 'TODAY',
-      maxRangeDays: 366,
+      maxRangeDays: 3653,
       updatedAt: '',
     );
   }

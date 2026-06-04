@@ -199,8 +199,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
         SnackBar(
           content: Text(
             AppLang.t(
-              'ডিফল্ট রেঞ্জ সর্বোচ্চ ১ বছর (${_uiSettings.maxRangeDays} দিন) হতে পারবে',
-              'Default range cannot exceed 1 year (${_uiSettings.maxRangeDays} days)',
+              'ডিফল্ট রেঞ্জ সর্বোচ্চ ${_uiSettings.maxRangeDays} দিন হতে পারবে',
+              'Default range cannot exceed ${_uiSettings.maxRangeDays} days',
             ),
           ),
           backgroundColor: Colors.red.shade700,
@@ -768,8 +768,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     const SizedBox(height: 6),
                     Text(
                       AppLang.t(
-                        'রিপোর্ট ও ড্যাশবোর্ডে ডিফল্ট date range এখান থেকে নির্ধারণ করুন। সর্বোচ্চ ১ বছর।',
-                        'Set default date range for reports and dashboard. Maximum 1 year.',
+                        'রিপোর্ট ও ড্যাশবোর্ডে ডিফল্ট date range এখান থেকে নির্ধারণ করুন। বহু বছরের historical data-ও রাখা যাবে।',
+                        'Set the default date range for reports and dashboard here. Multi-year historical data is supported.',
                       ),
                       style:
                           TextStyle(color: Colors.grey.shade700, fontSize: 12),

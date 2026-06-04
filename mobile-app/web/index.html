@@ -29,11 +29,83 @@
 
   <!-- Favicon -->
   <link rel="icon" type="image/png" href="favicon.png"/>
+  <meta name="theme-color" content="#08111F">
 
   <title>Madrasah ERP Pro</title>
   <link rel="manifest" href="manifest.json">
+  <style>
+    :root {
+      color-scheme: dark;
+    }
+    html, body {
+      margin: 0;
+      min-height: 100%;
+      background: #08111F;
+      color: #E5EEF8;
+      font-family: "Segoe UI", sans-serif;
+    }
+    body {
+      overflow: hidden;
+    }
+    #boot-splash {
+      position: fixed;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 16px;
+      background:
+        radial-gradient(circle at top, rgba(20, 184, 166, 0.22), transparent 34%),
+        linear-gradient(180deg, #0A1325 0%, #08111F 100%);
+      z-index: 9999;
+      transition: opacity 220ms ease;
+    }
+    #boot-splash.hidden {
+      opacity: 0;
+      pointer-events: none;
+    }
+    .boot-logo {
+      width: 74px;
+      height: 74px;
+      border-radius: 24px;
+      display: grid;
+      place-items: center;
+      background: rgba(25, 183, 165, 0.12);
+      border: 1px solid rgba(25, 183, 165, 0.35);
+      box-shadow: 0 16px 40px rgba(0, 0, 0, 0.28);
+      font-size: 34px;
+      font-weight: 700;
+    }
+    .boot-spinner {
+      width: 34px;
+      height: 34px;
+      border-radius: 50%;
+      border: 3px solid rgba(229, 238, 248, 0.16);
+      border-top-color: #19B7A5;
+      animation: spin 1s linear infinite;
+    }
+    .boot-title {
+      font-size: 18px;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+    }
+    .boot-subtitle {
+      font-size: 13px;
+      color: rgba(229, 238, 248, 0.72);
+    }
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+  </style>
 </head>
 <body>
+  <div id="boot-splash" aria-live="polite">
+    <div class="boot-logo">M</div>
+    <div class="boot-spinner" aria-hidden="true"></div>
+    <div class="boot-title">Madrasah ERP Pro</div>
+    <div class="boot-subtitle">ডেটা ও অ্যাপ লোড হচ্ছে...</div>
+  </div>
   <!--
     You can customize the "flutter_bootstrap.js" script.
     This is useful to provide a custom configuration to the Flutter loader
@@ -42,6 +114,18 @@
     For more details:
     * https://docs.flutter.dev/platform-integration/web/initialization
   -->
+  <script>
+    window.addEventListener('flutter-first-frame', function () {
+      document.getElementById('boot-splash')?.classList.add('hidden');
+      document.body.style.overflow = 'auto';
+    });
+    window.addEventListener('load', function () {
+      setTimeout(function () {
+        document.getElementById('boot-splash')?.classList.add('hidden');
+        document.body.style.overflow = 'auto';
+      }, 8000);
+    });
+  </script>
   <script src="flutter_bootstrap.js" async></script>
 </body>
 </html>

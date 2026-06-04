@@ -46,6 +46,8 @@ const CONFIG = {
   },
 };
 
+const MAX_REPORT_RANGE_DAYS = 3653;
+
 // Route both GET and POST through a single handler so the Flutter app
 // can use HTTP POST for all requests (simpler client code).
 function doGet(e) {
@@ -573,10 +575,10 @@ function rangeReport_(params) {
   }
   if (from > to) return { ok: false, message: 'from date cannot be after to date' };
 
-  const maxDays = 366;
+  const maxDays = MAX_REPORT_RANGE_DAYS;
   const days = rangeDaysInclusive_(from, to);
   if (days > maxDays) {
-    return { ok: false, message: 'Maximum report range is 1 year (366 days)', max_range_days: maxDays };
+    return { ok: false, message: 'Maximum report range is ' + maxDays + ' days', max_range_days: maxDays };
   }
 
   const txns = listSheetRows_(CONFIG.SHEETS.TXN).data || [];
@@ -2154,7 +2156,7 @@ function appUiSettingDefs_() {
   return [
     { key: 'report.default_from_date', defaultValue: '2022-01-26', notes: 'Default report range start date (YYYY-MM-DD)' },
     { key: 'report.default_to_date', defaultValue: 'TODAY', notes: 'Default report range end date (YYYY-MM-DD or TODAY)' },
-    { key: 'report.max_range_days', defaultValue: '366', notes: 'Guard rail: max report span in days' },
+    { key: 'report.max_range_days', defaultValue: String(MAX_REPORT_RANGE_DAYS), notes: 'Guard rail: max report span in days' },
   ];
 }
 
@@ -2208,11 +2210,11 @@ function readAppUiSettings_() {
   const byKey = getSettingsMapByKey_();
   const fromRaw = String((byKey['report.default_from_date'] || {}).value || '2022-01-26').trim();
   const toRaw = String((byKey['report.default_to_date'] || {}).value || 'TODAY').trim().toUpperCase();
-  const maxRaw = String((byKey['report.max_range_days'] || {}).value || '366').trim();
+  const maxRaw = String((byKey['report.max_range_days'] || {}).value || String(MAX_REPORT_RANGE_DAYS)).trim();
 
   const from = isIsoDateText_(fromRaw) ? fromRaw : '2022-01-26';
   const to = toRaw === 'TODAY' ? todayIso_() : (isIsoDateText_(toRaw) ? toRaw : todayIso_());
-  const maxDays = Math.max(1, Math.min(366, parseInt(maxRaw, 10) || 366));
+  const maxDays = Math.max(1, Math.min(MAX_REPORT_RANGE_DAYS, parseInt(maxRaw, 10) || MAX_REPORT_RANGE_DAYS));
   const updatedCandidates = appUiSettingDefs_()
     .map(function (d) { return String((byKey[d.key] || {}).updated_at || ''); })
     .filter(function (v) { return !!v; });
@@ -2249,13 +2251,13 @@ function upsertAppUiSettings_(payload, params) {
 
   const resolvedTo = to === 'TODAY' ? todayIso_() : to;
   const days = rangeDaysInclusive_(from, resolvedTo);
-  if (days > 366) {
-    return { ok: false, message: 'Default range cannot exceed 1 year (366 days)' };
+  if (days > MAX_REPORT_RANGE_DAYS) {
+    return { ok: false, message: 'Default range cannot exceed ' + MAX_REPORT_RANGE_DAYS + ' days' };
   }
 
   upsertSettingTextByKey_('report.default_from_date', from, 'Default report range start date (YYYY-MM-DD)');
   upsertSettingTextByKey_('report.default_to_date', to, 'Default report range end date (YYYY-MM-DD or TODAY)');
-  upsertSettingTextByKey_('report.max_range_days', '366', 'Guard rail: max report span in days');
+  upsertSettingTextByKey_('report.max_range_days', String(MAX_REPORT_RANGE_DAYS), 'Guard rail: max report span in days');
 
   const after = readAppUiSettings_();
   addAudit_(

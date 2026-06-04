@@ -168,30 +168,47 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final teal = theme.colorScheme.primary;
+    final scheme = theme.colorScheme;
+    final teal = scheme.primary;
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF0FDF4),
+      backgroundColor: theme.scaffoldBackgroundColor,
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
             padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 24),
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 400),
-              child: Form(
-                key: _formKey,
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  color: scheme.surface,
+                  borderRadius: BorderRadius.circular(28),
+                  border: Border.all(color: scheme.outlineVariant),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.28),
+                      blurRadius: 30,
+                      offset: const Offset(0, 18),
+                    ),
+                  ],
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(24, 28, 24, 24),
+                  child: Form(
+                    key: _formKey,
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
                     // Logo / Title
                     Container(
                       padding: const EdgeInsets.all(20),
                       decoration: BoxDecoration(
-                        color: teal,
+                        color: teal.withValues(alpha: 0.18),
                         shape: BoxShape.circle,
+                        border: Border.all(color: teal.withValues(alpha: 0.35)),
                       ),
-                      child: const Icon(Icons.school, color: Colors.white, size: 48),
+                      child: Icon(Icons.school, color: teal, size: 48),
                     ),
                     const SizedBox(height: 24),
                     Text(
@@ -207,7 +224,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       'আস-সালামু আলাইকুম',
                       textAlign: TextAlign.center,
                       style: theme.textTheme.bodyMedium?.copyWith(
-                        color: Colors.grey.shade600,
+                        color: scheme.onSurfaceVariant,
                       ),
                     ),
                     const SizedBox(height: 40),
@@ -279,25 +296,46 @@ class _LoginScreenState extends State<LoginScreen> {
                     // Login button
                     FilledButton(
                       onPressed: _loading ? null : _login,
-                      style: FilledButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
+                      style: ButtonStyle(
+                        padding: const WidgetStatePropertyAll(
+                          EdgeInsets.symmetric(vertical: 16),
                         ),
+                        shape: WidgetStatePropertyAll(
+                          RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        backgroundColor: WidgetStateProperty.resolveWith((states) {
+                          if (states.contains(WidgetState.disabled)) {
+                            return teal.withValues(alpha: 0.75);
+                          }
+                          return teal;
+                        }),
+                        foregroundColor: const WidgetStatePropertyAll(Colors.white),
                       ),
-                      child: _loading
-                          ? const SizedBox(
-                              height: 20,
-                              width: 20,
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          if (_loading) ...[
+                            const SizedBox(
+                              height: 18,
+                              width: 18,
                               child: CircularProgressIndicator(
-                                strokeWidth: 2,
+                                strokeWidth: 2.2,
                                 color: Colors.white,
                               ),
-                            )
-                          : const Text(
-                              'প্রবেশ করুন',
-                              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                             ),
+                            const SizedBox(width: 10),
+                          ],
+                          Text(
+                            _loading ? 'প্রবেশ করা হচ্ছে...' : 'প্রবেশ করুন',
+                            style: const TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                     const SizedBox(height: 24),
 
@@ -305,17 +343,21 @@ class _LoginScreenState extends State<LoginScreen> {
                     Container(
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
-                        color: Colors.blue.shade50,
+                        color: scheme.primary.withValues(alpha: 0.12),
                         borderRadius: BorderRadius.circular(10),
-                        border: Border.all(color: Colors.blue.shade100),
+                        border: Border.all(
+                          color: scheme.primary.withValues(alpha: 0.24),
+                        ),
                       ),
                       child: Text(
                         'নতুন ব্যবহারকারী হতে চাইলে Admin-এর সাথে যোগাযোগ করুন। Admin আপনার ইমেইল ও পিন সেট করে দেবেন।',
                         textAlign: TextAlign.center,
-                        style: TextStyle(fontSize: 13, color: Colors.blue.shade800),
+                        style: TextStyle(fontSize: 13, color: scheme.onSurface),
                       ),
                     ),
-                  ],
+                      ],
+                    ),
+                  ),
                 ),
               ),
             ),
