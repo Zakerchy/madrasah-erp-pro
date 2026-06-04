@@ -34,11 +34,14 @@ class _ExpenseScreenState extends State<ExpenseScreen> {
     _loadRows();
   }
 
-  Future<void> _loadRows() async {
+  Future<void> _loadRows({bool forceRefresh = false}) async {
     setState(() => _loadingList = true);
     try {
-      final res =
-          await _api.get('listTransactions', query: {'direction': 'OUT'});
+      final res = await _api.get(
+        'listTransactions',
+        query: {'direction': 'OUT'},
+        forceRefresh: forceRefresh,
+      );
       if (res['ok'] == true) {
         final data = (res['data'] as List<dynamic>? ?? []);
         _rows = data
@@ -246,7 +249,8 @@ class _ExpenseScreenState extends State<ExpenseScreen> {
                     style: const TextStyle(fontWeight: FontWeight.bold)),
                 const Spacer(),
                 IconButton(
-                    onPressed: _loadRows, icon: const Icon(Icons.refresh)),
+                    onPressed: () => _loadRows(forceRefresh: true),
+                    icon: const Icon(Icons.refresh)),
               ],
             ),
             if (_loadingList)

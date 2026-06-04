@@ -39,11 +39,14 @@ class _ScholarshipScreenState extends State<ScholarshipScreen> {
     _loadAll();
   }
 
-  Future<void> _loadAll() async {
+  Future<void> _loadAll({bool forceRefresh = false}) async {
     setState(() => _loading = true);
 
     try {
-      final benRes = await _api.get('listBeneficiaries');
+      final benRes = await _api.get(
+        'listBeneficiaries',
+        forceRefresh: forceRefresh,
+      );
       if (benRes['ok'] == true) {
         _beneficiaries = ((benRes['data'] as List<dynamic>? ?? []).map((e) => Map<String, dynamic>.from(e as Map)).toList());
         if (_beneficiaries.isNotEmpty && _selectedBeneficiaryId.isEmpty) {
@@ -52,7 +55,11 @@ class _ScholarshipScreenState extends State<ScholarshipScreen> {
         }
       }
 
-      final payRes = await _api.get('listScholarshipByMonth', query: {'monthKey': _monthKey});
+      final payRes = await _api.get(
+        'listScholarshipByMonth',
+        query: {'monthKey': _monthKey},
+        forceRefresh: forceRefresh,
+      );
       if (payRes['ok'] == true) {
         _payments = ((payRes['data'] as List<dynamic>? ?? []).map((e) => Map<String, dynamic>.from(e as Map)).toList());
       }
@@ -187,7 +194,9 @@ class _ScholarshipScreenState extends State<ScholarshipScreen> {
                     children: [
                       Text('${AppLang.t('পরিশোধ', 'Payments')} $_monthKey', style: const TextStyle(fontWeight: FontWeight.bold)),
                       const Spacer(),
-                      IconButton(onPressed: _loadAll, icon: const Icon(Icons.refresh)),
+                      IconButton(
+                          onPressed: () => _loadAll(forceRefresh: true),
+                          icon: const Icon(Icons.refresh)),
                     ],
                   ),
                   ..._payments.map(

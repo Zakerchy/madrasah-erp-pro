@@ -54,13 +54,15 @@ class _FinanceControlScreenState extends State<FinanceControlScreen> {
     super.dispose();
   }
 
-  Future<void> _loadAll() async {
+  Future<void> _loadAll({bool forceRefresh = false}) async {
     setState(() => _loading = true);
     final responses = await Future.wait([
-      _api.get('financeControlSummary', query: {'month_key': _monthKey}),
-      _api.get('listBudgets', query: {'month_key': _monthKey}),
-      _api.get('listApprovalRequests'),
-      _api.get('listApprovalRules'),
+      _api.get('financeControlSummary',
+          query: {'month_key': _monthKey}, forceRefresh: forceRefresh),
+      _api.get('listBudgets',
+          query: {'month_key': _monthKey}, forceRefresh: forceRefresh),
+      _api.get('listApprovalRequests', forceRefresh: forceRefresh),
+      _api.get('listApprovalRules', forceRefresh: forceRefresh),
     ]);
     if (!mounted) return;
     if (responses[0]['ok'] == true) {
@@ -171,7 +173,7 @@ class _FinanceControlScreenState extends State<FinanceControlScreen> {
         title: AppLang.t('ফাইন্যান্স কন্ট্রোল', 'Finance Control'),
         actions: [
           IconButton(
-              onPressed: _loading ? null : _loadAll,
+              onPressed: _loading ? null : () => _loadAll(forceRefresh: true),
               icon: const Icon(Icons.refresh))
         ],
         body: _loading

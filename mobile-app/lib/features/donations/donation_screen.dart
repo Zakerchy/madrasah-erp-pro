@@ -35,10 +35,11 @@ class _DonationScreenState extends State<DonationScreen> {
     _loadRows();
   }
 
-  Future<void> _loadRows() async {
+  Future<void> _loadRows({bool forceRefresh = false}) async {
     setState(() => _loadingList = true);
     try {
-      final defaultRange = await _resolveDefaultRange();
+      final defaultRange =
+          await _resolveDefaultRange(forceRefresh: forceRefresh);
       _historyFrom ??= defaultRange.$1;
       _historyTo ??= defaultRange.$2;
 
@@ -47,7 +48,7 @@ class _DonationScreenState extends State<DonationScreen> {
         'from': _dateKey(_historyFrom!),
         'to': _dateKey(_historyTo!),
         'limit': 300,
-      });
+      }, forceRefresh: forceRefresh);
       if (res['ok'] == true) {
         final data = (res['data'] as List<dynamic>? ?? []);
         _rows = data.map((e) => Map<String, dynamic>.from(e as Map)).toList();
@@ -62,13 +63,15 @@ class _DonationScreenState extends State<DonationScreen> {
     return '${value.year.toString().padLeft(4, '0')}-${value.month.toString().padLeft(2, '0')}-${value.day.toString().padLeft(2, '0')}';
   }
 
-  Future<(DateTime, DateTime)> _resolveDefaultRange() async {
+  Future<(DateTime, DateTime)> _resolveDefaultRange(
+      {bool forceRefresh = false}) async {
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
     DateTime from = DateTime(2022, 1, 26);
     DateTime to = today;
     try {
-      final res = await _api.get('getAppUiSettings');
+      final res =
+          await _api.get('getAppUiSettings', forceRefresh: forceRefresh);
       if (res['ok'] == true) {
         final data = Map<String, dynamic>.from(res['data'] as Map? ?? {});
         final parsedFrom = _parseIsoDate('${data['default_from_date'] ?? ''}');
@@ -113,7 +116,7 @@ class _DonationScreenState extends State<DonationScreen> {
         }
       }
     });
-    await _loadRows();
+    await _loadRows(forceRefresh: true);
   }
 
   DateTime? _parseIsoDate(String value) {
@@ -317,7 +320,8 @@ class _DonationScreenState extends State<DonationScreen> {
                       : _dateKey(_historyTo!)),
                 ),
                 IconButton(
-                    onPressed: _loadRows, icon: const Icon(Icons.refresh)),
+                    onPressed: () => _loadRows(forceRefresh: true),
+                    icon: const Icon(Icons.refresh)),
               ],
             ),
             if (_loadingList)

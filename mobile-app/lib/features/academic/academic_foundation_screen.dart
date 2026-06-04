@@ -120,15 +120,15 @@ class _AcademicFoundationScreenState extends State<AcademicFoundationScreen> {
     super.dispose();
   }
 
-  Future<void> _loadAll() async {
+  Future<void> _loadAll({bool forceRefresh = false}) async {
     setState(() => _loading = true);
     try {
       final responses = await Future.wait([
-        _api.get('listClasses'),
-        _api.get('listSections'),
-        _api.get('listSubjects'),
-        _api.get('listStudents'),
-        _api.get('listStudentGuardians'),
+        _api.get('listClasses', forceRefresh: forceRefresh),
+        _api.get('listSections', forceRefresh: forceRefresh),
+        _api.get('listSubjects', forceRefresh: forceRefresh),
+        _api.get('listStudents', forceRefresh: forceRefresh),
+        _api.get('listStudentGuardians', forceRefresh: forceRefresh),
       ]);
       if (responses[0]['ok'] == true) _classes = _rows(responses[0]);
       if (responses[1]['ok'] == true) _sections = _rows(responses[1]);
@@ -504,7 +504,7 @@ class _AcademicFoundationScreenState extends State<AcademicFoundationScreen> {
         actions: [
           IconButton(
             tooltip: AppLang.t('রিফ্রেশ', 'Refresh'),
-            onPressed: _loading ? null : _loadAll,
+            onPressed: _loading ? null : () => _loadAll(forceRefresh: true),
             icon: const Icon(Icons.refresh),
           ),
         ],

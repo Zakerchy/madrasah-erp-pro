@@ -77,14 +77,15 @@ class _AcademicCoreScreenState extends State<AcademicCoreScreen> {
     super.dispose();
   }
 
-  Future<void> _loadAll() async {
+  Future<void> _loadAll({bool forceRefresh = false}) async {
     setState(() => _loading = true);
     try {
       final base = await Future.wait([
-        _api.get('listClasses'),
-        _api.get('listSections'),
-        _api.get('listSubjects'),
-        _api.get('listStudents', query: {'limit': 1000}),
+        _api.get('listClasses', forceRefresh: forceRefresh),
+        _api.get('listSections', forceRefresh: forceRefresh),
+        _api.get('listSubjects', forceRefresh: forceRefresh),
+        _api.get('listStudents',
+            query: {'limit': 1000}, forceRefresh: forceRefresh),
       ]);
       if (base[0]['ok'] == true) _classes = _rows(base[0]);
       if (base[1]['ok'] == true) _sections = _rows(base[1]);
@@ -92,7 +93,7 @@ class _AcademicCoreScreenState extends State<AcademicCoreScreen> {
       if (base[3]['ok'] == true) _students = _rows(base[3]);
       _classId = _validId(_classes, _classId);
       _sectionId = _validId(_filteredSections(), _sectionId, allowEmpty: true);
-      await _loadAcademicState();
+      await _loadAcademicState(forceRefresh: forceRefresh);
     } catch (_) {
       _snack(AppLang.t('Academic core data লোড করা যায়নি',
           'Could not load academic core data'));
@@ -100,32 +101,32 @@ class _AcademicCoreScreenState extends State<AcademicCoreScreen> {
     if (mounted) setState(() => _loading = false);
   }
 
-  Future<void> _loadAcademicState() async {
+  Future<void> _loadAcademicState({bool forceRefresh = false}) async {
     final responses = await Future.wait([
       _api.get('listAttendance', query: {
         'attendance_date': _attendanceDate,
         if (_classId.isNotEmpty) 'class_id': _classId,
         if (_sectionId.isNotEmpty) 'section_id': _sectionId,
-      }),
+      }, forceRefresh: forceRefresh),
       _api.get('listExamTerms', query: {
         if (_classId.isNotEmpty) 'class_id': _classId,
         if (_sectionId.isNotEmpty) 'section_id': _sectionId,
-      }),
+      }, forceRefresh: forceRefresh),
       _api.get('listExamMarks', query: {
         if (_examTermId.isNotEmpty) 'exam_term_id': _examTermId,
         if (_classId.isNotEmpty) 'class_id': _classId,
-      }),
+      }, forceRefresh: forceRefresh),
     ]);
     if (responses[0]['ok'] == true) _attendance = _rows(responses[0]);
     if (responses[1]['ok'] == true) _examTerms = _rows(responses[1]);
     _examTermId = _validId(_examTerms, _examTermId, allowEmpty: true);
     if (responses[2]['ok'] == true) _examMarks = _rows(responses[2]);
-    await _loadResultSummary();
+    await _loadResultSummary(forceRefresh: forceRefresh);
     _syncAttendanceDraft();
     _syncMarkDefaults();
   }
 
-  Future<void> _loadResultSummary() async {
+  Future<void> _loadResultSummary({bool forceRefresh = false}) async {
     if (_examTermId.isEmpty) {
       _summaryRows = [];
       return;
@@ -134,7 +135,7 @@ class _AcademicCoreScreenState extends State<AcademicCoreScreen> {
       'exam_term_id': _examTermId,
       if (_classId.isNotEmpty) 'class_id': _classId,
       if (_sectionId.isNotEmpty) 'section_id': _sectionId,
-    });
+    }, forceRefresh: forceRefresh);
     if (res['ok'] == true) {
       final data = Map<String, dynamic>.from(res['data'] as Map);
       _summaryRows = (data['rows'] as List<dynamic>? ?? [])
@@ -362,7 +363,7 @@ class _AcademicCoreScreenState extends State<AcademicCoreScreen> {
         actions: [
           IconButton(
             tooltip: AppLang.t('রিফ্রেশ', 'Refresh'),
-            onPressed: _loading ? null : _loadAll,
+            onPressed: _loading ? null : () => _loadAll(forceRefresh: true),
             icon: const Icon(Icons.refresh),
           ),
         ],

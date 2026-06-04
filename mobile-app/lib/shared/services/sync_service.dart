@@ -13,6 +13,7 @@ class SyncService {
 
     final api = ApiService();
     final remaining = <Map<String, dynamic>>[];
+    final syncedActions = <String>{};
     var synced = 0;
 
     for (final item in queue) {
@@ -21,6 +22,7 @@ class SyncService {
       final res = await api.post(action, payload, allowQueue: false);
       if (res['ok'] == true) {
         synced++;
+        syncedActions.add(action);
       } else {
         remaining.add(item);
         final failedAt = DateTime.now().toIso8601String();
@@ -55,6 +57,9 @@ class SyncService {
     }
 
     await LocalStoreService.replacePendingPosts(remaining);
+    if (syncedActions.isNotEmpty) {
+      await LocalStoreService.invalidateGetCache();
+    }
     return {
       'ok': true,
       'synced': synced,

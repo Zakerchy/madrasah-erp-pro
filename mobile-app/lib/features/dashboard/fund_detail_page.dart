@@ -35,7 +35,7 @@ class _FundDetailPageState extends State<FundDetailPage> {
     _load();
   }
 
-  Future<void> _load() async {
+  Future<void> _load({bool forceRefresh = false}) async {
     setState(() {
       _loading = true;
       _error = null;
@@ -53,7 +53,7 @@ class _FundDetailPageState extends State<FundDetailPage> {
         'fundType': widget.fundKey,
         'from': from,
         'to': to,
-      });
+      }, forceRefresh: forceRefresh);
 
       if (res['ok'] == true) {
         final data = (res['data'] as List? ?? [])
@@ -125,7 +125,7 @@ class _FundDetailPageState extends State<FundDetailPage> {
 
     if (picked != null && picked != _selectedMonth) {
       setState(() => _selectedMonth = picked);
-      await _load();
+      await _load(forceRefresh: true);
     }
   }
 
@@ -163,7 +163,7 @@ class _FundDetailPageState extends State<FundDetailPage> {
             ),
           ),
           IconButton(
-            onPressed: _load,
+            onPressed: () => _load(forceRefresh: true),
             icon: _loading
                 ? const SizedBox(
                     width: 18,
@@ -219,7 +219,7 @@ class _FundDetailPageState extends State<FundDetailPage> {
                             Text(_error!, textAlign: TextAlign.center),
                             const SizedBox(height: 12),
                             OutlinedButton(
-                                onPressed: _load,
+                                onPressed: () => _load(forceRefresh: true),
                                 child: const Text('পুনরায় চেষ্টা করুন')),
                           ],
                         ),

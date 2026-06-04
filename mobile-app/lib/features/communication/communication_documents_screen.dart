@@ -58,13 +58,14 @@ class _CommunicationDocumentsScreenState
     super.dispose();
   }
 
-  Future<void> _loadAll() async {
+  Future<void> _loadAll({bool forceRefresh = false}) async {
     setState(() => _loading = true);
     final responses = await Future.wait([
-      _api.get('listClasses'),
+      _api.get('listClasses', forceRefresh: forceRefresh),
       _api.get('listNotices',
-          query: {if (_targetClassId.isNotEmpty) 'class_id': _targetClassId}),
-      _api.get('listDocuments'),
+          query: {if (_targetClassId.isNotEmpty) 'class_id': _targetClassId},
+          forceRefresh: forceRefresh),
+      _api.get('listDocuments', forceRefresh: forceRefresh),
     ]);
     if (!mounted) return;
     if (responses[0]['ok'] == true) _classes = _rows(responses[0]);
@@ -174,7 +175,7 @@ class _CommunicationDocumentsScreenState
         title: AppLang.t('নোটিশ ও ডকুমেন্ট', 'Notices & Documents'),
         actions: [
           IconButton(
-              onPressed: _loading ? null : _loadAll,
+              onPressed: _loading ? null : () => _loadAll(forceRefresh: true),
               icon: const Icon(Icons.refresh))
         ],
         body: _loading

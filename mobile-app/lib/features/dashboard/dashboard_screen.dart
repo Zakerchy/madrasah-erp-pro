@@ -72,7 +72,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     });
   }
 
-  Future<void> _load() async {
+  Future<void> _load({bool forceRefresh = false}) async {
     setState(() {
       _loading = true;
       _error = null;
@@ -85,7 +85,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
       String toKey = todayKey;
 
       try {
-        final uiRes = await _api.get('getAppUiSettings');
+        final uiRes = await _api.get(
+          'getAppUiSettings',
+          forceRefresh: forceRefresh,
+        );
         if (uiRes['ok'] == true) {
           final ui = Map<String, dynamic>.from(uiRes['data'] as Map? ?? {});
           final fromParsed = _parseIsoDate(ui['default_from_date']);
@@ -107,7 +110,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
       }
 
       try {
-        final statsRes = await _api.get('datasetStats');
+        final statsRes =
+            await _api.get('datasetStats', forceRefresh: forceRefresh);
         if (statsRes['ok'] == true) {
           final stats =
               Map<String, dynamic>.from(statsRes['data'] as Map? ?? {});
@@ -132,6 +136,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           'from': fromKey,
           'to': toKey,
         },
+        forceRefresh: forceRefresh,
       );
       if (res['ok'] == true) {
         _summary = DashboardSummary.fromMap(
@@ -140,8 +145,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
         _summaryTo = toKey;
         _offline = _offline || (res['offline'] == true);
         await Future.wait([
-          _loadPremiumData(),
-          _loadMonthlyData(autoBacktrack: true),
+          _loadPremiumData(forceRefresh: forceRefresh),
+          _loadMonthlyData(
+            autoBacktrack: true,
+            forceRefresh: forceRefresh,
+          ),
         ]);
       } else {
         _error =
@@ -155,12 +163,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
     }
   }
 
-  Future<void> _loadPremiumData() async {
+  Future<void> _loadPremiumData({bool forceRefresh = false}) async {
     setState(() => _loadingPremium = true);
     try {
       final result = await Future.wait([
-        _api.get('getNotificationSettings'),
-        _api.get('listInAppNotifications'),
+        _api.get('getNotificationSettings', forceRefresh: forceRefresh),
+        _api.get('listInAppNotifications', forceRefresh: forceRefresh),
       ]);
       final settingsRes = result[0];
       final eventsRes = result[1];
@@ -208,7 +216,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
     return double.tryParse(cleaned) ?? 0;
   }
 
-  Future<void> _loadMonthlyData({bool autoBacktrack = false}) async {
+  Future<void> _loadMonthlyData({
+    bool autoBacktrack = false,
+    bool forceRefresh = false,
+  }) async {
     setState(() => _loadingMonthly = true);
     try {
       DateTime cursor = _selectedMonth;
@@ -219,6 +230,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         final res = await _api.get(
           'monthlyReport',
           query: {'monthKey': _monthKey(cursor)},
+          forceRefresh: forceRefresh,
         );
         if (res['ok'] != true) break;
 
@@ -500,7 +512,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 child: Icon(Icons.cloud_off, size: 18),
               ),
             IconButton(
-              onPressed: _load,
+              onPressed: () => _load(forceRefresh: true),
               icon: _loading
                   ? const SizedBox(
                       width: 18,
@@ -583,7 +595,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
             const Text('কোনো তথ্য নেই'),
             const SizedBox(height: 12),
             OutlinedButton(
-                onPressed: _load, child: const Text('পুনরায় চেষ্টা করুন')),
+                onPressed: () => _load(forceRefresh: true),
+                child: const Text('পুনরায় চেষ্টা করুন')),
           ],
         ),
       );

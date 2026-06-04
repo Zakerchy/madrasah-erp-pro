@@ -78,32 +78,33 @@ class _FeeDuesScreenState extends State<FeeDuesScreen> {
     super.dispose();
   }
 
-  Future<void> _loadAll() async {
+  Future<void> _loadAll({bool forceRefresh = false}) async {
     setState(() => _loading = true);
     try {
       final base = await Future.wait([
-        _api.get('listClasses'),
-        _api.get('listStudents', query: {'limit': 1000}),
-        _api.get('listFeePlans'),
+        _api.get('listClasses', forceRefresh: forceRefresh),
+        _api.get('listStudents',
+            query: {'limit': 1000}, forceRefresh: forceRefresh),
+        _api.get('listFeePlans', forceRefresh: forceRefresh),
       ]);
       if (base[0]['ok'] == true) _classes = _rows(base[0]);
       if (base[1]['ok'] == true) _students = _rows(base[1]);
       if (base[2]['ok'] == true) _plans = _rows(base[2]);
       _classId = _validId(_classes, _classId, allowEmpty: true);
       _studentId = _validId(_filteredStudents(), _studentId, allowEmpty: true);
-      await _loadDues();
+      await _loadDues(forceRefresh: forceRefresh);
     } catch (_) {
       _snack(AppLang.t('ফি data লোড করা যায়নি', 'Could not load fee data'));
     }
     if (mounted) setState(() => _loading = false);
   }
 
-  Future<void> _loadDues() async {
+  Future<void> _loadDues({bool forceRefresh = false}) async {
     final res = await _api.get('listFeeDues', query: {
       'month_key': _monthKey,
       if (_classId.isNotEmpty) 'class_id': _classId,
       if (_studentId.isNotEmpty) 'student_id': _studentId,
-    });
+    }, forceRefresh: forceRefresh);
     if (res['ok'] == true) {
       final data = Map<String, dynamic>.from(res['data'] as Map);
       _dues = (data['rows'] as List<dynamic>? ?? [])
@@ -269,7 +270,7 @@ class _FeeDuesScreenState extends State<FeeDuesScreen> {
         title: AppLang.t('ফি ও বকেয়া', 'Fees & Dues'),
         actions: [
           IconButton(
-              onPressed: _loading ? null : _loadAll,
+              onPressed: _loading ? null : () => _loadAll(forceRefresh: true),
               icon: const Icon(Icons.refresh)),
         ],
         body: _loading
@@ -375,7 +376,7 @@ class _FeeDuesScreenState extends State<FeeDuesScreen> {
           SizedBox(width: 240, child: _classDropdown()),
           SizedBox(width: 260, child: _studentDropdown()),
           FilledButton.tonalIcon(
-              onPressed: _loadAll,
+              onPressed: () => _loadAll(forceRefresh: true),
               icon: const Icon(Icons.search),
               label: Text(AppLang.t('দেখুন', 'Load'))),
         ]),

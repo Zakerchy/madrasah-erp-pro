@@ -40,7 +40,7 @@ class _SalaryScreenState extends State<SalaryScreen> {
     return RegExp(r'^\d{4}-(0[1-9]|1[0-2])$').hasMatch(value.trim());
   }
 
-  Future<void> _reloadByMonth() async {
+  Future<void> _reloadByMonth({bool forceRefresh = false}) async {
     final month = _monthKey.text.trim();
     if (!_isValidMonthKey(month)) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -48,17 +48,19 @@ class _SalaryScreenState extends State<SalaryScreen> {
       );
       return;
     }
-    await _loadAll();
+    await _loadAll(forceRefresh: forceRefresh);
   }
 
-  Future<void> _loadAll() async {
+  Future<void> _loadAll({bool forceRefresh = false}) async {
     setState(() => _loading = true);
     try {
-      final staffRes = await _api.get('listStaff');
+      final staffRes =
+          await _api.get('listStaff', forceRefresh: forceRefresh);
       final month = _monthKey.text.trim();
       final paymentRes = await _api.get(
         'listSalaryPayments',
         query: _isValidMonthKey(month) ? {'monthKey': month} : null,
+        forceRefresh: forceRefresh,
       );
 
       if (staffRes['ok'] == true) {
@@ -222,7 +224,7 @@ class _SalaryScreenState extends State<SalaryScreen> {
                       const Spacer(),
                       IconButton(
                         tooltip: AppLang.t('নির্বাচিত মাস রিলোড করুন', 'Reload selected month'),
-                        onPressed: _reloadByMonth,
+                        onPressed: () => _reloadByMonth(forceRefresh: true),
                         icon: const Icon(Icons.refresh),
                       ),
                     ],

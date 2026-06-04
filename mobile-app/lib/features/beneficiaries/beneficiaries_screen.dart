@@ -23,10 +23,13 @@ class _BeneficiariesScreenState extends State<BeneficiariesScreen> {
   final _guardianStatus = TextEditingController();
   final _monthlyAmount = TextEditingController();
 
-  Future<void> _load() async {
+  Future<void> _load({bool forceRefresh = false}) async {
     setState(() => _loading = true);
     try {
-      final res = await _api.get('listBeneficiaries');
+      final res = await _api.get(
+        'listBeneficiaries',
+        forceRefresh: forceRefresh,
+      );
       if (res['ok'] == true) {
         final data = (res['data'] as List<dynamic>? ?? []);
         _rows = data.map((e) => Map<String, dynamic>.from(e as Map)).toList();
@@ -109,7 +112,9 @@ class _BeneficiariesScreenState extends State<BeneficiariesScreen> {
               children: [
                 Text(AppLang.t('সুবিধাভোগীর তালিকা', 'Beneficiary List'), style: const TextStyle(fontWeight: FontWeight.bold)),
                 const Spacer(),
-                IconButton(onPressed: _load, icon: const Icon(Icons.refresh)),
+                IconButton(
+                    onPressed: () => _load(forceRefresh: true),
+                    icon: const Icon(Icons.refresh)),
               ],
             ),
             if (_loading)
