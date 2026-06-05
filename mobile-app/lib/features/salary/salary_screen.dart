@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
 import '../../core/app_lang.dart';
+import '../../shared/constants/app_permissions.dart';
+import '../../shared/services/access_control_service.dart';
 import '../../shared/services/api_service.dart';
 import '../../shared/services/session_service.dart';
 import '../../shared/widgets/base_scaffold.dart';
@@ -29,6 +31,8 @@ class _SalaryScreenState extends State<SalaryScreen> {
   final _payableAmount = TextEditingController();
   final _dueAmount = TextEditingController(text: '0');
   String _fundType = 'GENERAL';
+
+  bool get _canWrite => SessionService.can(AppPermissions.salaryWrite);
 
   @override
   void initState() {
@@ -78,6 +82,14 @@ class _SalaryScreenState extends State<SalaryScreen> {
 
   Future<void> _saveStaff() async {
     final messenger = ScaffoldMessenger.of(context);
+    if (!_canWrite) {
+      AccessControlService.showDeniedSnack(
+        context,
+        permission: AppPermissions.salaryWrite,
+        routeName: '/salary',
+      );
+      return;
+    }
     if (_staffName.text.trim().isEmpty) {
       messenger.showSnackBar(SnackBar(content: Text(AppLang.t('কর্মীর নাম দিন', 'Staff name required'))));
       return;
@@ -115,6 +127,14 @@ class _SalaryScreenState extends State<SalaryScreen> {
 
   Future<void> _recordPayment() async {
     final messenger = ScaffoldMessenger.of(context);
+    if (!_canWrite) {
+      AccessControlService.showDeniedSnack(
+        context,
+        permission: AppPermissions.salaryWrite,
+        routeName: '/salary',
+      );
+      return;
+    }
     if (_selectedStaffId.isEmpty || _paidAmount.text.trim().isEmpty || _monthKey.text.trim().isEmpty) {
       messenger.showSnackBar(SnackBar(content: Text(AppLang.t('কর্মী, মাস ও প্রদত্ত পরিমাণ দিন', 'Staff, month, and paid amount required'))));
       return;

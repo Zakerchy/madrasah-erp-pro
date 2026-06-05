@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 
 import '../../core/app_lang.dart';
+import '../../shared/constants/app_permissions.dart';
 import '../../shared/models/app_ui_settings.dart';
 import '../../shared/models/notification_settings.dart';
+import '../../shared/models/role_definition.dart';
 import '../../shared/services/api_service.dart';
+import '../../shared/services/role_service.dart';
 import '../../shared/services/session_service.dart';
 import '../../shared/widgets/base_scaffold.dart';
 import '../../shared/widgets/themed_date_picker.dart';
@@ -21,12 +24,23 @@ class _SettingsScreenState extends State<SettingsScreen> {
   final _name = TextEditingController();
   final _email = TextEditingController();
   final _phone = TextEditingController();
+  final _roleKey = TextEditingController();
+  final _roleNameBn = TextEditingController();
+  final _roleNameEn = TextEditingController();
+  final _roleDescription = TextEditingController();
   String _role = 'VIEWER';
   String _approvalStatus = 'APPROVED';
   bool _active = true;
+  bool _roleActive = true;
+  final Set<String> _rolePermissions = {
+    AppPermissions.dashboardView,
+    AppPermissions.reportsView,
+  };
 
   bool _saving = false;
+  bool _savingRole = false;
   bool _loadingUsers = true;
+  bool _loadingRoles = true;
   bool _loadingNotify = true;
   bool _savingNotify = false;
   bool _loadingNotifyEvents = false;
@@ -42,10 +56,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
   List<Map<String, dynamic>> _notifyEvents = [];
   List<Map<String, dynamic>> _auditRows = [];
   List<Map<String, dynamic>> _launchChecks = [];
+  List<RoleDefinition> _roles = [];
 
   @override
   void initState() {
     super.initState();
+    _loadRoles();
     _loadUsers();
     _loadNotificationSettings();
     _loadNotificationEvents();
@@ -58,10 +74,67 @@ class _SettingsScreenState extends State<SettingsScreen> {
     _name.dispose();
     _email.dispose();
     _phone.dispose();
+    _roleKey.dispose();
+    _roleNameBn.dispose();
+    _roleNameEn.dispose();
+    _roleDescription.dispose();
     super.dispose();
   }
 
+  Future<void> _loadRoles({bool forceRefresh = false}) async {
+    if (!SessionService.can(AppPermissions.rolesView)) {
+      setState(() {
+        _roles = RoleService.activeDefinitions();
+        _loadingRoles = false;
+      });
+      return;
+    }
+    setState(() => _loadingRoles = true);
+    final res = await _api.get(
+      'listRoleDefinitions',
+      forceRefresh: forceRefresh,
+    );
+    if (!mounted) return;
+    if (res['ok'] == true) {
+      final items = (res['data'] as List<dynamic>? ?? [])
+          .map((e) => RoleDefinition.fromMap(Map<String, dynamic>.from(e as Map)))
+          .where((e) => e.active)
+          .toList()
+        ..sort((a, b) => a.key.compareTo(b.key));
+      await RoleService.storeDefinitions(items);
+      setState(() {
+        _roles = items;
+        if (!_roles.any((r) => r.key == _role)) {
+          _role = _roles.any((r) => r.key == 'VIEWER')
+              ? 'VIEWER'
+              : (_roles.isEmpty ? 'VIEWER' : _roles.first.key);
+        }
+        _loadingRoles = false;
+      });
+      return;
+    }
+
+    setState(() {
+      _roles = RoleService.activeDefinitions();
+      _loadingRoles = false;
+    });
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          '${res['message'] ?? res['error'] ?? AppLang.t('রোল লোড ব্যর্থ', 'Failed to load roles')}',
+        ),
+      ),
+    );
+  }
+
   Future<void> _loadUsers() async {
+    if (!SessionService.can(AppPermissions.usersManage)) {
+      setState(() {
+        _users = [];
+        _loadingUsers = false;
+      });
+      return;
+    }
     setState(() => _loadingUsers = true);
     final res = await _api.get('listUsers');
     if (!mounted) return;
@@ -87,6 +160,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Future<void> _loadNotificationSettings() async {
+    if (!SessionService.can(AppPermissions.notificationsManage)) {
+      setState(() => _loadingNotify = false);
+      return;
+    }
     setState(() => _loadingNotify = true);
     final res = await _api.get('getNotificationSettings');
     if (!mounted) return;
@@ -143,6 +220,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Future<void> _loadNotificationEvents() async {
+    if (!SessionService.can(AppPermissions.notificationsView)) {
+      setState(() => _loadingNotifyEvents = false);
+      return;
+    }
     setState(() => _loadingNotifyEvents = true);
     final res = await _api.get('listInAppNotifications');
     if (!mounted) return;
@@ -281,7 +362,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Future<void> _loadAuditLog() async {
-    if (SessionService.role != 'ADMIN' && SessionService.role != 'ACCOUNTANT') {
+    if (!SessionService.can(AppPermissions.auditView)) {
       return;
     }
     setState(() => _loadingAudit = true);
@@ -393,7 +474,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
       _name.clear();
       _email.clear();
       _phone.clear();
-      _role = 'VIEWER';
+      _role = _roles.any((r) => r.key == 'VIEWER')
+          ? 'VIEWER'
+          : (_roles.isEmpty ? 'VIEWER' : _roles.first.key);
       _approvalStatus = 'APPROVED';
       _active = true;
       await _loadUsers();
@@ -411,6 +494,92 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 '${res['message'] ?? res['error'] ?? AppLang.t('ব্যবহারকারী তৈরি ব্যর্থ', 'User create failed')}')),
       );
     }
+  }
+
+  Future<void> _createRole() async {
+    final key = _roleKey.text.trim().toUpperCase();
+    if (!RegExp(r'^[A-Z][A-Z0-9_]{1,39}$').hasMatch(key)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            AppLang.t(
+              'Role key বড় হাতের অক্ষর/সংখ্যা/underscore হতে হবে',
+              'Role key must use uppercase letters, numbers, or underscore',
+            ),
+          ),
+        ),
+      );
+      return;
+    }
+    if (_rolePermissions.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            AppLang.t(
+              'কমপক্ষে একটি permission দিন',
+              'Select at least one permission',
+            ),
+          ),
+        ),
+      );
+      return;
+    }
+
+    setState(() => _savingRole = true);
+    final res = await _api.post(
+      'upsertRoleDefinition',
+      {
+        'user_role': SessionService.role,
+        'user_id': SessionService.userId,
+        'payload': {
+          'key': key,
+          'name_bn': _roleNameBn.text.trim().isEmpty
+              ? key
+              : _roleNameBn.text.trim(),
+          'name_en': _roleNameEn.text.trim().isEmpty
+              ? key
+              : _roleNameEn.text.trim(),
+          'description': _roleDescription.text.trim(),
+          'permissions': _rolePermissions.toList()..sort(),
+          'active': _roleActive,
+        },
+      },
+      allowQueue: false,
+    );
+    if (!mounted) return;
+    setState(() => _savingRole = false);
+
+    if (res['ok'] == true) {
+      _roleKey.clear();
+      _roleNameBn.clear();
+      _roleNameEn.clear();
+      _roleDescription.clear();
+      _rolePermissions
+        ..clear()
+        ..addAll({
+          AppPermissions.dashboardView,
+          AppPermissions.reportsView,
+        });
+      _roleActive = true;
+      await _loadRoles(forceRefresh: true);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            AppLang.t('নতুন রোল সংরক্ষিত হয়েছে', 'Role saved successfully'),
+          ),
+        ),
+      );
+      return;
+    }
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          '${res['message'] ?? res['error'] ?? AppLang.t('রোল সংরক্ষণ ব্যর্থ', 'Failed to save role')}',
+        ),
+      ),
+    );
   }
 
   Future<void> _toggleActive(Map<String, dynamic> user) async {
@@ -874,6 +1043,155 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ),
             ),
             const Divider(height: 28),
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.all(14),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Text(
+                          AppLang.t('গ্লোবাল রোল রেজিস্ট্রি', 'Global Role Registry'),
+                          style: const TextStyle(
+                              fontWeight: FontWeight.bold, fontSize: 16),
+                        ),
+                        const Spacer(),
+                        IconButton(
+                          onPressed: _loadingRoles
+                              ? null
+                              : () => _loadRoles(forceRefresh: true),
+                          icon: const Icon(Icons.refresh),
+                        ),
+                      ],
+                    ),
+                    Text(
+                      AppLang.t(
+                        'এখানে role create করলে menu, route guard, write access, এবং backend permission একই definition follow করবে।',
+                        'Roles created here drive menu visibility, route guards, write access, and backend permissions globally.',
+                      ),
+                      style: TextStyle(color: Colors.grey.shade700, fontSize: 12),
+                    ),
+                    const SizedBox(height: 12),
+                    if (_loadingRoles)
+                      const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 12),
+                        child: Center(child: CircularProgressIndicator()),
+                      )
+                    else ...[
+                      TextField(
+                        controller: _roleKey,
+                        textCapitalization: TextCapitalization.characters,
+                        decoration: InputDecoration(
+                          labelText: AppLang.t('Role Key', 'Role Key'),
+                          helperText: 'Example: AUDIT_OFFICER',
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      TextField(
+                        controller: _roleNameBn,
+                        decoration: InputDecoration(
+                          labelText: AppLang.t('বাংলা নাম', 'Bangla Name'),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      TextField(
+                        controller: _roleNameEn,
+                        decoration: InputDecoration(
+                          labelText: AppLang.t('English Name', 'English Name'),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      TextField(
+                        controller: _roleDescription,
+                        maxLines: 2,
+                        decoration: InputDecoration(
+                          labelText: AppLang.t('বর্ণনা', 'Description'),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      SwitchListTile(
+                        value: _roleActive,
+                        onChanged:
+                            _savingRole ? null : (v) => setState(() => _roleActive = v),
+                        title: Text(AppLang.t('রোল সক্রিয়', 'Role active')),
+                        contentPadding: EdgeInsets.zero,
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        AppLang.t('Permissions', 'Permissions'),
+                        style: const TextStyle(fontWeight: FontWeight.w600),
+                      ),
+                      const SizedBox(height: 8),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: AppPermissions.all.map((permission) {
+                          final selected = _rolePermissions.contains(permission);
+                          return FilterChip(
+                            selected: selected,
+                            label: Text(
+                              RoleService.permissionLabel(
+                                permission,
+                                isEnglish: isEn,
+                              ),
+                            ),
+                            onSelected: _savingRole
+                                ? null
+                                : (value) {
+                                    setState(() {
+                                      if (value) {
+                                        _rolePermissions.add(permission);
+                                      } else {
+                                        _rolePermissions.remove(permission);
+                                      }
+                                    });
+                                  },
+                          );
+                        }).toList(),
+                      ),
+                      const SizedBox(height: 12),
+                      FilledButton.icon(
+                        onPressed: _savingRole ? null : _createRole,
+                        icon: _savingRole
+                            ? const SizedBox(
+                                width: 14,
+                                height: 14,
+                                child: CircularProgressIndicator(strokeWidth: 2),
+                              )
+                            : const Icon(Icons.admin_panel_settings_outlined),
+                        label: Text(
+                          AppLang.t('রোল সংরক্ষণ', 'Save Role'),
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+                      Text(
+                        AppLang.t('সক্রিয় রোলসমূহ', 'Active Roles'),
+                        style: const TextStyle(fontWeight: FontWeight.w600),
+                      ),
+                      const SizedBox(height: 8),
+                      ..._roles.map(
+                        (role) => ListTile(
+                          dense: true,
+                          contentPadding: EdgeInsets.zero,
+                          title: Text('${role.key} • ${isEn ? role.nameEn : role.nameBn}'),
+                          subtitle: Text(
+                            '${role.permissions.length} ${AppLang.t('টি permission', 'permissions')}'
+                            '${role.description.isEmpty ? '' : ' • ${role.description}'}',
+                          ),
+                          trailing: role.isBuiltin
+                              ? Chip(
+                                  label: Text(AppLang.t('Built-in', 'Built-in')),
+                                )
+                              : null,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
             Text(AppLang.t('ব্যবহারকারী ব্যবস্থাপনা', 'Admin User Management'),
                 style:
                     const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
@@ -896,15 +1214,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     labelText: AppLang.t('ফোন (ঐচ্ছিক)', 'Phone (optional)'))),
             const SizedBox(height: 8),
             DropdownButtonFormField<String>(
-              initialValue: _role,
-              items: const [
-                DropdownMenuItem(value: 'ADMIN', child: Text('ADMIN')),
-                DropdownMenuItem(
-                    value: 'ACCOUNTANT', child: Text('ACCOUNTANT')),
-                DropdownMenuItem(
-                    value: 'FIELD_USER', child: Text('FIELD_USER')),
-                DropdownMenuItem(value: 'VIEWER', child: Text('VIEWER')),
-              ],
+              initialValue: _roles.any((r) => r.key == _role) ? _role : null,
+              items: _roles
+                  .map(
+                    (role) => DropdownMenuItem(
+                      value: role.key,
+                      child: Text('${role.key} • ${isEn ? role.nameEn : role.nameBn}'),
+                    ),
+                  )
+                  .toList(),
               onChanged: (v) => setState(() => _role = v ?? 'VIEWER'),
               decoration:
                   InputDecoration(labelText: AppLang.t('ভূমিকা', 'Role')),
@@ -1109,8 +1427,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ),
             ),
             const SizedBox(height: 12),
-            if (SessionService.role == 'ADMIN' ||
-                SessionService.role == 'ACCOUNTANT')
+            if (SessionService.can(AppPermissions.auditView))
               Card(
                 child: Padding(
                   padding: const EdgeInsets.all(14),

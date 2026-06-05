@@ -3,11 +3,15 @@ import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/app_config.dart';
+import '../../shared/constants/app_permissions.dart';
+import '../../shared/constants/app_routes.dart';
 import '../../shared/models/dashboard_summary.dart';
 import '../../shared/models/notification_settings.dart';
+import '../../shared/services/access_control_service.dart';
 import '../../shared/services/api_service.dart';
 import '../../shared/services/local_store_service.dart';
 import '../../shared/services/pwa_runtime_service.dart';
+import '../../shared/services/role_service.dart';
 import '../../shared/services/session_service.dart';
 import '../../shared/widgets/themed_date_picker.dart';
 import 'fund_detail_page.dart';
@@ -336,6 +340,17 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   Future<void> _quickEntry({required bool income}) async {
+    final neededPermission = income
+        ? AppPermissions.donationsWrite
+        : AppPermissions.expensesWrite;
+    if (!SessionService.can(neededPermission)) {
+      AccessControlService.showDeniedSnack(
+        context,
+        permission: neededPermission,
+        routeName: AppRoutes.dashboard,
+      );
+      return;
+    }
     final formKey = GlobalKey<FormState>();
     final dateCtrl = TextEditingController(
         text: DateTime.now().toIso8601String().split('T').first);
@@ -527,19 +542,25 @@ class _DashboardScreenState extends State<DashboardScreen> {
               onSelected: (v) {
                 switch (v) {
                   case 'salary':
-                    Navigator.pushNamed(context, '/salary');
+                    Navigator.pushNamed(context, AppRoutes.salary);
+                    return;
                   case 'scholarship':
-                    Navigator.pushNamed(context, '/scholarship');
+                    Navigator.pushNamed(context, AppRoutes.scholarship);
+                    return;
                   case 'beneficiaries':
-                    Navigator.pushNamed(context, '/beneficiaries');
+                    Navigator.pushNamed(context, AppRoutes.beneficiaries);
+                    return;
                   case 'reports':
-                    Navigator.pushNamed(context, '/reports');
+                    Navigator.pushNamed(context, AppRoutes.reports);
+                    return;
                   case 'settings':
-                    Navigator.pushNamed(context, '/settings');
+                    Navigator.pushNamed(context, AppRoutes.settings);
+                    return;
                   case 'logout':
                     SessionService.clear();
                     Navigator.pushNamedAndRemoveUntil(
-                        context, '/login', (_) => false);
+                        context, AppRoutes.login, (_) => false);
+                    return;
                 }
               },
               itemBuilder: (_) => [
@@ -549,7 +570,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 const PopupMenuItem(
                     value: 'beneficiaries', child: Text('উপকারভোগী')),
                 const PopupMenuItem(value: 'reports', child: Text('রিপোর্ট')),
-                if (SessionService.role == 'ADMIN')
+                if (SessionService.can(AppPermissions.settingsView))
                   const PopupMenuItem(value: 'settings', child: Text('সেটিংস')),
                 const PopupMenuDivider(),
                 const PopupMenuItem(value: 'logout', child: Text('লগআউট')),
@@ -565,20 +586,24 @@ class _DashboardScreenState extends State<DashboardScreen> {
         floatingActionButton: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            FloatingActionButton.small(
-              heroTag: 'expense',
-              onPressed: () => _quickEntry(income: false),
-              backgroundColor: Colors.red.shade600,
-              tooltip: 'ব্যয় যোগ করুন',
-              child: const Icon(Icons.remove, color: Colors.white),
-            ),
-            const SizedBox(height: 8),
-            FloatingActionButton(
-              heroTag: 'income',
-              onPressed: () => _quickEntry(income: true),
-              tooltip: 'দান / আয় যোগ করুন',
-              child: const Icon(Icons.add),
-            ),
+            if (SessionService.can(AppPermissions.expensesWrite))
+              FloatingActionButton.small(
+                heroTag: 'expense',
+                onPressed: () => _quickEntry(income: false),
+                backgroundColor: Colors.red.shade600,
+                tooltip: 'ব্যয় যোগ করুন',
+                child: const Icon(Icons.remove, color: Colors.white),
+              ),
+            if (SessionService.can(AppPermissions.expensesWrite) &&
+                SessionService.can(AppPermissions.donationsWrite))
+              const SizedBox(height: 8),
+            if (SessionService.can(AppPermissions.donationsWrite))
+              FloatingActionButton(
+                heroTag: 'income',
+                onPressed: () => _quickEntry(income: true),
+                tooltip: 'দান / আয় যোগ করুন',
+                child: const Icon(Icons.add),
+              ),
           ],
         ),
       ),
@@ -641,13 +666,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 _QuickActionsRow(
                   onAddIncome: () => _quickEntry(income: true),
                   onAddExpense: () => _quickEntry(income: false),
-                  onOpenReports: () => Navigator.pushNamed(context, '/reports'),
+                  onOpenReports: () =>
+                      Navigator.pushNamed(context, AppRoutes.reports),
                   onDownloadApk: _downloadApk,
                   onInstallPwa: (!_isStandalonePwa && _canInstallPwa)
                       ? _installWebApp
                       : null,
-                  onOpenSettings: SessionService.role == 'ADMIN'
-                      ? () => Navigator.pushNamed(context, '/settings')
+                  onOpenSettings: SessionService.can(AppPermissions.settingsView)
+                      ? () => Navigator.pushNamed(context, AppRoutes.settings)
                       : null,
                 ),
                 const SizedBox(height: 14),
@@ -802,16 +828,7 @@ class _GreetingCard extends StatelessWidget {
   }
 
   String _roleLabel(String role) {
-    switch (role) {
-      case 'ADMIN':
-        return 'অ্যাডমিন';
-      case 'ACCOUNTANT':
-        return 'হিসাবরক্ষক';
-      case 'FIELD_USER':
-        return 'ফিল্ড ব্যবহারকারী';
-      default:
-        return 'দর্শক';
-    }
+    return RoleService.roleName(role, isEnglish: false);
   }
 }
 

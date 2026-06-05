@@ -47,6 +47,114 @@ const CONFIG = {
 };
 
 const MAX_REPORT_RANGE_DAYS = 3653;
+const ROLE_DEFINITIONS_SETTING_KEY = 'roles.definitions';
+
+const APP_PERMISSIONS = [
+  'dashboard.view',
+  'donations.view',
+  'donations.write',
+  'transactions.manage',
+  'expenses.view',
+  'expenses.write',
+  'beneficiaries.view',
+  'beneficiaries.write',
+  'salary.view',
+  'salary.write',
+  'scholarship.view',
+  'scholarship.write',
+  'academic.foundation.view',
+  'academic.foundation.write',
+  'academic.core.view',
+  'academic.core.write',
+  'academic.attendance.write',
+  'fees.view',
+  'fees.write',
+  'finance.view',
+  'finance.write',
+  'finance.approval_rules.manage',
+  'finance.approval_requests.create',
+  'finance.approval_requests.decide',
+  'communication.view',
+  'communication.write',
+  'reports.view',
+  'settings.view',
+  'users.manage',
+  'roles.view',
+  'roles.manage',
+  'notifications.view',
+  'notifications.manage',
+  'app_ui.manage',
+  'audit.view',
+];
+
+const ACTION_PERMISSIONS = {
+  dashboardSummary: 'dashboard.view',
+  listTransactions: 'donations.view',
+  listBeneficiaries: 'beneficiaries.view',
+  listStaff: 'salary.view',
+  listSalaryPayments: 'salary.view',
+  listScholarshipByMonth: 'scholarship.view',
+  listStudents: 'academic.foundation.view',
+  listStudentGuardians: 'academic.foundation.view',
+  listClasses: 'academic.foundation.view',
+  listSections: 'academic.foundation.view',
+  listSubjects: 'academic.foundation.view',
+  listAttendance: 'academic.core.view',
+  listExamTerms: 'academic.core.view',
+  listExamMarks: 'academic.core.view',
+  resultSummary: 'academic.core.view',
+  listFeePlans: 'fees.view',
+  listFeePayments: 'fees.view',
+  listFeeWaivers: 'fees.view',
+  listFeeDues: 'fees.view',
+  listBudgets: 'finance.view',
+  financeControlSummary: 'finance.view',
+  listApprovalRules: 'finance.view',
+  listApprovalRequests: 'finance.view',
+  listNotices: 'communication.view',
+  listDocuments: 'communication.view',
+  monthlyReport: 'reports.view',
+  rangeReport: 'reports.view',
+  datasetStats: 'reports.view',
+  getAppUiSettings: 'reports.view',
+  listAuditLog: 'audit.view',
+  getNotificationSettings: 'notifications.manage',
+  listInAppNotifications: 'notifications.view',
+  listRoleDefinitions: 'roles.view',
+  createTransaction: 'donations.write',
+  updateTransaction: 'transactions.manage',
+  upsertBeneficiary: 'beneficiaries.write',
+  upsertStaff: 'salary.write',
+  recordSalaryPayment: 'salary.write',
+  saveScholarshipPayment: 'scholarship.write',
+  upsertStudent: 'academic.foundation.write',
+  upsertStudentGuardian: 'academic.foundation.write',
+  upsertClass: 'academic.foundation.write',
+  upsertSection: 'academic.foundation.write',
+  upsertSubject: 'academic.foundation.write',
+  saveAttendance: 'academic.attendance.write',
+  upsertExamTerm: 'academic.core.write',
+  saveExamMark: 'academic.core.write',
+  upsertFeePlan: 'fees.write',
+  recordFeePayment: 'fees.write',
+  upsertFeeWaiver: 'fees.write',
+  upsertBudget: 'finance.write',
+  upsertApprovalRule: 'finance.approval_rules.manage',
+  createApprovalRequest: 'finance.approval_requests.create',
+  decideApprovalRequest: 'finance.approval_requests.decide',
+  publishNotice: 'communication.write',
+  markNoticeRead: 'communication.view',
+  upsertDocument: 'communication.write',
+  listUsers: 'users.manage',
+  upsertUser: 'users.manage',
+  setUserApprovalStatus: 'users.manage',
+  generateTempResetToken: 'users.manage',
+  upsertNotificationSettings: 'notifications.manage',
+  upsertAppUiSettings: 'app_ui.manage',
+  createNotificationEvent: 'notifications.view',
+  upsertRoleDefinition: 'roles.manage',
+  logClientGuard: 'notifications.view',
+};
 
 // Route both GET and POST through a single handler so the Flutter app
 // can use HTTP POST for all requests (simpler client code).
@@ -97,6 +205,9 @@ function handleRequest_(params) {
       return json({ ok: true, pin_hash: pinHash_(pin) });
     }
 
+    params.action = action;
+    assertActionPermission_(params, action);
+
     // Read actions (also allowed via POST body)
     if (action === 'dashboardSummary') return json(dashboardSummary_(params));
     if (action === 'listTransactions') return json(listTransactions_(params));
@@ -128,11 +239,9 @@ function handleRequest_(params) {
     if (action === 'datasetStats') return json(datasetStats_(params));
     if (action === 'getAppUiSettings') return json(getAppUiSettings_(params));
     if (action === 'listAuditLog') return json(listAuditLog_(params));
-    if (action === 'getNotificationSettings') {
-      assertRole_(params.user_role, ['ADMIN']);
-      return json(getNotificationSettings_(params));
-    }
+    if (action === 'getNotificationSettings') return json(getNotificationSettings_(params));
     if (action === 'listInAppNotifications') return json(listInAppNotifications_(params));
+    if (action === 'listRoleDefinitions') return json(listRoleDefinitions_(params));
 
     // Write actions
     if (action === 'login') return json(login_(params));
@@ -140,155 +249,133 @@ function handleRequest_(params) {
     if (action === 'confirmPinReset') return json(confirmPinReset_(params));
 
     if (action === 'createTransaction') {
-      assertRole_(params.user_role, ['ADMIN', 'ACCOUNTANT', 'FIELD_USER']);
       return json(createTransaction_(params.payload));
     }
 
     if (action === 'updateTransaction') {
-      assertRole_(params.user_role, ['ADMIN', 'ACCOUNTANT']);
       return json(updateTransaction_(params.id, params.payload));
     }
 
     if (action === 'upsertBeneficiary') {
-      assertRole_(params.user_role, ['ADMIN', 'ACCOUNTANT']);
       return json(upsertById_(CONFIG.SHEETS.BENEFICIARIES, params.payload));
     }
 
     if (action === 'upsertStaff') {
-      assertRole_(params.user_role, ['ADMIN', 'ACCOUNTANT']);
       return json(upsertById_(CONFIG.SHEETS.STAFF, params.payload));
     }
 
     if (action === 'recordSalaryPayment') {
-      assertRole_(params.user_role, ['ADMIN', 'ACCOUNTANT']);
       return json(recordSalaryPayment_(params.payload));
     }
 
     if (action === 'saveScholarshipPayment') {
-      assertRole_(params.user_role, ['ADMIN', 'ACCOUNTANT']);
       return json(saveScholarshipPayment_(params.payload));
     }
 
     if (action === 'upsertStudent') {
-      assertRole_(params.user_role, ['ADMIN', 'ACCOUNTANT']);
       return json(upsertStudent_(params.payload, params));
     }
 
     if (action === 'upsertStudentGuardian') {
-      assertRole_(params.user_role, ['ADMIN', 'ACCOUNTANT']);
       return json(upsertStudentGuardian_(params.payload, params));
     }
 
     if (action === 'upsertClass') {
-      assertRole_(params.user_role, ['ADMIN', 'ACCOUNTANT']);
       return json(upsertClass_(params.payload, params));
     }
 
     if (action === 'upsertSection') {
-      assertRole_(params.user_role, ['ADMIN', 'ACCOUNTANT']);
       return json(upsertSection_(params.payload, params));
     }
 
     if (action === 'upsertSubject') {
-      assertRole_(params.user_role, ['ADMIN', 'ACCOUNTANT']);
       return json(upsertSubject_(params.payload, params));
     }
 
     if (action === 'saveAttendance') {
-      assertRole_(params.user_role, ['ADMIN', 'ACCOUNTANT', 'FIELD_USER']);
       return json(saveAttendance_(params.payload, params));
     }
 
     if (action === 'upsertExamTerm') {
-      assertRole_(params.user_role, ['ADMIN', 'ACCOUNTANT']);
       return json(upsertExamTerm_(params.payload, params));
     }
 
     if (action === 'saveExamMark') {
-      assertRole_(params.user_role, ['ADMIN', 'ACCOUNTANT']);
       return json(saveExamMark_(params.payload, params));
     }
 
     if (action === 'upsertFeePlan') {
-      assertRole_(params.user_role, ['ADMIN', 'ACCOUNTANT']);
       return json(upsertFeePlan_(params.payload, params));
     }
 
     if (action === 'recordFeePayment') {
-      assertRole_(params.user_role, ['ADMIN', 'ACCOUNTANT']);
       return json(recordFeePayment_(params.payload, params));
     }
 
     if (action === 'upsertFeeWaiver') {
-      assertRole_(params.user_role, ['ADMIN', 'ACCOUNTANT']);
       return json(upsertFeeWaiver_(params.payload, params));
     }
 
     if (action === 'upsertBudget') {
-      assertRole_(params.user_role, ['ADMIN', 'ACCOUNTANT']);
       return json(upsertBudget_(params.payload, params));
     }
 
     if (action === 'upsertApprovalRule') {
-      assertRole_(params.user_role, ['ADMIN']);
       return json(upsertApprovalRule_(params.payload, params));
     }
 
     if (action === 'createApprovalRequest') {
-      assertRole_(params.user_role, ['ADMIN', 'ACCOUNTANT', 'FIELD_USER']);
       return json(createApprovalRequest_(params.payload, params));
     }
 
     if (action === 'decideApprovalRequest') {
-      assertRole_(params.user_role, ['ADMIN']);
       return json(decideApprovalRequest_(params.payload, params));
     }
 
     if (action === 'publishNotice') {
-      assertRole_(params.user_role, ['ADMIN', 'ACCOUNTANT']);
       return json(publishNotice_(params.payload, params));
     }
 
     if (action === 'markNoticeRead') {
-      assertRole_(params.user_role, ['ADMIN', 'ACCOUNTANT', 'FIELD_USER', 'VIEWER']);
       return json(markNoticeRead_(params.payload, params));
     }
 
     if (action === 'upsertDocument') {
-      assertRole_(params.user_role, ['ADMIN', 'ACCOUNTANT']);
       return json(upsertDocument_(params.payload, params));
     }
 
     if (action === 'listUsers') return json(listUsers_(params));
 
     if (action === 'upsertUser') {
-      assertRole_(params.user_role, ['ADMIN']);
-      return json(upsertById_(CONFIG.SHEETS.USERS, params.payload));
+      return json(upsertUser_(params.payload, params));
     }
 
     if (action === 'setUserApprovalStatus') {
-      assertRole_(params.user_role, ['ADMIN']);
       return json(setUserApprovalStatus_(params.payload, params));
     }
 
     if (action === 'generateTempResetToken') {
-      assertRole_(params.user_role, ['ADMIN']);
       return json(generateTempResetToken_(params.payload, params));
     }
 
     if (action === 'upsertNotificationSettings') {
-      assertRole_(params.user_role, ['ADMIN']);
       return json(upsertNotificationSettings_(params.payload, params));
     }
 
     if (action === 'upsertAppUiSettings') {
-      assertRole_(params.user_role, ['ADMIN']);
       return json(upsertAppUiSettings_(params.payload, params));
     }
 
     if (action === 'createNotificationEvent') {
-      assertRole_(params.user_role, ['ADMIN', 'ACCOUNTANT', 'FIELD_USER', 'VIEWER']);
       return json(createNotificationEvent_(params.payload, params));
+    }
+
+    if (action === 'upsertRoleDefinition') {
+      return json(upsertRoleDefinition_(params.payload, params));
+    }
+
+    if (action === 'logClientGuard') {
+      return json(logClientGuard_(params.payload, params));
     }
 
     if (action === 'importMigratedData') {
@@ -326,7 +413,18 @@ function login_(payload) {
       updated_at: nowIso(),
     };
     appendRow_(CONFIG.SHEETS.USERS, boot);
-    return { ok: true, data: { id: boot.id, name: boot.name, role: boot.role, phone: '', email: boot.email, approval_status: 'APPROVED' } };
+    return {
+      ok: true,
+      data: {
+        id: boot.id,
+        name: boot.name,
+        role: boot.role,
+        phone: '',
+        email: boot.email,
+        approval_status: 'APPROVED',
+        permissions: (getRoleDefinition_(boot.role) || { permissions: [] }).permissions || [],
+      },
+    };
   }
 
   const anyUser = users.find(u => String(u.email || '').trim().toLowerCase() === email);
@@ -357,6 +455,7 @@ function login_(payload) {
       phone: anyUser.phone || '',
       email: anyUser.email || '',
       approval_status: status,
+      permissions: (getRoleDefinition_(anyUser.role || 'VIEWER') || { permissions: [] }).permissions || [],
     },
   };
 }
@@ -480,7 +579,7 @@ function saveScholarshipPayment_(payload) {
 
 function dashboardSummary_(params) {
   params = params || {};
-  assertRole_(params.user_role, ['ADMIN', 'ACCOUNTANT', 'FIELD_USER', 'VIEWER']);
+  assertPermission_(params, 'dashboard.view');
   const role = String(params.user_role || '');
   const userId = String(params.user_id || '');
   requireUserIdIfFieldRole_(role, userId);
@@ -534,7 +633,7 @@ function dashboardSummary_(params) {
 
 function monthlyReport_(params) {
   params = params || {};
-  assertRole_(params.user_role, ['ADMIN', 'ACCOUNTANT', 'FIELD_USER', 'VIEWER']);
+  assertPermission_(params, 'reports.view');
   const role = String(params.user_role || '');
   const userId = String(params.user_id || '');
   requireUserIdIfFieldRole_(role, userId);
@@ -563,7 +662,7 @@ function monthlyReport_(params) {
 
 function rangeReport_(params) {
   params = params || {};
-  assertRole_(params.user_role, ['ADMIN', 'ACCOUNTANT', 'FIELD_USER', 'VIEWER']);
+  assertPermission_(params, 'reports.view');
   const role = String(params.user_role || '');
   const userId = String(params.user_id || '');
   requireUserIdIfFieldRole_(role, userId);
@@ -645,7 +744,7 @@ function rangeReport_(params) {
 
 function listTransactions_(params) {
   params = params || {};
-  assertRole_(params.user_role, ['ADMIN', 'ACCOUNTANT', 'FIELD_USER', 'VIEWER']);
+  assertPermission_(params, 'donations.view');
   const role = String(params.user_role || '');
   const userId = String(params.user_id || '');
   requireUserIdIfFieldRole_(role, userId);
@@ -673,7 +772,7 @@ function listTransactions_(params) {
 
 function datasetStats_(params) {
   params = params || {};
-  assertRole_(params.user_role, ['ADMIN', 'ACCOUNTANT', 'FIELD_USER', 'VIEWER']);
+  assertPermission_(params, 'reports.view');
   const role = String(params.user_role || '');
   const userId = String(params.user_id || '');
   requireUserIdIfFieldRole_(role, userId);
@@ -715,19 +814,19 @@ function datasetStats_(params) {
 
 function listBeneficiaries_(params) {
   params = params || {};
-  assertRole_(params.user_role, ['ADMIN', 'ACCOUNTANT', 'VIEWER']);
+  assertPermission_(params, 'beneficiaries.view');
   return listSheetRows_(CONFIG.SHEETS.BENEFICIARIES);
 }
 
 function listStaff_(params) {
   params = params || {};
-  assertRole_(params.user_role, ['ADMIN', 'ACCOUNTANT', 'VIEWER']);
+  assertPermission_(params, 'salary.view');
   return listSheetRows_(CONFIG.SHEETS.STAFF);
 }
 
 function listSalaryPayments_(params) {
   params = params || {};
-  assertRole_(params.user_role, ['ADMIN', 'ACCOUNTANT', 'VIEWER']);
+  assertPermission_(params, 'salary.view');
 
   const rows = listSheetRows_(CONFIG.SHEETS.SALARY).data || [];
   const monthKey = params.monthKey || '';
@@ -745,7 +844,7 @@ function listSalaryPayments_(params) {
 
 function listScholarshipByMonth_(params) {
   params = params || {};
-  assertRole_(params.user_role, ['ADMIN', 'ACCOUNTANT', 'VIEWER']);
+  assertPermission_(params, 'scholarship.view');
 
   const rows = listSheetRows_(CONFIG.SHEETS.SCHOLAR_PAY).data || [];
   const monthKey = params.monthKey || '';
@@ -763,7 +862,7 @@ function listScholarshipByMonth_(params) {
 
 function listStudents_(params) {
   params = params || {};
-  assertRole_(params.user_role, ['ADMIN', 'ACCOUNTANT', 'FIELD_USER', 'VIEWER']);
+  assertPermission_(params, 'academic.foundation.view');
   ensurePhase1Sheet_(CONFIG.SHEETS.STUDENTS);
   const classId = String(params.class_id || '').trim();
   const sectionId = String(params.section_id || '').trim();
@@ -801,7 +900,7 @@ function listStudents_(params) {
 
 function listStudentGuardians_(params) {
   params = params || {};
-  assertRole_(params.user_role, ['ADMIN', 'ACCOUNTANT', 'FIELD_USER', 'VIEWER']);
+  assertPermission_(params, 'academic.foundation.view');
   ensurePhase1Sheet_(CONFIG.SHEETS.GUARDIANS);
   const studentId = String(params.student_id || '').trim();
   const rows = listSheetRows_(CONFIG.SHEETS.GUARDIANS).data || [];
@@ -818,7 +917,7 @@ function listStudentGuardians_(params) {
 
 function listClasses_(params) {
   params = params || {};
-  assertRole_(params.user_role, ['ADMIN', 'ACCOUNTANT', 'FIELD_USER', 'VIEWER']);
+  assertPermission_(params, 'academic.foundation.view');
   ensurePhase1Sheet_(CONFIG.SHEETS.CLASSES);
   const rows = listSheetRows_(CONFIG.SHEETS.CLASSES).data || [];
   rows.sort(function (a, b) {
@@ -830,7 +929,7 @@ function listClasses_(params) {
 
 function listSections_(params) {
   params = params || {};
-  assertRole_(params.user_role, ['ADMIN', 'ACCOUNTANT', 'FIELD_USER', 'VIEWER']);
+  assertPermission_(params, 'academic.foundation.view');
   ensurePhase1Sheet_(CONFIG.SHEETS.SECTIONS);
   const classId = String(params.class_id || '').trim();
   const rows = listSheetRows_(CONFIG.SHEETS.SECTIONS).data || [];
@@ -847,7 +946,7 @@ function listSections_(params) {
 
 function listSubjects_(params) {
   params = params || {};
-  assertRole_(params.user_role, ['ADMIN', 'ACCOUNTANT', 'FIELD_USER', 'VIEWER']);
+  assertPermission_(params, 'academic.foundation.view');
   ensurePhase1Sheet_(CONFIG.SHEETS.SUBJECTS);
   const classId = String(params.class_id || '').trim();
   const rows = listSheetRows_(CONFIG.SHEETS.SUBJECTS).data || [];
@@ -980,7 +1079,7 @@ function upsertSubject_(payload, params) {
 
 function listAttendance_(params) {
   params = params || {};
-  assertRole_(params.user_role, ['ADMIN', 'ACCOUNTANT', 'FIELD_USER', 'VIEWER']);
+  assertPermission_(params, 'academic.core.view');
   ensurePhase2Sheet_(CONFIG.SHEETS.ATTENDANCE);
 
   const date = normalizeIsoDate_(params.attendance_date || params.date || '');
@@ -1054,7 +1153,7 @@ function saveAttendance_(payload, params) {
 
 function listExamTerms_(params) {
   params = params || {};
-  assertRole_(params.user_role, ['ADMIN', 'ACCOUNTANT', 'FIELD_USER', 'VIEWER']);
+  assertPermission_(params, 'academic.core.view');
   ensurePhase2Sheet_(CONFIG.SHEETS.EXAM_TERMS);
   const classId = String(params.class_id || '').trim();
   const sectionId = String(params.section_id || '').trim();
@@ -1104,7 +1203,7 @@ function upsertExamTerm_(payload, params) {
 
 function listExamMarks_(params) {
   params = params || {};
-  assertRole_(params.user_role, ['ADMIN', 'ACCOUNTANT', 'FIELD_USER', 'VIEWER']);
+  assertPermission_(params, 'academic.core.view');
   ensurePhase2Sheet_(CONFIG.SHEETS.EXAM_MARKS);
   const examTermId = String(params.exam_term_id || '').trim();
   const studentId = String(params.student_id || '').trim();
@@ -1161,7 +1260,7 @@ function saveExamMark_(payload, params) {
 
 function resultSummary_(params) {
   params = params || {};
-  assertRole_(params.user_role, ['ADMIN', 'ACCOUNTANT', 'FIELD_USER', 'VIEWER']);
+  assertPermission_(params, 'academic.core.view');
   ensurePhase1Sheet_(CONFIG.SHEETS.STUDENTS);
   ensurePhase1Sheet_(CONFIG.SHEETS.SUBJECTS);
   ensurePhase2Sheet_(CONFIG.SHEETS.EXAM_TERMS);
@@ -1229,7 +1328,7 @@ function resultSummary_(params) {
 
 function listFeePlans_(params) {
   params = params || {};
-  assertRole_(params.user_role, ['ADMIN', 'ACCOUNTANT', 'FIELD_USER', 'VIEWER']);
+  assertPermission_(params, 'fees.view');
   ensurePhase3Sheet_(CONFIG.SHEETS.FEE_PLANS);
   const classId = String(params.class_id || '').trim();
   const rows = listSheetRows_(CONFIG.SHEETS.FEE_PLANS).data || [];
@@ -1275,7 +1374,7 @@ function upsertFeePlan_(payload, params) {
 
 function listFeePayments_(params) {
   params = params || {};
-  assertRole_(params.user_role, ['ADMIN', 'ACCOUNTANT', 'FIELD_USER', 'VIEWER']);
+  assertPermission_(params, 'fees.view');
   ensurePhase3Sheet_(CONFIG.SHEETS.FEE_PAYMENTS);
   const monthKey = normalizeMonthKey_(params.month_key || '');
   const studentId = String(params.student_id || '').trim();
@@ -1345,7 +1444,7 @@ function recordFeePayment_(payload, params) {
 
 function listFeeWaivers_(params) {
   params = params || {};
-  assertRole_(params.user_role, ['ADMIN', 'ACCOUNTANT', 'FIELD_USER', 'VIEWER']);
+  assertPermission_(params, 'fees.view');
   ensurePhase3Sheet_(CONFIG.SHEETS.FEE_WAIVERS);
   const monthKey = normalizeMonthKey_(params.month_key || '');
   const studentId = String(params.student_id || '').trim();
@@ -1392,7 +1491,7 @@ function upsertFeeWaiver_(payload, params) {
 
 function listFeeDues_(params) {
   params = params || {};
-  assertRole_(params.user_role, ['ADMIN', 'ACCOUNTANT', 'FIELD_USER', 'VIEWER']);
+  assertPermission_(params, 'fees.view');
   ensurePhase1Sheet_(CONFIG.SHEETS.STUDENTS);
   ensurePhase3Sheet_(CONFIG.SHEETS.FEE_PLANS);
   ensurePhase3Sheet_(CONFIG.SHEETS.FEE_PAYMENTS);
@@ -1468,7 +1567,7 @@ function listFeeDues_(params) {
 
 function listBudgets_(params) {
   params = params || {};
-  assertRole_(params.user_role, ['ADMIN', 'ACCOUNTANT', 'FIELD_USER', 'VIEWER']);
+  assertPermission_(params, 'finance.view');
   ensurePhase4Sheet_(CONFIG.SHEETS.BUDGETS);
   const monthKey = normalizeMonthKey_(params.month_key || '');
   const fundType = String(params.fund_type || '').trim().toUpperCase();
@@ -1508,7 +1607,7 @@ function upsertBudget_(payload, params) {
 
 function financeControlSummary_(params) {
   params = params || {};
-  assertRole_(params.user_role, ['ADMIN', 'ACCOUNTANT', 'FIELD_USER', 'VIEWER']);
+  assertPermission_(params, 'finance.view');
   ensurePhase4Sheet_(CONFIG.SHEETS.BUDGETS);
   const monthKey = normalizeMonthKey_(params.month_key || '');
   if (!isMonthKey_(monthKey)) return { ok: false, message: 'month_key must be YYYY-MM' };
@@ -1576,7 +1675,7 @@ function financeControlSummary_(params) {
 
 function listApprovalRules_(params) {
   params = params || {};
-  assertRole_(params.user_role, ['ADMIN', 'ACCOUNTANT', 'FIELD_USER', 'VIEWER']);
+  assertPermission_(params, 'finance.view');
   ensurePhase4Sheet_(CONFIG.SHEETS.APPROVAL_RULES);
   return listSheetRows_(CONFIG.SHEETS.APPROVAL_RULES);
 }
@@ -1595,12 +1694,13 @@ function upsertApprovalRule_(payload, params) {
     notes: String(payload.notes || '').trim(),
     updated_by: String(payload.updated_by || params.user_id || params.user_role || 'system'),
   };
+  validateRoleKey_(row.approver_role, 'approver_role');
   return upsertById_(CONFIG.SHEETS.APPROVAL_RULES, row);
 }
 
 function listApprovalRequests_(params) {
   params = params || {};
-  assertRole_(params.user_role, ['ADMIN', 'ACCOUNTANT', 'FIELD_USER', 'VIEWER']);
+  assertPermission_(params, 'finance.view');
   ensurePhase4Sheet_(CONFIG.SHEETS.APPROVAL_REQUESTS);
   const status = String(params.status || '').trim().toUpperCase();
   const rows = listSheetRows_(CONFIG.SHEETS.APPROVAL_REQUESTS).data || [];
@@ -1658,7 +1758,7 @@ function decideApprovalRequest_(payload, params) {
 
 function listNotices_(params) {
   params = params || {};
-  assertRole_(params.user_role, ['ADMIN', 'ACCOUNTANT', 'FIELD_USER', 'VIEWER']);
+  assertPermission_(params, 'communication.view');
   ensurePhase5Sheet_(CONFIG.SHEETS.NOTICES);
   ensurePhase5Sheet_(CONFIG.SHEETS.NOTICE_READS);
   const role = String(params.user_role || '');
@@ -1706,7 +1806,7 @@ function publishNotice_(payload, params) {
     expires_at: normalizeIsoDate_(payload.expires_at || ''),
     updated_by: String(payload.updated_by || params.user_id || params.user_role || 'system'),
   };
-  if (row.target_role) validateEnum_(row.target_role, CONFIG.ENUMS.ROLE, 'target_role');
+  if (row.target_role) validateRoleKey_(row.target_role, 'target_role');
   return upsertById_(CONFIG.SHEETS.NOTICES, row);
 }
 
@@ -1728,7 +1828,7 @@ function markNoticeRead_(payload, params) {
 
 function listDocuments_(params) {
   params = params || {};
-  assertRole_(params.user_role, ['ADMIN', 'ACCOUNTANT', 'FIELD_USER', 'VIEWER']);
+  assertPermission_(params, 'communication.view');
   ensurePhase5Sheet_(CONFIG.SHEETS.DOCUMENTS);
   const entityType = String(params.entity_type || '').trim();
   const entityId = String(params.entity_id || '').trim();
@@ -2024,7 +2124,7 @@ function addAudit_(module, action, entityId, beforeJson, afterJson, doneBy) {
 
 function listAuditLog_(params) {
   params = params || {};
-  assertRole_(params.user_role, ['ADMIN', 'ACCOUNTANT']);
+  assertPermission_(params, 'audit.view');
 
   const rows = listSheetRows_(CONFIG.SHEETS.AUDIT).data || [];
   const moduleFilter = String(params.module || '').trim();
@@ -2057,6 +2157,292 @@ function notificationSettingDefs_() {
     { key: 'notify.email.due_reminder', defaultValue: 'FALSE', notes: 'Email due reminders' },
     { key: 'notify.email.security_alert', defaultValue: 'FALSE', notes: 'Email security alerts' },
   ];
+}
+
+function defaultRoleDefinitions_() {
+  const admin = APP_PERMISSIONS.slice();
+  const accountant = [
+    'dashboard.view',
+    'donations.view',
+    'donations.write',
+    'transactions.manage',
+    'expenses.view',
+    'expenses.write',
+    'beneficiaries.view',
+    'beneficiaries.write',
+    'salary.view',
+    'salary.write',
+    'scholarship.view',
+    'scholarship.write',
+    'academic.foundation.view',
+    'academic.foundation.write',
+    'academic.core.view',
+    'academic.core.write',
+    'academic.attendance.write',
+    'fees.view',
+    'fees.write',
+    'finance.view',
+    'finance.write',
+    'finance.approval_requests.create',
+    'communication.view',
+    'communication.write',
+    'reports.view',
+    'roles.view',
+    'notifications.view',
+    'audit.view',
+  ];
+  const fieldUser = [
+    'dashboard.view',
+    'donations.view',
+    'donations.write',
+    'academic.foundation.view',
+    'academic.core.view',
+    'academic.attendance.write',
+    'communication.view',
+    'reports.view',
+    'roles.view',
+    'notifications.view',
+    'finance.approval_requests.create',
+  ];
+  const viewer = [
+    'dashboard.view',
+    'donations.view',
+    'academic.foundation.view',
+    'academic.core.view',
+    'communication.view',
+    'reports.view',
+    'roles.view',
+    'notifications.view',
+  ];
+  return [
+    {
+      key: 'ADMIN',
+      name_bn: 'অ্যাডমিন',
+      name_en: 'Admin',
+      description: 'Full platform access',
+      permissions: admin,
+      is_builtin: true,
+      active: true,
+    },
+    {
+      key: 'ACCOUNTANT',
+      name_bn: 'অ্যাকাউন্ট্যান্ট',
+      name_en: 'Accountant',
+      description: 'Operations, finance and reports',
+      permissions: accountant,
+      is_builtin: true,
+      active: true,
+    },
+    {
+      key: 'FIELD_USER',
+      name_bn: 'ফিল্ড ইউজার',
+      name_en: 'Field User',
+      description: 'Field collection and attendance tasks',
+      permissions: fieldUser,
+      is_builtin: true,
+      active: true,
+    },
+    {
+      key: 'VIEWER',
+      name_bn: 'ভিউয়ার',
+      name_en: 'Viewer',
+      description: 'Read-only dashboard, academic and reports access',
+      permissions: viewer,
+      is_builtin: true,
+      active: true,
+    },
+  ];
+}
+
+function sanitizePermissionList_(permissions) {
+  if (!Array.isArray(permissions)) return [];
+  const seen = {};
+  return permissions
+    .map(function (p) { return String(p || '').trim(); })
+    .filter(function (p) {
+      if (!p || APP_PERMISSIONS.indexOf(p) === -1 || seen[p]) return false;
+      seen[p] = true;
+      return true;
+    })
+    .sort();
+}
+
+function validateRoleKey_(value, fieldName) {
+  const key = String(value || '').trim().toUpperCase();
+  if (!key) throw new Error((fieldName || 'role') + ' is required');
+  if (!/^[A-Z][A-Z0-9_]{1,39}$/.test(key)) {
+    throw new Error((fieldName || 'role') + ' invalid value: ' + key);
+  }
+  const defs = readRoleDefinitions_();
+  const found = defs.find(function (r) {
+    return String(r.key || '').trim().toUpperCase() === key && !!r.active;
+  });
+  if (!found) throw new Error((fieldName || 'role') + ' invalid value: ' + key);
+  return key;
+}
+
+function ensureRoleDefinitionDefaults_() {
+  const byKey = getSettingsMapByKey_();
+  if (byKey[ROLE_DEFINITIONS_SETTING_KEY]) return;
+  upsertSettingTextByKey_(
+    ROLE_DEFINITIONS_SETTING_KEY,
+    JSON.stringify(defaultRoleDefinitions_()),
+    'Centralized role definitions and permissions'
+  );
+}
+
+function readRoleDefinitions_() {
+  ensureRoleDefinitionDefaults_();
+  const byKey = getSettingsMapByKey_();
+  const raw = String((byKey[ROLE_DEFINITIONS_SETTING_KEY] || {}).value || '').trim();
+  const defaults = defaultRoleDefinitions_();
+  if (!raw) return defaults;
+
+  try {
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return defaults;
+    const merged = {};
+    defaults.forEach(function (def) {
+      merged[def.key] = Object.assign({}, def, {
+        permissions: sanitizePermissionList_(def.permissions),
+      });
+    });
+    parsed.forEach(function (item) {
+      const key = String((item && item.key) || '').trim().toUpperCase();
+      if (!key) return;
+      merged[key] = {
+        key: key,
+        name_bn: String((item && item.name_bn) || key).trim(),
+        name_en: String((item && item.name_en) || key).trim(),
+        description: String((item && item.description) || '').trim(),
+        permissions: sanitizePermissionList_((item && item.permissions) || []),
+        is_builtin: !!(item && item.is_builtin),
+        active: item && item.active !== false,
+      };
+    });
+    return Object.keys(merged)
+      .sort()
+      .map(function (key) { return merged[key]; });
+  } catch (err) {
+    return defaults;
+  }
+}
+
+function getRoleDefinition_(roleKey) {
+  const key = String(roleKey || '').trim().toUpperCase();
+  if (!key) return null;
+  const defs = readRoleDefinitions_();
+  for (let i = 0; i < defs.length; i++) {
+    if (String(defs[i].key || '').trim().toUpperCase() === key) return defs[i];
+  }
+  return null;
+}
+
+function roleHasPermission_(roleKey, permission) {
+  const def = getRoleDefinition_(roleKey);
+  if (!def || !def.active) return false;
+  return (def.permissions || []).indexOf(String(permission || '').trim()) !== -1;
+}
+
+function assertPermission_(params, permission) {
+  const role = validateRoleKey_(params && params.user_role, 'user_role');
+  if (!permission) return role;
+  if (!roleHasPermission_(role, permission)) {
+    addAudit_(
+      'security',
+      'PERMISSION_DENIED',
+      String(permission),
+      '',
+      JSON.stringify({
+        permission: permission,
+        action: String((params && params.action) || ''),
+        user_id: String((params && params.user_id) || ''),
+        role: role,
+      }),
+      String((params && params.user_id) || role)
+    );
+    throw new Error('Permission denied for role: ' + role + ' (' + permission + ')');
+  }
+  return role;
+}
+
+function assertActionPermission_(params, action) {
+  const permission = ACTION_PERMISSIONS[String(action || '').trim()];
+  if (!permission) return;
+  assertPermission_(params || {}, permission);
+}
+
+function listRoleDefinitions_(params) {
+  params = params || {};
+  assertPermission_(params, 'roles.view');
+  return {
+    ok: true,
+    data: readRoleDefinitions_().map(function (def) {
+      return {
+        key: def.key,
+        name_bn: def.name_bn,
+        name_en: def.name_en,
+        description: def.description,
+        permissions: sanitizePermissionList_(def.permissions),
+        is_builtin: !!def.is_builtin,
+        active: def.active !== false,
+      };
+    }),
+  };
+}
+
+function upsertRoleDefinition_(payload, params) {
+  payload = payload || {};
+  params = params || {};
+  const key = String(payload.key || '').trim().toUpperCase();
+  if (!/^[A-Z][A-Z0-9_]{1,39}$/.test(key)) {
+    return { ok: false, message: 'Role key must be uppercase letters, numbers or underscore' };
+  }
+
+  const permissions = sanitizePermissionList_(payload.permissions || []);
+  if (!permissions.length) {
+    return { ok: false, message: 'At least one permission is required' };
+  }
+
+  const defs = readRoleDefinitions_();
+  const existing = defs.find(function (def) {
+    return String(def.key || '').trim().toUpperCase() === key;
+  });
+  if (existing && existing.is_builtin) {
+    return { ok: false, message: 'Built-in roles cannot be edited from here' };
+  }
+
+  const nextDef = {
+    key: key,
+    name_bn: String(payload.name_bn || key).trim(),
+    name_en: String(payload.name_en || key).trim(),
+    description: String(payload.description || '').trim(),
+    permissions: permissions,
+    is_builtin: false,
+    active: payload.active !== false,
+  };
+  const before = existing ? JSON.stringify(existing) : '';
+  const nextDefs = defs.filter(function (def) {
+    return String(def.key || '').trim().toUpperCase() !== key;
+  });
+  nextDefs.push(nextDef);
+  nextDefs.sort(function (a, b) {
+    return String(a.key || '').localeCompare(String(b.key || ''));
+  });
+  upsertSettingTextByKey_(
+    ROLE_DEFINITIONS_SETTING_KEY,
+    JSON.stringify(nextDefs),
+    'Centralized role definitions and permissions'
+  );
+  addAudit_(
+    'roles',
+    existing ? 'UPDATE' : 'CREATE',
+    key,
+    before,
+    JSON.stringify(nextDef),
+    String(params.user_id || params.user_role || 'admin')
+  );
+  return { ok: true, data: nextDef };
 }
 
 function parseBool_(raw, defaultValue) {
@@ -2230,7 +2616,7 @@ function readAppUiSettings_() {
 
 function getAppUiSettings_(params) {
   params = params || {};
-  assertRole_(params.user_role, ['ADMIN', 'ACCOUNTANT', 'FIELD_USER', 'VIEWER']);
+  assertPermission_(params, 'reports.view');
   return { ok: true, data: readAppUiSettings_() };
 }
 
@@ -2434,7 +2820,7 @@ function upsertNotificationSettings_(payload, params) {
 
 function listInAppNotifications_(params) {
   params = params || {};
-  assertRole_(params.user_role, ['ADMIN', 'ACCOUNTANT', 'FIELD_USER', 'VIEWER']);
+  assertPermission_(params, 'notifications.view');
   const role = String(params.user_role || '');
   const userId = String(params.user_id || '');
 
@@ -2484,12 +2870,35 @@ function createNotificationEvent_(payload, params) {
   return { ok: true, data: result };
 }
 
+function logClientGuard_(payload, params) {
+  payload = payload || {};
+  params = params || {};
+  const guardType = String(payload.type || 'ROUTE_DENIED').trim().toUpperCase();
+  const permission = String(payload.permission || '').trim();
+  const routeName = String(payload.route_name || '').trim();
+  addAudit_(
+    'client_guard',
+    guardType,
+    permission || routeName || uid_('guard'),
+    '',
+    JSON.stringify({
+      permission: permission,
+      route_name: routeName,
+      role: String(params.user_role || ''),
+      user_id: String(params.user_id || ''),
+    }),
+    String(params.user_id || params.user_role || 'unknown')
+  );
+  return { ok: true };
+}
+
 function assertRole_(currentRole, allowedRoles) {
   if (!currentRole) throw new Error('user_role is required');
-  validateEnum_(currentRole, CONFIG.ENUMS.ROLE, 'user_role');
-  if (allowedRoles.indexOf(currentRole) === -1) {
-    throw new Error('Permission denied for role: ' + currentRole);
+  const role = validateRoleKey_(currentRole, 'user_role');
+  if (Array.isArray(allowedRoles) && allowedRoles.length && allowedRoles.indexOf(role) === -1) {
+    throw new Error('Permission denied for role: ' + role);
   }
+  return role;
 }
 
 function requireUserIdIfFieldRole_(role, userId) {
@@ -2775,9 +3184,45 @@ function confirmPinReset_(params) {
   return { ok: true, message: 'পিন সফলভাবে রিসেট হয়েছে' };
 }
 
+function upsertUser_(payload, params) {
+  payload = payload || {};
+  params = params || {};
+  validateRequired_(payload, ['id', 'name', 'email', 'role']);
+  const roleKey = validateRoleKey_(payload.role, 'role');
+  const email = String(payload.email || '').trim().toLowerCase();
+  if (!email || email.indexOf('@') === -1) {
+    return { ok: false, message: 'Valid email is required' };
+  }
+
+  const next = Object.assign({}, payload, {
+    role: roleKey,
+    email: email,
+    name: String(payload.name || '').trim(),
+    phone: String(payload.phone || '').trim(),
+    active: String(payload.active || 'TRUE').trim().toUpperCase() === 'TRUE' ? 'TRUE' : 'FALSE',
+    approval_status: String(payload.approval_status || 'APPROVED').trim().toUpperCase(),
+    updated_by: String(params.user_id || params.user_role || 'admin'),
+  });
+  const res = upsertById_(CONFIG.SHEETS.USERS, next);
+  addAudit_(
+    'users',
+    res.mode === 'create' ? 'CREATE' : 'UPDATE',
+    next.id,
+    '',
+    JSON.stringify({
+      role: next.role,
+      active: next.active,
+      approval_status: next.approval_status,
+      email: next.email,
+    }),
+    String(params.user_id || params.user_role || 'admin')
+  );
+  return res;
+}
+
 function listUsers_(params) {
   params = params || {};
-  assertRole_(params.user_role, ['ADMIN']);
+  assertPermission_(params, 'users.manage');
   const users = listSheetRows_(CONFIG.SHEETS.USERS).data || [];
   return {
     ok: true,

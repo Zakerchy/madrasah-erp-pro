@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
 import '../../core/app_lang.dart';
+import '../../shared/constants/app_permissions.dart';
+import '../../shared/services/access_control_service.dart';
 import '../../shared/services/api_service.dart';
 import '../../shared/services/session_service.dart';
 import '../../shared/widgets/base_scaffold.dart';
@@ -26,6 +28,8 @@ class _ExpenseScreenState extends State<ExpenseScreen> {
   bool _saving = false;
   bool _loadingList = true;
   List<Map<String, dynamic>> _rows = [];
+
+  bool get _canWrite => SessionService.can(AppPermissions.expensesWrite);
 
   @override
   void initState() {
@@ -79,6 +83,14 @@ class _ExpenseScreenState extends State<ExpenseScreen> {
 
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
+    if (!_canWrite) {
+      AccessControlService.showDeniedSnack(
+        context,
+        permission: AppPermissions.expensesWrite,
+        routeName: '/expenses',
+      );
+      return;
+    }
 
     setState(() => _saving = true);
     try {

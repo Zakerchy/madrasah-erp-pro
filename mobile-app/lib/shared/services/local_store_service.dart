@@ -3,12 +3,15 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../models/role_definition.dart';
+
 class LocalStoreService {
   static const String _pendingQueueKey = 'pending_post_queue_v1';
   static const String _getCacheKey = 'get_cache_v1';
   static const String _sessionUserKey = 'session_user_v1';
   static const String _offlineCredentialKey = 'offline_credentials_v2';
   static const String _inAppNotificationsKey = 'in_app_notifications_v1';
+  static const String _roleDefinitionsKey = 'role_definitions_v1';
   static const Duration _getCacheTtl = Duration(hours: 6);
   static const Duration _staleGetCacheTtl = Duration(days: 14);
   static const int _maxGetCacheEntries = 80;
@@ -154,6 +157,25 @@ class LocalStoreService {
     await init();
     await _prefs!.remove(_sessionUserKey);
     await _prefs!.remove(_offlineCredentialKey);
+  }
+
+  static Future<void> saveRoleDefinitions(List<RoleDefinition> defs) async {
+    await init();
+    await _prefs!.setString(
+      _roleDefinitionsKey,
+      jsonEncode(defs.map((e) => e.toMap()).toList()),
+    );
+  }
+
+  static List<RoleDefinition> readRoleDefinitions() {
+    final raw = _prefs?.getString(_roleDefinitionsKey);
+    if (raw == null || raw.isEmpty) return [];
+    final decoded = jsonDecode(raw);
+    if (decoded is! List) return [];
+    return decoded
+        .whereType<Map>()
+        .map((e) => RoleDefinition.fromMap(Map<String, dynamic>.from(e)))
+        .toList();
   }
 
   static List<Map<String, dynamic>> readInAppNotifications() {

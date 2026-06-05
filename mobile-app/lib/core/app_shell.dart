@@ -16,6 +16,8 @@ import '../features/scholarship/scholarship_screen.dart';
 import '../features/settings/settings_screen.dart';
 import 'app_lang.dart';
 import 'theme.dart';
+import '../shared/constants/app_routes.dart';
+import '../shared/widgets/guarded_route.dart';
 
 class MadrasahErpProApp extends StatefulWidget {
   const MadrasahErpProApp({super.key});
@@ -47,22 +49,34 @@ class _MadrasahErpProAppState extends State<MadrasahErpProApp> {
       theme: buildTheme(),
       darkTheme: buildDarkTheme(),
       themeMode: ThemeMode.dark,
-      initialRoute: '/login',
-      routes: {
-        '/login': (_) => const LoginScreen(),
-        '/dashboard': (_) => const DashboardScreen(),
-        '/academic': (_) => const AcademicFoundationScreen(),
-        '/academic-core': (_) => const AcademicCoreScreen(),
-        '/donations': (_) => const DonationScreen(),
-        '/expenses': (_) => const ExpenseScreen(),
-        '/fees': (_) => const FeeDuesScreen(),
-        '/finance-control': (_) => const FinanceControlScreen(),
-        '/communication': (_) => const CommunicationDocumentsScreen(),
-        '/salary': (_) => const SalaryScreen(),
-        '/beneficiaries': (_) => const BeneficiariesScreen(),
-        '/scholarship': (_) => const ScholarshipScreen(),
-        '/reports': (_) => const ReportsScreen(),
-        '/settings': (_) => const SettingsScreen(),
+      initialRoute: AppRoutes.login,
+      onGenerateRoute: (settings) {
+        final name = settings.name ?? AppRoutes.login;
+        final routes = <String, Widget>{
+          AppRoutes.login: const LoginScreen(),
+          AppRoutes.dashboard: const DashboardScreen(),
+          AppRoutes.academic: const AcademicFoundationScreen(),
+          AppRoutes.academicCore: const AcademicCoreScreen(),
+          AppRoutes.donations: const DonationScreen(),
+          AppRoutes.expenses: const ExpenseScreen(),
+          AppRoutes.fees: const FeeDuesScreen(),
+          AppRoutes.financeControl: const FinanceControlScreen(),
+          AppRoutes.communication: const CommunicationDocumentsScreen(),
+          AppRoutes.salary: const SalaryScreen(),
+          AppRoutes.beneficiaries: const BeneficiariesScreen(),
+          AppRoutes.scholarship: const ScholarshipScreen(),
+          AppRoutes.reports: const ReportsScreen(),
+          AppRoutes.settings: const SettingsScreen(),
+        };
+        final child = routes[name] ?? const LoginScreen();
+        return MaterialPageRoute(
+          settings: settings,
+          builder: (_) => GuardedRoute(
+            routeName: name,
+            permission: AppRoutes.requiredPermissions[name],
+            child: child,
+          ),
+        );
       },
     );
   }

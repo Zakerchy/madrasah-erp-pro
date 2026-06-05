@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
 import '../../core/app_lang.dart';
+import '../../shared/constants/app_permissions.dart';
+import '../../shared/services/access_control_service.dart';
 import '../../shared/services/api_service.dart';
 import '../../shared/services/session_service.dart';
 import '../../shared/widgets/base_scaffold.dart';
@@ -27,6 +29,8 @@ class _DonationScreenState extends State<DonationScreen> {
   List<Map<String, dynamic>> _rows = [];
   DateTime? _historyFrom;
   DateTime? _historyTo;
+
+  bool get _canWrite => SessionService.can(AppPermissions.donationsWrite);
 
   @override
   void initState() {
@@ -145,6 +149,14 @@ class _DonationScreenState extends State<DonationScreen> {
 
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
+    if (!_canWrite) {
+      AccessControlService.showDeniedSnack(
+        context,
+        permission: AppPermissions.donationsWrite,
+        routeName: '/donations',
+      );
+      return;
+    }
 
     setState(() => _saving = true);
     try {

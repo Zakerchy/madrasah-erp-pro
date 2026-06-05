@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
 import '../../core/app_lang.dart';
+import '../../shared/constants/app_permissions.dart';
 import '../../shared/services/api_service.dart';
 import '../../shared/services/session_service.dart';
 import '../../shared/widgets/base_scaffold.dart';
@@ -49,8 +50,7 @@ class _FeeDuesScreenState extends State<FeeDuesScreen> {
   final _waiverReason = TextEditingController();
   final _waiverNotes = TextEditingController();
 
-  bool get _canWrite =>
-      SessionService.role == 'ADMIN' || SessionService.role == 'ACCOUNTANT';
+  bool get _canWrite => SessionService.can(AppPermissions.feesWrite);
 
   @override
   void initState() {

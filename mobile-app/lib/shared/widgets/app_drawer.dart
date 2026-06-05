@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 
 import '../../core/app_lang.dart';
+import '../constants/app_permissions.dart';
+import '../constants/app_routes.dart';
+import '../services/role_service.dart';
 import '../services/session_service.dart';
 
 class AppDrawer extends StatelessWidget {
@@ -20,8 +23,6 @@ class AppDrawer extends StatelessWidget {
             },
           );
         }
-
-        final role = SessionService.role;
 
         return Drawer(
           child: ListView(
@@ -44,7 +45,7 @@ class AppDrawer extends StatelessWidget {
                             style:
                                 const TextStyle(fontWeight: FontWeight.w600)),
                         Text(
-                          '${AppLang.t('ভূমিকা', 'Role')}: ${user?.role ?? 'N/A'}',
+                          '${AppLang.t('ভূমিকা', 'Role')}: ${user == null ? 'N/A' : RoleService.roleName(user.role, isEnglish: isEn)}',
                           style: const TextStyle(fontSize: 12),
                         ),
                       ],
@@ -52,26 +53,36 @@ class AppDrawer extends StatelessWidget {
                   );
                 },
               ),
-              item('ড্যাশবোর্ড', 'Dashboard', '/dashboard'),
-              item('শিক্ষার্থী ও একাডেমিক', 'Students & Academic', '/academic'),
-              item('হাজিরা ও ফলাফল', 'Attendance & Results', '/academic-core'),
-              item('দান সংগ্রহ', 'Donations', '/donations'),
-              if (role == 'ADMIN' || role == 'ACCOUNTANT')
-                item('ফি ও বকেয়া', 'Fees & Dues', '/fees'),
-              if (role == 'ADMIN' || role == 'ACCOUNTANT')
+              if (SessionService.can(AppPermissions.dashboardView))
+                item('ড্যাশবোর্ড', 'Dashboard', AppRoutes.dashboard),
+              if (SessionService.can(AppPermissions.academicFoundationView))
+                item('শিক্ষার্থী ও একাডেমিক', 'Students & Academic',
+                    AppRoutes.academic),
+              if (SessionService.can(AppPermissions.academicCoreView))
+                item('হাজিরা ও ফলাফল', 'Attendance & Results',
+                    AppRoutes.academicCore),
+              if (SessionService.can(AppPermissions.donationsView))
+                item('দান সংগ্রহ', 'Donations', AppRoutes.donations),
+              if (SessionService.can(AppPermissions.feesView))
+                item('ফি ও বকেয়া', 'Fees & Dues', AppRoutes.fees),
+              if (SessionService.can(AppPermissions.financeView))
                 item('ফাইন্যান্স কন্ট্রোল', 'Finance Control',
-                    '/finance-control'),
-              item('নোটিশ ও ডকুমেন্ট', 'Notices & Documents', '/communication'),
-              if (role == 'ADMIN' || role == 'ACCOUNTANT')
-                item('খরচ', 'Expenses', '/expenses'),
-              if (role == 'ADMIN' || role == 'ACCOUNTANT')
-                item('বেতন', 'Salary', '/salary'),
-              if (role == 'ADMIN' || role == 'ACCOUNTANT')
-                item('সুবিধাভোগী', 'Beneficiaries', '/beneficiaries'),
-              if (role == 'ADMIN' || role == 'ACCOUNTANT')
-                item('বৃত্তি', 'Scholarship', '/scholarship'),
-              item('রিপোর্ট', 'Reports', '/reports'),
-              if (role == 'ADMIN') item('সেটিংস', 'Settings', '/settings'),
+                    AppRoutes.financeControl),
+              if (SessionService.can(AppPermissions.communicationView))
+                item('নোটিশ ও ডকুমেন্ট', 'Notices & Documents',
+                    AppRoutes.communication),
+              if (SessionService.can(AppPermissions.expensesView))
+                item('খরচ', 'Expenses', AppRoutes.expenses),
+              if (SessionService.can(AppPermissions.salaryView))
+                item('বেতন', 'Salary', AppRoutes.salary),
+              if (SessionService.can(AppPermissions.beneficiariesView))
+                item('সুবিধাভোগী', 'Beneficiaries', AppRoutes.beneficiaries),
+              if (SessionService.can(AppPermissions.scholarshipView))
+                item('বৃত্তি', 'Scholarship', AppRoutes.scholarship),
+              if (SessionService.can(AppPermissions.reportsView))
+                item('রিপোর্ট', 'Reports', AppRoutes.reports),
+              if (SessionService.can(AppPermissions.settingsView))
+                item('সেটিংস', 'Settings', AppRoutes.settings),
               const Divider(),
               ListTile(
                 title: Text(AppLang.t('লগআউট', 'Logout')),
@@ -80,7 +91,7 @@ class AppDrawer extends StatelessWidget {
                   SessionService.clear();
                   Navigator.pop(context);
                   Navigator.pushNamedAndRemoveUntil(
-                      context, '/login', (route) => false);
+                      context, AppRoutes.login, (route) => false);
                 },
               ),
             ],

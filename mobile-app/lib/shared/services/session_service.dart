@@ -2,26 +2,65 @@ import 'package:flutter/foundation.dart';
 
 import '../models/session_user.dart';
 import 'local_store_service.dart';
+import 'role_service.dart';
 
 class SessionService {
   static final ValueNotifier<SessionUser?> currentUser = ValueNotifier<SessionUser?>(null);
 
   static SessionUser? get user => currentUser.value;
+  static bool get isLoggedIn => user != null;
   static String get role => user?.role ?? 'VIEWER';
   static String get userId => user?.id ?? 'unknown';
   static String get userName => user?.name ?? 'Unknown';
+  static List<String> get permissions {
+    final current = user?.permissions ?? const [];
+    if (current.isNotEmpty) return current;
+    return RoleService.permissionsForRole(role);
+  }
 
   static Future<void> bootstrap() async {
     await LocalStoreService.init();
+    await RoleService.bootstrap();
     final cachedUser = LocalStoreService.readSessionUser();
     if (cachedUser != null) {
-      currentUser.value = SessionUser.fromMap(cachedUser);
+      final next = SessionUser.fromMap(cachedUser);
+      currentUser.value = next.permissions.isNotEmpty
+          ? next
+          : SessionUser(
+              id: next.id,
+              name: next.name,
+              role: next.role,
+              phone: next.phone,
+              email: next.email,
+              approvalStatus: next.approvalStatus,
+              permissions: RoleService.permissionsForRole(next.role),
+            );
+      LocalStoreService.saveSessionUser(currentUser.value!.toMap());
     }
   }
 
   static void setUser(SessionUser next) {
-    currentUser.value = next;
-    LocalStoreService.saveSessionUser(next.toMap());
+    final permissions = next.permissions.isNotEmpty
+        ? next.permissions
+        : RoleService.permissionsForRole(next.role);
+    currentUser.value = SessionUser(
+      id: next.id,
+      name: next.name,
+      role: next.role,
+      phone: next.phone,
+      email: next.email,
+      approvalStatus: next.approvalStatus,
+      permissions: permissions,
+    );
+    LocalStoreService.saveSessionUser(currentUser.value!.toMap());
+  }
+
+  static bool can(String permission) {
+    return RoleService.hasPermission(
+      permission,
+      role: role,
+      permissions: permissions,
+    );
   }
 
   static Future<void> saveOfflineCredential({

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
 import '../../core/app_lang.dart';
+import '../../shared/constants/app_permissions.dart';
 import '../../shared/services/api_service.dart';
 import '../../shared/services/session_service.dart';
 import '../../shared/widgets/base_scaffold.dart';
@@ -50,9 +51,9 @@ class _AcademicCoreScreenState extends State<AcademicCoreScreen> {
   final _markNotes = TextEditingController();
 
   bool get _canWrite =>
-      SessionService.role == 'ADMIN' || SessionService.role == 'ACCOUNTANT';
+      SessionService.can(AppPermissions.academicCoreWrite);
   bool get _canRecordAttendance =>
-      _canWrite || SessionService.role == 'FIELD_USER';
+      _canWrite || SessionService.can(AppPermissions.academicAttendanceWrite);
 
   @override
   void initState() {

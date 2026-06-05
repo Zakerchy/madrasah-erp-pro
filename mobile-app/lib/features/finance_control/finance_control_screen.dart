@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../core/app_lang.dart';
+import '../../shared/constants/app_permissions.dart';
 import '../../shared/services/api_service.dart';
 import '../../shared/services/session_service.dart';
 import '../../shared/widgets/base_scaffold.dart';
@@ -32,8 +33,13 @@ class _FinanceControlScreenState extends State<FinanceControlScreen> {
   final _requestAmount = TextEditingController();
   final _requestSummary = TextEditingController();
 
-  bool get _isAdmin => SessionService.role == 'ADMIN';
-  bool get _canWrite => _isAdmin || SessionService.role == 'ACCOUNTANT';
+  bool get _canWrite => SessionService.can(AppPermissions.financeWrite);
+  bool get _canManageRules =>
+      SessionService.can(AppPermissions.financeApprovalRulesManage);
+  bool get _canCreateRequests =>
+      SessionService.can(AppPermissions.financeApprovalRequestsCreate);
+  bool get _canDecideRequests =>
+      SessionService.can(AppPermissions.financeApprovalRequestsDecide);
 
   @override
   void initState() {
@@ -379,7 +385,7 @@ class _FinanceControlScreenState extends State<FinanceControlScreen> {
     return _panel(
         AppLang.t('Approval Workflow', 'Approval Workflow'),
         Column(children: [
-          if (_isAdmin) ...[
+          if (_canManageRules) ...[
             TextField(
                 controller: _ruleThreshold,
                 keyboardType: TextInputType.number,
@@ -408,7 +414,7 @@ class _FinanceControlScreenState extends State<FinanceControlScreen> {
           Align(
               alignment: Alignment.centerRight,
               child: FilledButton.icon(
-                  onPressed: _saving ? null : _createRequest,
+                  onPressed: !_canCreateRequests || _saving ? null : _createRequest,
                   icon: const Icon(Icons.add_task),
                   label: Text(AppLang.t('Create Request', 'Create Request')))),
           const Divider(height: 24),
@@ -421,7 +427,7 @@ class _FinanceControlScreenState extends State<FinanceControlScreen> {
               child: ListTile(
                   title: Text(r['summary']?.toString() ?? '-'),
                   subtitle: Text('${r['amount']} • ${r['status']}'),
-                  trailing: _isAdmin && r['status'] == 'PENDING'
+                  trailing: _canDecideRequests && r['status'] == 'PENDING'
                       ? Wrap(spacing: 6, children: [
                           IconButton(
                               onPressed: () =>

@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
 import '../../core/app_config.dart';
+import '../constants/app_permissions.dart';
 import 'local_store_service.dart';
 import 'session_service.dart';
 
@@ -61,6 +62,76 @@ class ApiService {
     'listDocuments': Duration(minutes: 15),
     'listNotices': Duration(minutes: 15),
     'listAuditLog': Duration(minutes: 5),
+    'listRoleDefinitions': Duration(hours: 1),
+  };
+
+  static const Map<String, String> _actionPermissions = {
+    'dashboardSummary': AppPermissions.dashboardView,
+    'listTransactions': AppPermissions.donationsView,
+    'listBeneficiaries': AppPermissions.beneficiariesView,
+    'listStaff': AppPermissions.salaryView,
+    'listSalaryPayments': AppPermissions.salaryView,
+    'listScholarshipByMonth': AppPermissions.scholarshipView,
+    'listStudents': AppPermissions.academicFoundationView,
+    'listStudentGuardians': AppPermissions.academicFoundationView,
+    'listClasses': AppPermissions.academicFoundationView,
+    'listSections': AppPermissions.academicFoundationView,
+    'listSubjects': AppPermissions.academicFoundationView,
+    'listAttendance': AppPermissions.academicCoreView,
+    'listExamTerms': AppPermissions.academicCoreView,
+    'listExamMarks': AppPermissions.academicCoreView,
+    'resultSummary': AppPermissions.academicCoreView,
+    'listFeePlans': AppPermissions.feesView,
+    'listFeePayments': AppPermissions.feesView,
+    'listFeeWaivers': AppPermissions.feesView,
+    'listFeeDues': AppPermissions.feesView,
+    'listBudgets': AppPermissions.financeView,
+    'financeControlSummary': AppPermissions.financeView,
+    'listApprovalRules': AppPermissions.financeView,
+    'listApprovalRequests': AppPermissions.financeView,
+    'listNotices': AppPermissions.communicationView,
+    'listDocuments': AppPermissions.communicationView,
+    'monthlyReport': AppPermissions.reportsView,
+    'rangeReport': AppPermissions.reportsView,
+    'datasetStats': AppPermissions.reportsView,
+    'getAppUiSettings': AppPermissions.reportsView,
+    'listAuditLog': AppPermissions.auditView,
+    'getNotificationSettings': AppPermissions.notificationsManage,
+    'listInAppNotifications': AppPermissions.notificationsView,
+    'listRoleDefinitions': AppPermissions.rolesView,
+    'createTransaction': AppPermissions.donationsWrite,
+    'updateTransaction': AppPermissions.transactionsManage,
+    'upsertBeneficiary': AppPermissions.beneficiariesWrite,
+    'upsertStaff': AppPermissions.salaryWrite,
+    'recordSalaryPayment': AppPermissions.salaryWrite,
+    'saveScholarshipPayment': AppPermissions.scholarshipWrite,
+    'upsertStudent': AppPermissions.academicFoundationWrite,
+    'upsertStudentGuardian': AppPermissions.academicFoundationWrite,
+    'upsertClass': AppPermissions.academicFoundationWrite,
+    'upsertSection': AppPermissions.academicFoundationWrite,
+    'upsertSubject': AppPermissions.academicFoundationWrite,
+    'saveAttendance': AppPermissions.academicAttendanceWrite,
+    'upsertExamTerm': AppPermissions.academicCoreWrite,
+    'saveExamMark': AppPermissions.academicCoreWrite,
+    'upsertFeePlan': AppPermissions.feesWrite,
+    'recordFeePayment': AppPermissions.feesWrite,
+    'upsertFeeWaiver': AppPermissions.feesWrite,
+    'upsertBudget': AppPermissions.financeWrite,
+    'upsertApprovalRule': AppPermissions.financeApprovalRulesManage,
+    'createApprovalRequest': AppPermissions.financeApprovalRequestsCreate,
+    'decideApprovalRequest': AppPermissions.financeApprovalRequestsDecide,
+    'publishNotice': AppPermissions.communicationWrite,
+    'markNoticeRead': AppPermissions.communicationView,
+    'upsertDocument': AppPermissions.communicationWrite,
+    'listUsers': AppPermissions.usersManage,
+    'upsertUser': AppPermissions.usersManage,
+    'setUserApprovalStatus': AppPermissions.usersManage,
+    'generateTempResetToken': AppPermissions.usersManage,
+    'upsertNotificationSettings': AppPermissions.notificationsManage,
+    'upsertAppUiSettings': AppPermissions.appUiManage,
+    'createNotificationEvent': AppPermissions.notificationsView,
+    'upsertRoleDefinition': AppPermissions.rolesManage,
+    'logClientGuard': AppPermissions.notificationsView,
   };
 
   static const Duration _defaultReadCacheTtl = Duration(minutes: 30);
@@ -110,6 +181,7 @@ class ApiService {
     'upsertDocument': {'listDocuments'},
     'upsertUser': {'listUsers'},
     'setUserApprovalStatus': {'listUsers'},
+    'upsertRoleDefinition': {'listRoleDefinitions', 'listUsers'},
   };
 
   static String hashPin(String pin) {
@@ -164,6 +236,17 @@ class ApiService {
   }) async {
     final isReadOnly = !_queueableActions.contains(action);
     final cacheKey = _cacheKeyFor(action, body);
+    final requiredPermission = _actionPermissions[action];
+
+    if (requiredPermission != null &&
+        SessionService.isLoggedIn &&
+        !SessionService.can(requiredPermission)) {
+      return {
+        'ok': false,
+        'permission_denied': true,
+        'message': 'আপনার এই কাজের অনুমতি নেই',
+      };
+    }
 
     if (!_isConfigured) {
       final cached = LocalStoreService.readCachedGetResponse(

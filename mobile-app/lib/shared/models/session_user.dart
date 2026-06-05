@@ -5,6 +5,7 @@ class SessionUser {
   final String phone;
   final String email;
   final String approvalStatus;
+  final List<String> permissions;
 
   const SessionUser({
     required this.id,
@@ -13,6 +14,7 @@ class SessionUser {
     required this.phone,
     required this.email,
     required this.approvalStatus,
+    required this.permissions,
   });
 
   factory SessionUser.fromMap(Map<String, dynamic> map) {
@@ -23,6 +25,10 @@ class SessionUser {
       phone: (map['phone'] ?? '').toString(),
       email: (map['email'] ?? '').toString(),
       approvalStatus: (map['approval_status'] ?? 'APPROVED').toString(),
+      permissions: (map['permissions'] as List<dynamic>? ?? const [])
+          .map((e) => e.toString())
+          .where((e) => e.trim().isNotEmpty)
+          .toList(),
     );
   }
 
@@ -34,6 +40,7 @@ class SessionUser {
       'phone': phone,
       'email': email,
       'approval_status': approvalStatus,
+      'permissions': permissions,
     };
   }
 }

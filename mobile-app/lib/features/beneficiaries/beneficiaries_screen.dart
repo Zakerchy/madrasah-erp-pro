@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
 import '../../core/app_lang.dart';
+import '../../shared/constants/app_permissions.dart';
+import '../../shared/services/access_control_service.dart';
 import '../../shared/services/api_service.dart';
 import '../../shared/services/session_service.dart';
 import '../../shared/widgets/base_scaffold.dart';
@@ -22,6 +24,8 @@ class _BeneficiariesScreenState extends State<BeneficiariesScreen> {
   final _className = TextEditingController();
   final _guardianStatus = TextEditingController();
   final _monthlyAmount = TextEditingController();
+
+  bool get _canWrite => SessionService.can(AppPermissions.beneficiariesWrite);
 
   Future<void> _load({bool forceRefresh = false}) async {
     setState(() => _loading = true);
@@ -46,6 +50,14 @@ class _BeneficiariesScreenState extends State<BeneficiariesScreen> {
 
   Future<void> _save() async {
     final messenger = ScaffoldMessenger.of(context);
+    if (!_canWrite) {
+      AccessControlService.showDeniedSnack(
+        context,
+        permission: AppPermissions.beneficiariesWrite,
+        routeName: '/beneficiaries',
+      );
+      return;
+    }
     if (_name.text.trim().isEmpty) {
       messenger.showSnackBar(SnackBar(content: Text(AppLang.t('নাম প্রয়োজন', 'Name is required'))));
       return;

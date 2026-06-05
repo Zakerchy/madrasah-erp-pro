@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
 import '../../core/app_lang.dart';
+import '../../shared/constants/app_permissions.dart';
+import '../../shared/services/access_control_service.dart';
 import '../../shared/services/api_service.dart';
 import '../../shared/services/session_service.dart';
 import '../../shared/widgets/base_scaffold.dart';
@@ -31,6 +33,8 @@ class _ScholarshipScreenState extends State<ScholarshipScreen> {
   final _other = TextEditingController(text: '0');
   final _remaining = TextEditingController(text: '0');
   String _status = 'PAID';
+
+  bool get _canWrite => SessionService.can(AppPermissions.scholarshipWrite);
 
   @override
   void initState() {
@@ -72,6 +76,14 @@ class _ScholarshipScreenState extends State<ScholarshipScreen> {
 
   Future<void> _savePayment() async {
     final messenger = ScaffoldMessenger.of(context);
+    if (!_canWrite) {
+      AccessControlService.showDeniedSnack(
+        context,
+        permission: AppPermissions.scholarshipWrite,
+        routeName: '/scholarship',
+      );
+      return;
+    }
     if (_selectedBeneficiaryId.isEmpty || _monthKey.trim().isEmpty) {
       messenger.showSnackBar(SnackBar(content: Text(AppLang.t('সুবিধাভোগী ও মাস প্রয়োজন', 'Beneficiary and month are required'))));
       return;

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
 import '../../core/app_lang.dart';
+import '../../shared/constants/app_permissions.dart';
 import '../../shared/services/api_service.dart';
 import '../../shared/services/session_service.dart';
 import '../../shared/widgets/base_scaffold.dart';
@@ -78,7 +79,7 @@ class _AcademicFoundationScreenState extends State<AcademicFoundationScreen> {
   String _subjectStatus = 'ACTIVE';
 
   bool get _canWrite =>
-      SessionService.role == 'ADMIN' || SessionService.role == 'ACCOUNTANT';
+      SessionService.can(AppPermissions.academicFoundationWrite);
 
   @override
   void initState() {

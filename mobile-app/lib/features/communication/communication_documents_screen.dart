@@ -2,7 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/app_lang.dart';
+import '../../shared/constants/app_permissions.dart';
+import '../../shared/models/role_definition.dart';
+import '../../shared/services/access_control_service.dart';
 import '../../shared/services/api_service.dart';
+import '../../shared/services/role_service.dart';
 import '../../shared/services/session_service.dart';
 import '../../shared/widgets/base_scaffold.dart';
 
@@ -24,6 +28,7 @@ class _CommunicationDocumentsScreenState
   List<Map<String, dynamic>> _classes = [];
   List<Map<String, dynamic>> _notices = [];
   List<Map<String, dynamic>> _documents = [];
+  List<RoleDefinition> _roles = [];
 
   final _noticeTitle = TextEditingController();
   final _noticeMessage = TextEditingController();
@@ -38,7 +43,7 @@ class _CommunicationDocumentsScreenState
   final _docNotes = TextEditingController();
 
   bool get _canWrite =>
-      SessionService.role == 'ADMIN' || SessionService.role == 'ACCOUNTANT';
+      SessionService.can(AppPermissions.communicationWrite);
 
   @override
   void initState() {
@@ -61,6 +66,7 @@ class _CommunicationDocumentsScreenState
   Future<void> _loadAll({bool forceRefresh = false}) async {
     setState(() => _loading = true);
     final responses = await Future.wait([
+      _api.get('listRoleDefinitions', forceRefresh: forceRefresh),
       _api.get('listClasses', forceRefresh: forceRefresh),
       _api.get('listNotices',
           query: {if (_targetClassId.isNotEmpty) 'class_id': _targetClassId},
@@ -68,9 +74,19 @@ class _CommunicationDocumentsScreenState
       _api.get('listDocuments', forceRefresh: forceRefresh),
     ]);
     if (!mounted) return;
-    if (responses[0]['ok'] == true) _classes = _rows(responses[0]);
-    if (responses[1]['ok'] == true) _notices = _rows(responses[1]);
-    if (responses[2]['ok'] == true) _documents = _rows(responses[2]);
+    if (responses[0]['ok'] == true) {
+      _roles = (responses[0]['data'] as List<dynamic>? ?? [])
+          .map((e) => RoleDefinition.fromMap(Map<String, dynamic>.from(e as Map)))
+          .where((e) => e.active)
+          .toList()
+        ..sort((a, b) => a.key.compareTo(b.key));
+      await RoleService.storeDefinitions(_roles);
+    } else {
+      _roles = RoleService.activeDefinitions();
+    }
+    if (responses[1]['ok'] == true) _classes = _rows(responses[1]);
+    if (responses[2]['ok'] == true) _notices = _rows(responses[2]);
+    if (responses[3]['ok'] == true) _documents = _rows(responses[3]);
     setState(() => _loading = false);
   }
 
@@ -133,8 +149,11 @@ class _CommunicationDocumentsScreenState
   Future<void> _post(String action, Map<String, dynamic> payload, String okMsg,
       {bool requireWrite = true}) async {
     if (requireWrite && !_canWrite) {
-      _snack(AppLang.t(
-          'আপনার লেখার অনুমতি নেই', 'You do not have write permission'));
+      AccessControlService.showDeniedSnack(
+        context,
+        permission: AppPermissions.communicationWrite,
+        routeName: '/communication',
+      );
       return;
     }
     setState(() => _saving = true);
@@ -326,11 +345,16 @@ class _CommunicationDocumentsScreenState
   Widget _roleDropdown() {
     return DropdownButtonFormField<String>(
         initialValue: _targetRole,
-        items: ['', 'ADMIN', 'ACCOUNTANT', 'FIELD_USER', 'VIEWER']
-            .map((r) => DropdownMenuItem(
-                value: r,
-                child: Text(r.isEmpty ? AppLang.t('সব role', 'All roles') : r)))
-            .toList(),
+        items: [
+          DropdownMenuItem(
+            value: '',
+            child: Text(AppLang.t('সব role', 'All roles')),
+          ),
+          ..._roles.map((role) => DropdownMenuItem(
+                value: role.key,
+                child: Text(role.key),
+              )),
+        ],
         onChanged: (v) => setState(() => _targetRole = v ?? ''),
         decoration: InputDecoration(
             labelText: AppLang.t('Target role', 'Target role')));
