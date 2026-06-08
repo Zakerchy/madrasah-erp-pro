@@ -301,9 +301,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   String _fmt(double n) {
-    if (n >= 10000000) return '৳${(n / 10000000).toStringAsFixed(1)}কোটি';
-    if (n >= 100000) return '৳${(n / 100000).toStringAsFixed(1)}লাখ';
-    return '৳${NumberFormat('#,##0', 'en_US').format(n.toInt())}';
+    return '৳${NumberFormat('#,##0.##', 'en_US').format(n)}';
   }
 
   void _goToFund(String fundKey, String fundName) {

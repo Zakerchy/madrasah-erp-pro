@@ -79,7 +79,7 @@ class _FundDetailPageState extends State<FundDetailPage> {
   }
 
   String _fmt(double n) =>
-      '৳${NumberFormat('#,##0', 'en_US').format(n.toInt())}';
+      '৳${NumberFormat('#,##0.##', 'en_US').format(n)}';
 
   String _monthLabel(String key) {
     try {

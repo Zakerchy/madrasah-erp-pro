@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:share_plus/share_plus.dart';
 
 import '../../core/app_lang.dart';
@@ -170,6 +171,9 @@ class _ReportsScreenState extends State<ReportsScreen> {
         (value ?? '').toString().replaceAll(',', '').replaceAll('৳', '').trim();
     return double.tryParse(cleaned) ?? 0;
   }
+
+  String _fmt(double n) =>
+      '৳${NumberFormat('#,##0.##', 'en_US').format(n)}';
 
   Future<void> _shareReport() async {
     if (_data == null) return;
@@ -385,7 +389,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
                   leading: const Icon(Icons.arrow_upward, color: Colors.green),
                   title: Text(AppLang.t('মোট আয়', 'Total In')),
                   trailing: Text(
-                    '৳${totalIn.toStringAsFixed(0)}',
+                    _fmt(totalIn),
                     style: const TextStyle(
                         fontWeight: FontWeight.bold, color: Colors.green),
                   ),
@@ -396,7 +400,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
                   leading: const Icon(Icons.arrow_downward, color: Colors.red),
                   title: Text(AppLang.t('মোট ব্যয়', 'Total Out')),
                   trailing: Text(
-                    '৳${totalOut.toStringAsFixed(0)}',
+                    _fmt(totalOut),
                     style: const TextStyle(
                         fontWeight: FontWeight.bold, color: Colors.red),
                   ),
@@ -407,7 +411,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
                   leading: const Icon(Icons.account_balance_wallet),
                   title: Text(AppLang.t('ব্যালেন্স', 'Balance')),
                   trailing: Text(
-                    '৳${balance.toStringAsFixed(0)}',
+                    _fmt(balance),
                     style: const TextStyle(fontWeight: FontWeight.bold),
                   ),
                 ),
