@@ -30,8 +30,7 @@ class _FundDetailPageState extends State<FundDetailPage> {
   @override
   void initState() {
     super.initState();
-    final now = DateTime.now();
-    _selectedMonth = '${now.year}-${now.month.toString().padLeft(2, '0')}';
+    _selectedMonth = 'all';
     _load();
   }
 
@@ -42,18 +41,18 @@ class _FundDetailPageState extends State<FundDetailPage> {
     });
 
     try {
-      final parts = _selectedMonth.split('-');
-      final year = int.parse(parts[0]);
-      final month = int.parse(parts[1]);
-      final from = '$_selectedMonth-01';
-      final to =
-          '$_selectedMonth-${DateUtils.getDaysInMonth(year, month).toString().padLeft(2, '0')}';
+      final query = <String, dynamic>{'fundType': widget.fundKey};
+      if (_selectedMonth != 'all') {
+        final parts = _selectedMonth.split('-');
+        final year = int.parse(parts[0]);
+        final month = int.parse(parts[1]);
+        query['from'] = '$_selectedMonth-01';
+        query['to'] =
+            '$_selectedMonth-${DateUtils.getDaysInMonth(year, month).toString().padLeft(2, '0')}';
+      }
 
-      final res = await _api.get('listTransactions', query: {
-        'fundType': widget.fundKey,
-        'from': from,
-        'to': to,
-      }, forceRefresh: forceRefresh);
+      final res = await _api.get('listTransactions',
+          query: query, forceRefresh: forceRefresh);
 
       if (res['ok'] == true) {
         final data = (res['data'] as List? ?? [])
@@ -82,6 +81,7 @@ class _FundDetailPageState extends State<FundDetailPage> {
       '৳${NumberFormat('#,##0.##', 'en_US').format(n)}';
 
   String _monthLabel(String key) {
+    if (key == 'all') return 'সকল সময়';
     try {
       final d = DateFormat('yyyy-MM').parse(key);
       return DateFormat('MMMM yyyy').format(d);
@@ -91,10 +91,9 @@ class _FundDetailPageState extends State<FundDetailPage> {
   }
 
   Future<void> _pickMonth() async {
-    // Build last 24 months options
-    final months = <String>[];
+    final months = <String>['all'];
     final now = DateTime.now();
-    for (int i = 0; i < 24; i++) {
+    for (int i = 0; i < 36; i++) {
       var m = now.month - i;
       var y = now.year;
       while (m <= 0) {
@@ -110,10 +109,13 @@ class _FundDetailPageState extends State<FundDetailPage> {
         children: [
           const Padding(
             padding: EdgeInsets.all(16),
-            child: Text('মাস নির্বাচন করুন',
+            child: Text('সময়কাল নির্বাচন করুন',
                 style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
           ),
           ...months.map((m) => ListTile(
+                leading: m == 'all'
+                    ? const Icon(Icons.all_inclusive, color: Color(0xFF0F766E))
+                    : const Icon(Icons.calendar_month_outlined),
                 title: Text(_monthLabel(m)),
                 selected: m == _selectedMonth,
                 selectedColor: Theme.of(ctx).colorScheme.primary,
@@ -227,7 +229,9 @@ class _FundDetailPageState extends State<FundDetailPage> {
                     : _txns.isEmpty
                         ? Center(
                             child: Text(
-                              '${_monthLabel(_selectedMonth)}-এ কোনো লেনদেন নেই',
+                              _selectedMonth == 'all'
+                                  ? 'কোনো লেনদেন পাওয়া যায়নি'
+                                  : '${_monthLabel(_selectedMonth)}-এ কোনো লেনদেন নেই',
                               style: TextStyle(color: Colors.grey.shade600),
                             ),
                           )
@@ -309,7 +313,7 @@ class _TxnTile extends StatelessWidget {
         ],
       ),
       trailing: Text(
-        '${isIn ? '+' : '−'}৳${NumberFormat('#,##0', 'en_US').format(amount.toInt())}',
+        '${isIn ? '+' : '−'}৳${NumberFormat('#,##0.##', 'en_US').format(amount)}',
         style: TextStyle(
           fontWeight: FontWeight.bold,
           fontSize: 14,

@@ -712,12 +712,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     SizedBox(
                       width: fundCardWidth,
                       child: _FundCard(
-                        name: 'নির্মাণ ফান্ড',
+                        name: 'নির্মাণ ও সাদাকাহ',
                         icon: Icons.construction,
                         color: const Color(0xFF1D4ED8),
                         fund: s.fund('CONSTRUCTION'),
                         fmt: _fmt,
-                        onTap: () => _goToFund('CONSTRUCTION', 'নির্মাণ ফান্ড'),
+                        onTap: () => _goToFund('CONSTRUCTION', 'নির্মাণ ও সাদাকাহ ফান্ড'),
                       ),
                     ),
                     SizedBox(
@@ -1038,6 +1038,7 @@ class _SeparationCard extends StatelessWidget {
     final scheme = Theme.of(context).colorScheme;
     final zakatIn = summary.fund('JAKAT').incoming;
     final scholarshipIn = summary.fund('SCHOLARSHIP').incoming;
+    final nirmanBalance = summary.fund('CONSTRUCTION').balance;
 
     return Card(
       color: scheme.surfaceContainerLow,
@@ -1073,28 +1074,20 @@ class _SeparationCard extends StatelessWidget {
               onTap: () => onTap('JAKAT', 'যাকাত ফান্ড'),
             ),
             _SepRow(
-              label: 'যাকাত বাদে মোট',
-              value: fmt(summary.balanceExclZakat),
-              isSubtotal: true,
-              onTap: () => onTap('CONSTRUCTION', 'নির্মাণ ফান্ড'),
-            ),
-            _SepRow(
-              label: '(−) বৃত্তি',
+              label: '(−) বৃত্তি / শিক্ষাবৃত্তি',
               value: '−${fmt(scholarshipIn)}',
               sublabel: 'আলাদা ফান্ড',
               color: Colors.purple.shade700,
               onTap: () => onTap('SCHOLARSHIP', 'বৃত্তি ফান্ড'),
             ),
             _SepRow(
-              label: 'যাকাত ও বৃত্তি বাদে',
-              value: fmt(summary.balanceExclZakatScholarship),
+              label: 'নির্মাণ ও সাদাকাহ ফান্ড',
+              value: fmt(nirmanBalance),
               isSubtotal: true,
               isLast: true,
-            ),
-            const SizedBox(height: 4),
-            Text(
-              '← ডান দিকের তীর চিহ্নে চাপলে বিস্তারিত দেখতে পারবেন',
-              style: TextStyle(fontSize: 11, color: scheme.onSurfaceVariant),
+              color: const Color(0xFF1D4ED8),
+              sublabel: 'বিস্তারিত দেখুন →',
+              onTap: () => onTap('CONSTRUCTION', 'নির্মাণ ও সাদাকাহ ফান্ড'),
             ),
           ],
         ),
