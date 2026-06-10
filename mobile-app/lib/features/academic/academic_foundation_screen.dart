@@ -248,6 +248,34 @@ class _AcademicFoundationScreenState extends State<AcademicFoundationScreen> {
           'Student name and class are required'));
       return;
     }
+    final nameCheck = _studentNameBn.text.trim().toLowerCase();
+    final hasDuplicateStudent = _students.any((s) {
+      if (_studentId.isNotEmpty && s['id']?.toString() == _studentId) return false;
+      return (s['name_bn']?.toString().toLowerCase() ?? '') == nameCheck &&
+          s['class_id']?.toString() == _studentClassId;
+    });
+    if (hasDuplicateStudent) {
+      if (!mounted) return;
+      final proceed = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: Text(AppLang.t('সম্ভাব্য ডুপ্লিকেট', 'Possible Duplicate')),
+          content: Text(AppLang.t(
+            'একই নাম ও শ্রেণিতে শিক্ষার্থী আছে। তবুও সংরক্ষণ করবেন?',
+            'A student with the same name and class already exists. Save anyway?',
+          )),
+          actions: [
+            TextButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: Text(AppLang.t('বাতিল', 'Cancel'))),
+            FilledButton(
+                onPressed: () => Navigator.pop(ctx, true),
+                child: Text(AppLang.t('হ্যাঁ, সংরক্ষণ', 'Yes, Save'))),
+          ],
+        ),
+      );
+      if (!mounted || proceed != true) return;
+    }
     await _save(
         'upsertStudent',
         {

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:share_plus/share_plus.dart';
 
 import '../../core/app_lang.dart';
 import '../../shared/constants/app_permissions.dart';
@@ -819,7 +820,19 @@ class _AcademicCoreScreenState extends State<AcademicCoreScreen> {
         label: Text('$label: $value'));
   }
 
-  Widget _resultTab() {
+  void _shareResultSheet() {
+    if (_summaryRows.isEmpty) return;
+    final lines = StringBuffer();
+    lines.writeln('--- ফলাফল শিট ---');
+    for (final r in _summaryRows) {
+      lines.writeln(
+          '${r["student_name"] ?? "-"} | গ্রেড: ${r["grade"] ?? "-"} | ${r["total_obtained"] ?? 0}/${r["total_max"] ?? 0} | ${r["percent"] ?? 0}%');
+    }
+    lines.writeln('------------------');
+    Share.share(lines.toString(), subject: AppLang.t('ফলাফল শিট', 'Result Sheet'));
+  }
+
+    Widget _resultTab() {
     return _panel(
       AppLang.t('ফলাফল summary', 'Result Summary'),
       Column(
@@ -829,7 +842,16 @@ class _AcademicCoreScreenState extends State<AcademicCoreScreen> {
                 'Create or select an exam first.'))
           else if (_summaryRows.isEmpty)
             Text(AppLang.t('নম্বর data পাওয়া যায়নি।', 'No marks data found.'))
-          else
+          else ...[
+            Align(
+              alignment: Alignment.centerRight,
+              child: FilledButton.icon(
+                onPressed: _shareResultSheet,
+                icon: const Icon(Icons.share, size: 16),
+                label: Text(AppLang.t('ফলাফল শেয়ার', 'Share Results')),
+              ),
+            ),
+            const SizedBox(height: 8),
             ..._summaryRows.map((r) => Card(
                   elevation: 0,
                   child: ListTile(
@@ -839,6 +861,7 @@ class _AcademicCoreScreenState extends State<AcademicCoreScreen> {
                         '${AppLang.t('মোট', 'Total')}: ${r['total_obtained'] ?? 0}/${r['total_max'] ?? 0} • ${r['percent'] ?? 0}% • ${AppLang.t('বিষয়', 'Subjects')}: ${r['subjects_recorded'] ?? 0}'),
                   ),
                 )),
+          ],
         ],
       ),
     );

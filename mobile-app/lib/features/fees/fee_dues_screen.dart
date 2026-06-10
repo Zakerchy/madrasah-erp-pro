@@ -214,12 +214,28 @@ class _FeeDuesScreenState extends State<FeeDuesScreen> {
           'Student, amount, and reason are required'));
       return;
     }
+    final wAmt = double.tryParse(_waiverAmount.text.trim()) ?? 0;
+    if (wAmt <= 0) {
+      _snack(AppLang.t('Waiver পরিমাণ ০ এর বেশি হতে হবে', 'Waiver amount must be > 0'));
+      return;
+    }
+    final dueRow = _dues.firstWhere(
+      (r) => r['student_id']?.toString() == _studentId,
+      orElse: () => <String, dynamic>{},
+    );
+    final planned = double.tryParse(dueRow['planned_amount']?.toString() ?? '0') ?? 0;
+    if (planned > 0 && wAmt > planned) {
+      _snack(AppLang.t(
+          'Waiver (৳$wAmt) প্রদেয় পরিমাণের (৳$planned) বেশি হতে পারবে না',
+          'Waiver (৳$wAmt) cannot exceed planned amount (৳$planned)'));
+      return;
+    }
     await _saveAction(
         'upsertFeeWaiver',
         {
           'student_id': _studentId,
           'month_key': _monthKey,
-          'amount': double.tryParse(_waiverAmount.text.trim()) ?? 0,
+          'amount': wAmt,
           'reason': _waiverReason.text.trim(),
           'notes': _waiverNotes.text.trim(),
           'updated_by': SessionService.userId,
@@ -498,9 +514,15 @@ class _FeeDuesScreenState extends State<FeeDuesScreen> {
                           trailing: Column(
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
-                                Text('৳${r['due_amount'] ?? 0}',
-                                    style: const TextStyle(
-                                        fontWeight: FontWeight.w800)),
+                                Text(
+                                  '৳${r['due_amount'] ?? 0}',
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.w800,
+                                    color: (double.tryParse(r['due_amount']?.toString() ?? '0') ?? 0) > 0
+                                        ? Colors.red.shade700
+                                        : Colors.green.shade700,
+                                  ),
+                                ),
                                 Text(r['scholarship_due_state']?.toString() ??
                                     ''),
                               ]),

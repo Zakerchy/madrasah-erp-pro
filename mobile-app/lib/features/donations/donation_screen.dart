@@ -139,7 +139,7 @@ class _DonationScreenState extends State<DonationScreen> {
       context: context,
       initialDate: initial,
       firstDate: DateTime(2000),
-      lastDate: DateTime(2100),
+      lastDate: DateTime.now(),
     );
     if (picked == null) return;
     _date.text =
@@ -158,6 +158,39 @@ class _DonationScreenState extends State<DonationScreen> {
       return;
     }
 
+    final enteredAmount = double.tryParse(_amount.text.trim()) ?? 0;
+    final enteredSource = _source.text.trim().toLowerCase();
+    final now = DateTime.now();
+    final hasDuplicate = _rows.any((r) {
+      final rowAmt = double.tryParse(r['amount'].toString()) ?? 0;
+      final rowSrc = (r['source_or_vendor'] ?? '').toString().toLowerCase();
+      if (rowAmt != enteredAmount || rowSrc != enteredSource) return false;
+      final rowDate = _parseIsoDate(r['txn_date']?.toString() ?? '');
+      return rowDate != null && now.difference(rowDate).inHours.abs() < 24;
+    });
+    if (hasDuplicate) {
+      final proceed = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: Text(AppLang.t('সম্ভাব্য ডুপ্লিকেট', 'Possible Duplicate')),
+          content: Text(AppLang.t(
+            'একই পরিমাণ ও দাতার নামে সম্প্রতি লেনদেন আছে। তবুও সংরক্ষণ করবেন?',
+            'A recent transaction with same amount and donor exists. Save anyway?',
+          )),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: Text(AppLang.t('বাতিল', 'Cancel')),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: Text(AppLang.t('হ্যাঁ, সংরক্ষণ', 'Yes, Save')),
+            ),
+          ],
+        ),
+      );
+      if (!mounted || proceed != true) return;
+    }
     setState(() => _saving = true);
     try {
       final res = await _api.post('createTransaction', {
@@ -231,9 +264,14 @@ class _DonationScreenState extends State<DonationScreen> {
                       if (value.isEmpty) {
                         return AppLang.t('তারিখ দিন', 'Date required');
                       }
-                      if (_parseIsoDate(value) == null) {
+                      final parsed = _parseIsoDate(value);
+                      if (parsed == null) {
                         return AppLang.t('বৈধ তারিখ দিন YYYY-MM-DD',
                             'Use valid date YYYY-MM-DD');
+                      }
+                      if (parsed.isAfter(DateTime.now())) {
+                        return AppLang.t('ভবিষ্যৎ তারিখ দেওয়া যাবে না',
+                            'Future date not allowed');
                       }
                       return null;
                     },

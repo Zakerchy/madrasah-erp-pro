@@ -382,7 +382,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                             context: ctx,
                             initialDate: initial,
                             firstDate: DateTime(2000, 1, 1),
-                            lastDate: DateTime(2100, 12, 31),
+                            lastDate: DateTime.now(),
                           );
                           if (picked == null) return;
                           final normalized =
@@ -398,15 +398,21 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         context: ctx,
                         initialDate: initial,
                         firstDate: DateTime(2000, 1, 1),
-                        lastDate: DateTime(2100, 12, 31),
+                        lastDate: DateTime.now(),
                       );
                       if (picked == null) return;
                       final normalized =
                           '${picked.year.toString().padLeft(4, '0')}-${picked.month.toString().padLeft(2, '0')}-${picked.day.toString().padLeft(2, '0')}';
                       setD(() => dateCtrl.text = normalized);
                     },
-                    validator: (v) =>
-                        (v?.trim().isEmpty ?? true) ? 'দিন' : null,
+                    validator: (v) {
+                      final value = (v ?? '').trim();
+                      if (value.isEmpty) return 'তারিখ দিন';
+                      final parsed = _parseIsoDate(value);
+                      if (parsed == null) return 'বৈধ তারিখ দিন';
+                      if (parsed.isAfter(DateTime.now())) return 'ভবিষ্যৎ তারিখ দেওয়া যাবে না';
+                      return null;
+                    },
                   ),
                   const SizedBox(height: 10),
                   DropdownButtonFormField<String>(
@@ -472,6 +478,60 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
 
     if (saved != true) return;
+
+    if (!_webOnline) {
+      if (!mounted) return;
+      final proceedOffline = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('অফলাইন সতর্কতা'),
+          content: const Text(
+              'আপনি বর্তমানে অফলাইনে আছেন। লেনদেনটি স্থানীয়ভাবে সংরক্ষিত হবে এবং সংযোগ ফিরলে পাঠানো হবে। তবুও এগিয়ে যাবেন?'),
+          actions: [
+            TextButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: const Text('বাতিল')),
+            FilledButton(
+                onPressed: () => Navigator.pop(ctx, true),
+                child: const Text('হ্যাঁ, সংরক্ষণ')),
+          ],
+        ),
+      );
+      if (!mounted || proceedOffline != true) return;
+    }
+
+    final enteredAmount = double.tryParse(amountCtrl.text.trim()) ?? 0;
+    final now = DateTime.now();
+    final hasDuplicate = _monthlyRows.any((r) {
+      final rowAmt = double.tryParse(r['amount'].toString()) ?? 0;
+      final rowDir = (r['direction'] ?? '').toString().toUpperCase();
+      final rowFund = (r['fund_type'] ?? '').toString().toUpperCase();
+      if (rowAmt != enteredAmount) return false;
+      if (rowDir != (income ? 'IN' : 'OUT')) return false;
+      if (rowFund != fundType.toUpperCase()) return false;
+      final rowDate = _parseIsoDate(r['txn_date']?.toString() ?? '');
+      return rowDate != null && now.difference(rowDate).inHours.abs() < 24;
+    });
+    if (hasDuplicate) {
+      if (!mounted) return;
+      final proceedDup = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('সম্ভাব্য ডুপ্লিকেট'),
+          content: const Text(
+              'একই পরিমাণ ও ফান্ডে গত ২৪ ঘণ্টায় লেনদেন আছে। তবুও সংরক্ষণ করবেন?'),
+          actions: [
+            TextButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: const Text('বাতিল')),
+            FilledButton(
+                onPressed: () => Navigator.pop(ctx, true),
+                child: const Text('হ্যাঁ, সংরক্ষণ')),
+          ],
+        ),
+      );
+      if (!mounted || proceedDup != true) return;
+    }
 
     final res = await _api.post('createTransaction', {
       'user_role': SessionService.role,
@@ -632,6 +692,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
         final isTablet = width >= 760;
         final fundCardWidth = isWide ? 290.0 : (isTablet ? 260.0 : 180.0);
         final maxWidth = isWide ? 1320.0 : 840.0;
+        final negFunds = <String>[
+          if (s.fund('CONSTRUCTION').balance < 0) 'নির্মাণ ও সাদাকাহ',
+          if (s.fund('JAKAT').balance < 0) 'যাকাত',
+          if (s.fund('SCHOLARSHIP').balance < 0) 'বৃত্তি',
+          if (s.fund('GENERAL').balance < 0) 'সাধারণ',
+        ];
 
         return Center(
           child: ConstrainedBox(
@@ -661,6 +727,31 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 else
                   const SizedBox(height: 12),
 
+                if (negFunds.isNotEmpty)
+                  Container(
+                    margin: const EdgeInsets.only(bottom: 12),
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.red.shade50,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.red.shade300),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(Icons.warning_amber_rounded,
+                            color: Colors.red.shade700),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            'সতর্কতা: ${negFunds.join(', ')} ফান্ডের ব্যালেন্স ঋণাত্মক!',
+                            style: TextStyle(
+                                color: Colors.red.shade700,
+                                fontWeight: FontWeight.w600),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                 _QuickActionsRow(
                   onAddIncome: () => _quickEntry(income: true),
                   onAddExpense: () => _quickEntry(income: false),

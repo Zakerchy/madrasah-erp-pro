@@ -62,6 +62,17 @@ class _BeneficiariesScreenState extends State<BeneficiariesScreen> {
       messenger.showSnackBar(SnackBar(content: Text(AppLang.t('নাম প্রয়োজন', 'Name is required'))));
       return;
     }
+    final ageText = _age.text.trim();
+    final age = int.tryParse(ageText) ?? 0;
+    if (ageText.isEmpty || age < 5 || age > 30) {
+      messenger.showSnackBar(SnackBar(content: Text(AppLang.t('বয়স ৫ থেকে ৩০ এর মধ্যে দিন', 'Age must be between 5 and 30'))));
+      return;
+    }
+    final monthlyAmt = double.tryParse(_monthlyAmount.text.trim()) ?? 0;
+    if (monthlyAmt <= 0) {
+      messenger.showSnackBar(SnackBar(content: Text(AppLang.t('মাসিক প্রয়োজনীয় পরিমাণ ০ এর বেশি হতে হবে', 'Monthly need amount must be > 0'))));
+      return;
+    }
 
     final payload = {
       'id': 'ben_${DateTime.now().millisecondsSinceEpoch}',

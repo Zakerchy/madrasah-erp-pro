@@ -441,8 +441,22 @@ class _ReportsScreenState extends State<ReportsScreen> {
                   style: const TextStyle(fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(height: 8),
-                ...rows.take(120).map(
-                      (r) => Card(
+                Builder(builder: (context) {
+                  final amounts = rows
+                      .map((r) => _toDouble(r['amount']))
+                      .where((a) => a > 0)
+                      .toList();
+                  final mean = amounts.isEmpty
+                      ? 0.0
+                      : amounts.reduce((a, b) => a + b) / amounts.length;
+                  final anomalyThreshold = mean * 3;
+                  return Column(
+                    children: rows.take(120).map((r) {
+                      final amt = _toDouble(r['amount']);
+                      final isAnomaly =
+                          mean > 0 && amt >= anomalyThreshold && amt > 0;
+                      return Card(
+                        color: isAnomaly ? Colors.orange.shade50 : null,
                         child: ListTile(
                           leading: Icon(
                             r['direction'] == 'IN'
@@ -452,13 +466,29 @@ class _ReportsScreenState extends State<ReportsScreen> {
                                 ? Colors.green
                                 : Colors.red,
                           ),
-                          title: Text(
-                              '${r['source_or_vendor'] ?? ''} • ৳${r['amount'] ?? 0}'),
+                          title: Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                    '${r['source_or_vendor'] ?? ''} • ৳${r['amount'] ?? 0}'),
+                              ),
+                              if (isAnomaly)
+                                Tooltip(
+                                  message: AppLang.t(
+                                      'গড়ের ৩ গুণ বেশি — অস্বাভাবিক লেনদেন',
+                                      'Over 3× average — unusual transaction'),
+                                  child: Icon(Icons.warning_amber_rounded,
+                                      color: Colors.orange.shade700, size: 18),
+                                ),
+                            ],
+                          ),
                           subtitle: Text(
                               '${r['fund_type'] ?? ''} • ${r['txn_date'] ?? ''} • ${r['category'] ?? ''}'),
                         ),
-                      ),
-                    ),
+                      );
+                    }).toList(),
+                  );
+                }),
               ],
             ],
           ],
