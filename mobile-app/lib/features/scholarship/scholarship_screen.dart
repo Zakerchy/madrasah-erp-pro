@@ -7,6 +7,7 @@ import '../../shared/services/access_control_service.dart';
 import '../../shared/services/api_service.dart';
 import '../../shared/services/session_service.dart';
 import '../../shared/widgets/base_scaffold.dart';
+import 'bulk_scholarship_screen.dart';
 
 class ScholarshipScreen extends StatefulWidget {
   const ScholarshipScreen({super.key});
@@ -266,10 +267,32 @@ class _ScholarshipScreenState extends State<ScholarshipScreen> {
             : ListView(
                 padding: const EdgeInsets.all(16),
                 children: [
-                  Text(
-                      AppLang.t('বৃত্তি পরিশোধ নথিভুক্ত করুন',
-                          'Record Scholarship Payment'),
-                      style: const TextStyle(fontWeight: FontWeight.bold)),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                          AppLang.t('বৃত্তি পরিশোধ নথিভুক্ত করুন',
+                              'Record Scholarship Payment'),
+                          style: const TextStyle(fontWeight: FontWeight.bold)),
+                      OutlinedButton.icon(
+                        onPressed: () async {
+                          final refreshed = await Navigator.push<bool>(
+                            context,
+                            MaterialPageRoute(
+                                builder: (_) =>
+                                    const BulkScholarshipScreen()),
+                          );
+                          if (refreshed == true) {
+                            await _loadAll(forceRefresh: true);
+                          }
+                        },
+                        icon: const Icon(Icons.list_alt, size: 16),
+                        label: Text(
+                            AppLang.t('বাল্ক প্রদান', 'Bulk Entry'),
+                            style: const TextStyle(fontSize: 12)),
+                      ),
+                    ],
+                  ),
                   const SizedBox(height: 8),
                   TextField(
                     controller: _monthCtrl,

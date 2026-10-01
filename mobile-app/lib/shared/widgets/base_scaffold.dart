@@ -9,9 +9,14 @@ class BaseScaffold extends StatelessWidget {
   final String title;
   final Widget body;
   final List<Widget>? actions;
+  final Widget? floatingActionButton;
 
   const BaseScaffold(
-      {super.key, required this.title, required this.body, this.actions});
+      {super.key,
+      required this.title,
+      required this.body,
+      this.actions,
+      this.floatingActionButton});
 
   @override
   Widget build(BuildContext context) {
@@ -76,6 +81,7 @@ class BaseScaffold extends StatelessWidget {
           appBar: AppBar(title: Text(title), actions: mergedActions),
           drawer: const AppDrawer(),
           body: body,
+          floatingActionButton: floatingActionButton,
         );
       },
     );
