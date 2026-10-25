@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 
 import '../../shared/models/session_user.dart';
 import '../../shared/services/api_service.dart';
+import '../donor/donor_login_screen.dart';
 import '../../shared/services/session_service.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -353,6 +354,17 @@ class _LoginScreenState extends State<LoginScreen> {
                         'নতুন ব্যবহারকারী হতে চাইলে Admin-এর সাথে যোগাযোগ করুন। Admin আপনার ইমেইল ও পিন সেট করে দেবেন।',
                         textAlign: TextAlign.center,
                         style: TextStyle(fontSize: 13, color: scheme.onSurface),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    OutlinedButton.icon(
+                      onPressed: () => Navigator.of(context).push(
+                        MaterialPageRoute(builder: (_) => const DonorLoginScreen()),
+                      ),
+                      icon: const Icon(Icons.volunteer_activism, size: 18),
+                      label: const Text('দানকারী পোর্টাল'),
+                      style: OutlinedButton.styleFrom(
+                        minimumSize: const Size.fromHeight(44),
                       ),
                     ),
                       ],

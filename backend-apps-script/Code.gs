@@ -35,14 +35,21 @@ const CONFIG = {
     AUDIT: 'audit_log',
     SETTINGS: 'settings',
     NOTIFICATIONS: 'notifications',
+    DONORS: 'donors',
+    DONOR_TXN: 'donor_transactions',
+    DONATION_TARGETS: 'donation_targets',
+    EXPENSE_DONOR_LINKS: 'expense_donor_links',
   },
   ENUMS: {
     ROLE: ['ADMIN', 'ACCOUNTANT', 'FIELD_USER', 'VIEWER'],
     DIRECTION: ['IN', 'OUT'],
-    FUND: ['CONSTRUCTION', 'JAKAT', 'SCHOLARSHIP', 'GENERAL'],
+    FUND: ['SADAQAH', 'ZAKAT', 'TALEBE_ELM', 'YATIM', 'BIA', 'EID', 'IFTAR', 'FITRA', 'LIBRARY', 'WATER'],
     STATUS: ['ACTIVE', 'VOID'],
     SCHOLAR_STATUS: ['PAID', 'PARTIAL', 'CANCELLED'],
     SALARY_STATUS: ['PAID', 'PARTIAL', 'UNPAID'],
+    DONOR_STATUS: ['PENDING', 'ACTIVE', 'REJECTED'],
+    DONOR_TXN_STATUS: ['PENDING', 'CONFIRMED', 'REJECTED'],
+    PAYMENT_METHOD: ['CASH', 'BANK_TRANSFER', 'MOBILE_BANKING', 'CHEQUE', 'OTHER'],
   },
 };
 
@@ -154,6 +161,13 @@ const ACTION_PERMISSIONS = {
   createNotificationEvent: 'notifications.view',
   upsertRoleDefinition: 'roles.manage',
   logClientGuard: 'notifications.view',
+  adminListPendingDonors: 'users.manage',
+  adminListAllDonors: 'users.manage',
+  approveDonor: 'users.manage',
+  adminListDonorTransactions: 'donations.view',
+  confirmDonation: 'donations.write',
+  setDonationTarget: 'donations.write',
+  linkExpenseToDonor: 'expenses.write',
 };
 
 // Route both GET and POST through a single handler so the Flutter app
@@ -204,6 +218,14 @@ function handleRequest_(params) {
       if (!pin) return json({ ok: false, message: 'pin required' });
       return json({ ok: true, pin_hash: pinHash_(pin) });
     }
+
+    // ── Donor Portal — public (no staff auth needed) ───────────────────────
+    if (action === 'donorRegister') return json(donorRegister_(params.payload));
+    if (action === 'donorLogin') return json(donorLogin_(params.payload));
+    if (action === 'listDonationOpportunities') return json(listDonationOpportunities_());
+    if (action === 'donorDonate') return json(donorDonate_(params.payload));
+    if (action === 'donorMyDashboard') return json(donorMyDashboard_(params.payload));
+    if (action === 'donorMyTransactions') return json(donorMyTransactions_(params.payload));
 
     params.action = action;
     assertActionPermission_(params, action);
@@ -383,6 +405,15 @@ function handleRequest_(params) {
       if (secret !== 'MADRASAH_IMPORT_2025') return json({ ok: false, message: 'unauthorized' });
       return json(importMigratedData_(String(params.sheet_name || ''), params.rows || []));
     }
+
+    // ── Donor Portal — admin actions (staff auth required) ─────────────────
+    if (action === 'adminListPendingDonors') return json(adminListPendingDonors_(params));
+    if (action === 'adminListAllDonors') return json(adminListAllDonors_(params));
+    if (action === 'approveDonor') return json(approveDonor_(params.payload, params));
+    if (action === 'adminListDonorTransactions') return json(adminListDonorTransactions_(params));
+    if (action === 'confirmDonation') return json(confirmDonation_(params.payload, params));
+    if (action === 'setDonationTarget') return json(setDonationTarget_(params.payload, params));
+    if (action === 'linkExpenseToDonor') return json(linkExpenseToDonor_(params.payload, params));
 
     return json({ ok: false, message: 'Unknown action: ' + action });
   } catch (err) {
@@ -3387,4 +3418,385 @@ function importMigratedData_(sheetName, rows) {
 function setupSheetId() {
   PropertiesService.getScriptProperties().setProperty('SHEET_ID', '1oDjX_FS0F0_4ZjZM0YBS-TLHFRmYwbNRCPKhcTUxr3Y');
   Logger.log('SHEET_ID set: ' + PropertiesService.getScriptProperties().getProperty('SHEET_ID'));
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// DONOR PORTAL
+// ═══════════════════════════════════════════════════════════════════════════
+
+const DONOR_TOKEN_SALT = 'madrasah_donor_portal_2025';
+
+/**
+ * Donor auth token: MD5(donor_id + ':' + pin_hash + ':' + SALT)
+ * Stateless — computed on login, verified on every donor request.
+ */
+function donorToken_(donorId, pinHash) {
+  const raw = donorId + ':' + pinHash + ':' + DONOR_TOKEN_SALT;
+  const bytes = Utilities.computeDigest(Utilities.DigestAlgorithm.MD5, raw);
+  return bytes.map(b => ('0' + (b & 0xff).toString(16)).slice(-2)).join('');
+}
+
+/**
+ * Verify donor_id + donor_token in payload. Returns donor row or throws.
+ */
+function assertDonorAuth_(payload) {
+  const donorId = String(payload.donor_id || '').trim();
+  const token = String(payload.donor_token || '').trim();
+  if (!donorId || !token) throw new Error('donor_id and donor_token required');
+  const donors = listSheetRows_(CONFIG.SHEETS.DONORS).data || [];
+  const donor = donors.find(d => d.id === donorId);
+  if (!donor) throw new Error('Donor not found');
+  if (donor.status !== 'ACTIVE') throw new Error('অ্যাকাউন্ট এখনো অনুমোদিত হয়নি');
+  const expected = donorToken_(donorId, String(donor.pin_hash || ''));
+  if (token !== expected) throw new Error('Invalid token');
+  return donor;
+}
+
+/** Public — no auth. Donor self-registration. */
+function donorRegister_(payload) {
+  payload = payload || {};
+  const name_bn = String(payload.name_bn || '').trim();
+  const phone = String(payload.phone || '').trim().replace(/\D/g, '');
+  const pin_hash = String(payload.pin_hash || '').trim();
+  if (!name_bn) return { ok: false, message: 'নাম দিন' };
+  if (!phone || phone.length < 10) return { ok: false, message: 'সঠিক ফোন নম্বর দিন' };
+  if (!pin_hash) return { ok: false, message: 'পিন দিন' };
+
+  // Duplicate check
+  const existing = (listSheetRows_(CONFIG.SHEETS.DONORS).data || [])
+    .find(d => d.phone === phone);
+  if (existing) return { ok: false, message: 'এই নম্বর দিয়ে আগেই রেজিস্ট্রেশন হয়েছে' };
+
+  const id = uid_('dn');
+  appendRow_(CONFIG.SHEETS.DONORS, {
+    id,
+    name_bn,
+    name_en: String(payload.name_en || '').trim(),
+    phone,
+    email: String(payload.email || '').trim(),
+    profession: String(payload.profession || '').trim(),
+    address: String(payload.address || '').trim(),
+    city: String(payload.city || '').trim(),
+    country: String(payload.country || 'BD').trim(),
+    currency_pref: String(payload.currency_pref || 'BDT').trim().toUpperCase(),
+    pin_hash,
+    status: 'PENDING',
+    created_at: nowIso(),
+    notes: String(payload.notes || '').trim(),
+  });
+  return { ok: true, message: 'রেজিস্ট্রেশন সম্পন্ন। অ্যাডমিন অনুমোদনের পর লগইন করতে পারবেন।', id };
+}
+
+/** Public — no auth. Phone + pin_hash login. */
+function donorLogin_(payload) {
+  payload = payload || {};
+  const phone = String(payload.phone || '').trim().replace(/\D/g, '');
+  const pin_hash = String(payload.pin_hash || '').trim();
+  if (!phone || !pin_hash) return { ok: false, message: 'ফোন ও পিন দিন' };
+
+  const donors = listSheetRows_(CONFIG.SHEETS.DONORS).data || [];
+  const donor = donors.find(d => String(d.phone || '').replace(/\D/g, '') === phone);
+  if (!donor) return { ok: false, message: 'ফোন নম্বর পাওয়া যায়নি' };
+  if (donor.status === 'PENDING') return { ok: false, message: 'আপনার অ্যাকাউন্ট এখনো অনুমোদিত হয়নি। অ্যাডমিনের সাথে যোগাযোগ করুন।' };
+  if (donor.status === 'REJECTED') return { ok: false, message: 'অ্যাকাউন্ট অনুমোদিত হয়নি।' };
+  if (String(donor.pin_hash || '') !== pin_hash) return { ok: false, message: 'পিন ভুল হয়েছে' };
+
+  const token = donorToken_(donor.id, pin_hash);
+  return {
+    ok: true,
+    donor_id: donor.id,
+    donor_token: token,
+    donor: {
+      id: donor.id,
+      name_bn: donor.name_bn,
+      name_en: donor.name_en,
+      phone: donor.phone,
+      currency_pref: donor.currency_pref || 'BDT',
+      country: donor.country,
+    },
+  };
+}
+
+/** Public — returns active donation targets/opportunities. */
+function listDonationOpportunities_() {
+  const targets = (listSheetRows_(CONFIG.SHEETS.DONATION_TARGETS).data || [])
+    .filter(t => t.is_active === true || t.is_active === 'TRUE' || t.is_active === '1');
+  // Also collect confirmed totals from donor_transactions per fund
+  const txns = listSheetRows_(CONFIG.SHEETS.DONOR_TXN).data || [];
+  const confirmedByFund = {};
+  txns.forEach(t => {
+    if (t.status === 'CONFIRMED') {
+      const k = String(t.fund_type || '');
+      confirmedByFund[k] = (confirmedByFund[k] || 0) + Number(t.amount_bdt || 0);
+    }
+  });
+
+  return {
+    ok: true,
+    data: targets.map(t => ({
+      id: t.id,
+      fund_type: t.fund_type,
+      title_bn: t.title_bn,
+      title_en: t.title_en,
+      target_amount: Number(t.target_amount || 0),
+      collected_amount: confirmedByFund[t.fund_type] || 0,
+      description_bn: t.description_bn,
+      start_date: t.start_date,
+      end_date: t.end_date,
+    })),
+  };
+}
+
+/** Donor auth required — submit a donation. */
+function donorDonate_(payload) {
+  payload = payload || {};
+  const donor = assertDonorAuth_(payload);
+  const fund_type = String(payload.fund_type || '').trim().toUpperCase();
+  if (!fund_type) return { ok: false, message: 'ফান্ড নির্বাচন করুন' };
+  const amount_bdt = Number(payload.amount_bdt || 0);
+  if (amount_bdt <= 0) return { ok: false, message: 'পরিমাণ দিন' };
+
+  const id = uid_('dtx');
+  appendRow_(CONFIG.SHEETS.DONOR_TXN, {
+    id,
+    donor_id: donor.id,
+    donor_name_bn: donor.name_bn,
+    fund_type,
+    amount_foreign: Number(payload.amount_foreign || 0),
+    currency: String(payload.currency || 'BDT').toUpperCase(),
+    exchange_rate: Number(payload.exchange_rate || 1),
+    amount_bdt,
+    payment_method: String(payload.payment_method || 'CASH').toUpperCase(),
+    txn_reference: String(payload.txn_reference || '').trim(),
+    slip_url: String(payload.slip_url || '').trim(),
+    status: 'PENDING',
+    confirmed_by: '',
+    confirmed_at: '',
+    notes: String(payload.notes || '').trim(),
+    created_at: nowIso(),
+  });
+  return { ok: true, id, message: 'দান নিবন্ধন হয়েছে। অ্যাডমিন নিশ্চিত করলে আপনাকে জানানো হবে।' };
+}
+
+/** Donor auth required — personal dashboard. */
+function donorMyDashboard_(payload) {
+  payload = payload || {};
+  const donor = assertDonorAuth_(payload);
+  const txns = (listSheetRows_(CONFIG.SHEETS.DONOR_TXN).data || [])
+    .filter(t => t.donor_id === donor.id);
+
+  const totalBdt = txns.filter(t => t.status === 'CONFIRMED')
+    .reduce((s, t) => s + Number(t.amount_bdt || 0), 0);
+  const pendingCount = txns.filter(t => t.status === 'PENDING').length;
+
+  // Fund-wise breakdown (confirmed only)
+  const byFund = {};
+  txns.filter(t => t.status === 'CONFIRMED').forEach(t => {
+    const k = t.fund_type;
+    byFund[k] = (byFund[k] || 0) + Number(t.amount_bdt || 0);
+  });
+
+  // Linked expenses
+  const links = (listSheetRows_(CONFIG.SHEETS.EXPENSE_DONOR_LINKS).data || [])
+    .filter(l => {
+      const txnId = l.donor_txn_id;
+      return txns.some(t => t.id === txnId);
+    });
+  const usedAmount = links.reduce((s, l) => s + Number(l.amount_used || 0), 0);
+
+  return {
+    ok: true,
+    donor: {
+      id: donor.id,
+      name_bn: donor.name_bn,
+      name_en: donor.name_en,
+      phone: donor.phone,
+      currency_pref: donor.currency_pref || 'BDT',
+    },
+    summary: {
+      total_donated_bdt: totalBdt,
+      total_used_bdt: usedAmount,
+      balance_bdt: totalBdt - usedAmount,
+      pending_count: pendingCount,
+    },
+    by_fund: byFund,
+  };
+}
+
+/** Donor auth required — transaction list. */
+function donorMyTransactions_(payload) {
+  payload = payload || {};
+  const donor = assertDonorAuth_(payload);
+  const txns = (listSheetRows_(CONFIG.SHEETS.DONOR_TXN).data || [])
+    .filter(t => t.donor_id === donor.id)
+    .sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)));
+
+  // Get linked expense ids for transparency
+  const links = listSheetRows_(CONFIG.SHEETS.EXPENSE_DONOR_LINKS).data || [];
+  const linksByTxn = {};
+  links.forEach(l => {
+    const k = l.donor_txn_id;
+    if (!linksByTxn[k]) linksByTxn[k] = [];
+    linksByTxn[k].push({ expense_id: l.expense_id, amount_used: Number(l.amount_used || 0), notes: l.notes });
+  });
+
+  return {
+    ok: true,
+    data: txns.map(t => ({
+      id: t.id,
+      fund_type: t.fund_type,
+      amount_bdt: Number(t.amount_bdt || 0),
+      amount_foreign: Number(t.amount_foreign || 0),
+      currency: t.currency,
+      exchange_rate: Number(t.exchange_rate || 1),
+      payment_method: t.payment_method,
+      txn_reference: t.txn_reference,
+      slip_url: t.slip_url,
+      status: t.status,
+      confirmed_at: t.confirmed_at,
+      notes: t.notes,
+      created_at: t.created_at,
+      expense_links: linksByTxn[t.id] || [],
+    })),
+  };
+}
+
+// ── Admin donor functions ──────────────────────────────────────────────────
+
+function adminListPendingDonors_(params) {
+  assertPermission_(params, 'users.manage');
+  const donors = (listSheetRows_(CONFIG.SHEETS.DONORS).data || [])
+    .filter(d => d.status === 'PENDING');
+  return { ok: true, data: donors };
+}
+
+function adminListAllDonors_(params) {
+  assertPermission_(params, 'users.manage');
+  const donors = listSheetRows_(CONFIG.SHEETS.DONORS).data || [];
+  return { ok: true, data: donors.map(d => ({ ...d, pin_hash: undefined })) };
+}
+
+function approveDonor_(payload, params) {
+  payload = payload || {};
+  assertPermission_(params, 'users.manage');
+  const id = String(payload.id || '').trim();
+  const status = String(payload.status || 'ACTIVE').trim(); // ACTIVE or REJECTED
+  if (!id) return { ok: false, message: 'id required' };
+  return updateById_(CONFIG.SHEETS.DONORS, id, { status });
+}
+
+function adminListDonorTransactions_(params) {
+  assertPermission_(params, 'donations.view');
+  const donorId = String(params.donor_id || '').trim();
+  let txns = listSheetRows_(CONFIG.SHEETS.DONOR_TXN).data || [];
+  if (donorId) txns = txns.filter(t => t.donor_id === donorId);
+  txns.sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)));
+  return { ok: true, data: txns };
+}
+
+function confirmDonation_(payload, params) {
+  payload = payload || {};
+  assertPermission_(params, 'donations.write');
+  const id = String(payload.id || '').trim();
+  const status = String(payload.status || 'CONFIRMED').trim(); // CONFIRMED or REJECTED
+  if (!id) return { ok: false, message: 'id required' };
+
+  const txns = listSheetRows_(CONFIG.SHEETS.DONOR_TXN).data || [];
+  const txn = txns.find(t => t.id === id);
+  if (!txn) return { ok: false, message: 'Transaction not found' };
+  if (txn.status !== 'PENDING') return { ok: false, message: 'Already processed' };
+
+  const confirmedBy = String(params.email || params.user_id || '').trim();
+  const updates = { status, confirmed_by: confirmedBy, confirmed_at: nowIso() };
+
+  // If confirming, also create a fund_transaction IN entry
+  if (status === 'CONFIRMED') {
+    createTransaction_({
+      txn_date: nowIso().substring(0, 10),
+      fund_type: txn.fund_type,
+      direction: 'IN',
+      amount: Number(txn.amount_bdt || 0),
+      notes: 'দানকারী: ' + (txn.donor_name_bn || txn.donor_id) + (txn.txn_reference ? ' | Ref: ' + txn.txn_reference : ''),
+      source_or_vendor: txn.payment_method || 'CASH',
+      reference: id,
+      created_by: confirmedBy,
+    });
+  }
+
+  return updateById_(CONFIG.SHEETS.DONOR_TXN, id, updates);
+}
+
+function setDonationTarget_(payload, params) {
+  payload = payload || {};
+  assertPermission_(params, 'donations.write');
+  const fund_type = String(payload.fund_type || '').trim().toUpperCase();
+  if (!fund_type) return { ok: false, message: 'fund_type required' };
+
+  const targets = listSheetRows_(CONFIG.SHEETS.DONATION_TARGETS).data || [];
+  const existing = targets.find(t => t.fund_type === fund_type);
+
+  const row = {
+    fund_type,
+    title_bn: String(payload.title_bn || '').trim(),
+    title_en: String(payload.title_en || '').trim(),
+    target_amount: Number(payload.target_amount || 0),
+    description_bn: String(payload.description_bn || '').trim(),
+    start_date: String(payload.start_date || '').trim(),
+    end_date: String(payload.end_date || '').trim(),
+    is_active: payload.is_active !== false,
+  };
+
+  if (existing) {
+    return updateById_(CONFIG.SHEETS.DONATION_TARGETS, existing.id, row);
+  } else {
+    appendRow_(CONFIG.SHEETS.DONATION_TARGETS, { id: uid_('dt'), ...row, created_at: nowIso() });
+    return { ok: true };
+  }
+}
+
+function linkExpenseToDonor_(payload, params) {
+  payload = payload || {};
+  assertPermission_(params, 'expenses.write');
+  const expense_id = String(payload.expense_id || '').trim();
+  const donor_txn_id = String(payload.donor_txn_id || '').trim();
+  const amount_used = Number(payload.amount_used || 0);
+  if (!expense_id || !donor_txn_id) return { ok: false, message: 'expense_id and donor_txn_id required' };
+
+  appendRow_(CONFIG.SHEETS.EXPENSE_DONOR_LINKS, {
+    id: uid_('edl'),
+    expense_id,
+    donor_txn_id,
+    amount_used,
+    notes: String(payload.notes || '').trim(),
+    created_at: nowIso(),
+  });
+  return { ok: true };
+}
+
+// Fund key migration — একবার run করুন
+function migrateFundKeys() {
+  const ss = SpreadsheetApp.openById(getSheetId_());
+  const KEY_MAP = { 'CONSTRUCTION': 'SADAQAH', 'JAKAT': 'ZAKAT', 'SCHOLARSHIP': 'TALEBE_ELM' };
+  const TARGETS = [
+    { sheetName: 'fund_transactions', colName: 'fund_type' },
+    { sheetName: 'reconciliation_snapshots', colName: 'fund_type' },
+  ];
+  let totalChanged = 0;
+  for (const target of TARGETS) {
+    const sheet = ss.getSheetByName(target.sheetName);
+    if (!sheet) { Logger.log('skip: ' + target.sheetName); continue; }
+    const data = sheet.getDataRange().getValues();
+    if (data.length < 2) continue;
+    const headers = data[0].map(h => h.toString().trim().toLowerCase());
+    const colIdx = headers.indexOf(target.colName.toLowerCase());
+    if (colIdx === -1) { Logger.log('col not found: ' + target.colName); continue; }
+    let changed = 0;
+    for (let i = 1; i < data.length; i++) {
+      const cur = data[i][colIdx]?.toString().trim().toUpperCase();
+      if (cur && KEY_MAP[cur]) { data[i][colIdx] = KEY_MAP[cur]; changed++; }
+    }
+    if (changed > 0) { sheet.getDataRange().setValues(data); totalChanged += changed; }
+    Logger.log(target.sheetName + ': ' + changed + ' rows updated');
+  }
+  Logger.log('Migration complete. Total: ' + totalChanged);
 }

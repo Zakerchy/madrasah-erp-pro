@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/app_lang.dart';
 import '../../shared/constants/app_permissions.dart';
+import '../donor/admin_donor_screen.dart';
 import '../../shared/models/app_ui_settings.dart';
 import '../../shared/models/notification_settings.dart';
 import '../../shared/models/role_definition.dart';
@@ -1426,6 +1427,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ),
               ),
             ),
+            const SizedBox(height: 12),
+            if (SessionService.can(AppPermissions.usersManage))
+              Card(
+                child: ListTile(
+                  leading: const Icon(Icons.volunteer_activism),
+                  title: Text(AppLang.t('দানকারী ব্যবস্থাপনা', 'Donor Management')),
+                  subtitle: Text(AppLang.t('অনুমোদন, লেনদেন নিশ্চিত', 'Approvals, confirm transactions')),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => const AdminDonorScreen()),
+                  ),
+                ),
+              ),
             const SizedBox(height: 12),
             if (SessionService.can(AppPermissions.auditView))
               Card(
