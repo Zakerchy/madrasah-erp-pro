@@ -3800,3 +3800,43 @@ function migrateFundKeys() {
   }
   Logger.log('Migration complete. Total: ' + totalChanged);
 }
+
+/**
+ * Donor Portal sheet setup — একবার run করুন।
+ * নতুন ৪টি sheet তৈরি করে সঠিক header দিয়ে।
+ * Sheet আগে থেকে থাকলে skip করে।
+ */
+function setupDonorSheets() {
+  const ss = SpreadsheetApp.openById(getSheetId_());
+
+  const SHEETS_TO_CREATE = [
+    {
+      name: 'donors',
+      headers: ['id','name_bn','name_en','phone','email','profession','address','city','country','currency_pref','pin_hash','status','created_at','notes'],
+    },
+    {
+      name: 'donor_transactions',
+      headers: ['id','donor_id','donor_name_bn','fund_type','amount_foreign','currency','exchange_rate','amount_bdt','payment_method','txn_reference','slip_url','status','confirmed_by','confirmed_at','notes','created_at'],
+    },
+    {
+      name: 'donation_targets',
+      headers: ['id','fund_type','title_bn','title_en','target_amount','description_bn','start_date','end_date','is_active','created_at'],
+    },
+    {
+      name: 'expense_donor_links',
+      headers: ['id','expense_id','donor_txn_id','amount_used','notes','created_at'],
+    },
+  ];
+
+  for (const def of SHEETS_TO_CREATE) {
+    if (ss.getSheetByName(def.name)) {
+      Logger.log('Already exists, skip: ' + def.name);
+      continue;
+    }
+    const sheet = ss.insertSheet(def.name);
+    sheet.getRange(1, 1, 1, def.headers.length).setValues([def.headers]);
+    sheet.getRange(1, 1, 1, def.headers.length).setFontWeight('bold');
+    Logger.log('Created: ' + def.name);
+  }
+  Logger.log('setupDonorSheets complete.');
+}
