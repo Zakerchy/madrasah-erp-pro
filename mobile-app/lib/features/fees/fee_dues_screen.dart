@@ -6,6 +6,7 @@ import '../../shared/constants/app_permissions.dart';
 import '../../shared/services/api_service.dart';
 import '../../shared/services/session_service.dart';
 import '../../shared/widgets/base_scaffold.dart';
+import '../../shared/widgets/fund_type_dropdown.dart';
 import '../../shared/widgets/themed_date_picker.dart';
 
 class FeeDuesScreen extends StatefulWidget {
@@ -44,7 +45,7 @@ class _FeeDuesScreenState extends State<FeeDuesScreen> {
   final _payReference = TextEditingController();
   final _payNotes = TextEditingController();
   String _payDate = '';
-  String _fundType = 'GENERAL';
+  String _fundType = 'SADAQAH';
 
   final _waiverAmount = TextEditingController();
   final _waiverReason = TextEditingController();
@@ -613,12 +614,9 @@ class _FeeDuesScreenState extends State<FeeDuesScreen> {
             icon: const Icon(Icons.calendar_month),
             label: Text('${AppLang.t('Date', 'Date')}: $_payDate')),
         const SizedBox(height: 8),
-        DropdownButtonFormField<String>(
-          initialValue: _fundType,
-          items: ['GENERAL', 'CONSTRUCTION', 'JAKAT', 'SCHOLARSHIP']
-              .map((f) => DropdownMenuItem(value: f, child: Text(f)))
-              .toList(),
-          onChanged: (v) => setState(() => _fundType = v ?? 'GENERAL'),
+        FundTypeDropdown(
+          value: _fundType,
+          onChanged: (v) => setState(() => _fundType = v),
           decoration: InputDecoration(labelText: AppLang.t('Fund', 'Fund')),
         ),
         const SizedBox(height: 8),

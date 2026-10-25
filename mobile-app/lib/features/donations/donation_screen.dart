@@ -6,6 +6,7 @@ import '../../shared/services/access_control_service.dart';
 import '../../shared/services/api_service.dart';
 import '../../shared/services/session_service.dart';
 import '../../shared/widgets/base_scaffold.dart';
+import '../../shared/widgets/fund_type_dropdown.dart';
 import '../../shared/widgets/themed_date_picker.dart';
 
 class DonationScreen extends StatefulWidget {
@@ -23,7 +24,7 @@ class _DonationScreenState extends State<DonationScreen> {
   final _source = TextEditingController();
   final _note = TextEditingController();
 
-  String _fundType = 'CONSTRUCTION';
+  String _fundType = 'SADAQAH';
   bool _saving = false;
   bool _loadingList = true;
   List<Map<String, dynamic>> _rows = [];
@@ -277,26 +278,9 @@ class _DonationScreenState extends State<DonationScreen> {
                     },
                   ),
                   const SizedBox(height: 12),
-                  DropdownButtonFormField<String>(
-                    initialValue: _fundType,
-                    items: [
-                      DropdownMenuItem(
-                          value: 'CONSTRUCTION',
-                          child: Text(AppLang.t('নির্মাণ', 'Construction'))),
-                      DropdownMenuItem(
-                          value: 'JAKAT',
-                          child: Text(AppLang.t('যাকাত', 'Jakat'))),
-                      DropdownMenuItem(
-                          value: 'SCHOLARSHIP',
-                          child: Text(AppLang.t('বৃত্তি', 'Scholarship'))),
-                      DropdownMenuItem(
-                          value: 'GENERAL',
-                          child: Text(AppLang.t('সাধারণ', 'General'))),
-                    ],
-                    onChanged: (v) =>
-                        setState(() => _fundType = v ?? 'CONSTRUCTION'),
-                    decoration: InputDecoration(
-                        labelText: AppLang.t('ফান্ড ধরন', 'Fund Type')),
+                  FundTypeDropdown(
+                    value: _fundType,
+                    onChanged: (v) => setState(() => _fundType = v),
                   ),
                   const SizedBox(height: 12),
                   TextFormField(

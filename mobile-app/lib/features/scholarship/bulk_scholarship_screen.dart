@@ -7,6 +7,7 @@ import '../../shared/services/access_control_service.dart';
 import '../../shared/services/api_service.dart';
 import '../../shared/services/session_service.dart';
 import '../../shared/widgets/base_scaffold.dart';
+import '../../shared/widgets/fund_type_dropdown.dart';
 
 class _BeneficiaryRow {
   final String id;
@@ -44,7 +45,7 @@ class _BulkScholarshipScreenState extends State<BulkScholarshipScreen> {
   late final TextEditingController _monthCtrl;
 
   List<_BeneficiaryRow> _rows = [];
-  String _fundType = 'SCHOLARSHIP';
+  String _fundType = 'TALEBE_ELM';
 
   bool get _canWrite => SessionService.can(AppPermissions.scholarshipWrite);
 
@@ -303,17 +304,12 @@ class _BulkScholarshipScreenState extends State<BulkScholarshipScreen> {
                               ),
                             ),
                             const SizedBox(width: 8),
-                            DropdownButton<String>(
-                              value: _fundType,
-                              items: const [
-                                DropdownMenuItem(
-                                    value: 'SCHOLARSHIP',
-                                    child: Text('SCHOLARSHIP')),
-                                DropdownMenuItem(
-                                    value: 'JAKAT', child: Text('JAKAT')),
-                              ],
-                              onChanged: (v) =>
-                                  setState(() => _fundType = v ?? 'SCHOLARSHIP'),
+                            SizedBox(
+                              width: 180,
+                              child: FundTypeDropdown(
+                                value: _fundType,
+                                onChanged: (v) => setState(() => _fundType = v),
+                              ),
                             ),
                           ],
                         ),

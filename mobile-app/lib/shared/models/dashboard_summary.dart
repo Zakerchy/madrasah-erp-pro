@@ -64,6 +64,18 @@ class DashboardSummary {
     );
   }
 
-  FundSummary fund(String key) =>
-      byFund[key] ?? FundSummary(incoming: 0, outgoing: 0, balance: 0);
+  /// key বা legacyKey যেটাই দাও — পাওয়া যায় এমন দিয়ে lookup।
+  FundSummary fund(String key) {
+    final upper = key.toUpperCase();
+    if (byFund.containsKey(upper)) return byFund[upper]!;
+    // legacyKey fallback (e.g. SADAQAH → CONSTRUCTION)
+    const legacyMap = <String, String>{
+      'SADAQAH': 'CONSTRUCTION',
+      'ZAKAT': 'JAKAT',
+      'TALEBE_ELM': 'SCHOLARSHIP',
+    };
+    final legacy = legacyMap[upper];
+    if (legacy != null && byFund.containsKey(legacy)) return byFund[legacy]!;
+    return FundSummary(incoming: 0, outgoing: 0, balance: 0);
+  }
 }

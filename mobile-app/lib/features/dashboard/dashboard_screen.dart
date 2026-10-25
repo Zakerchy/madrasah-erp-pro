@@ -13,6 +13,8 @@ import '../../shared/services/local_store_service.dart';
 import '../../shared/services/pwa_runtime_service.dart';
 import '../../shared/services/role_service.dart';
 import '../../shared/services/session_service.dart';
+import '../../shared/constants/fund_types.dart';
+import '../../shared/widgets/fund_type_dropdown.dart';
 import '../../shared/widgets/themed_date_picker.dart';
 import 'fund_detail_page.dart';
 
@@ -355,7 +357,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final amountCtrl = TextEditingController();
     final sourceCtrl = TextEditingController();
     final noteCtrl = TextEditingController();
-    var fundType = 'CONSTRUCTION';
+    var fundType = 'SADAQAH';
 
     final saved = await showDialog<bool>(
       context: context,
@@ -415,21 +417,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     },
                   ),
                   const SizedBox(height: 10),
-                  DropdownButtonFormField<String>(
-                    initialValue: fundType,
+                  FundTypeDropdown(
+                    value: fundType,
+                    onChanged: (v) => setD(() => fundType = v),
                     decoration: const InputDecoration(labelText: 'ফান্ড'),
-                    items: const [
-                      DropdownMenuItem(
-                          value: 'CONSTRUCTION', child: Text('নির্মাণ ফান্ড')),
-                      DropdownMenuItem(
-                          value: 'JAKAT', child: Text('যাকাত ফান্ড')),
-                      DropdownMenuItem(
-                          value: 'SCHOLARSHIP', child: Text('বৃত্তি ফান্ড')),
-                      DropdownMenuItem(
-                          value: 'GENERAL', child: Text('সাদাকাহ / সাধারণ')),
-                    ],
-                    onChanged: (v) =>
-                        setD(() => fundType = v ?? 'CONSTRUCTION'),
                   ),
                   const SizedBox(height: 10),
                   TextFormField(
@@ -692,12 +683,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
         final isTablet = width >= 760;
         final fundCardWidth = isWide ? 290.0 : (isTablet ? 260.0 : 180.0);
         final maxWidth = isWide ? 1320.0 : 840.0;
-        final negFunds = <String>[
-          if (s.fund('CONSTRUCTION').balance < 0) 'নির্মাণ ও সাদাকাহ',
-          if (s.fund('JAKAT').balance < 0) 'যাকাত',
-          if (s.fund('SCHOLARSHIP').balance < 0) 'বৃত্তি',
-          if (s.fund('GENERAL').balance < 0) 'সাধারণ',
-        ];
+        final negFunds = FundTypes.all
+            .where((f) {
+              final bal = s.fund(f.key).balance;
+              final legacyBal = f.legacyKey != null ? s.fund(f.legacyKey!).balance : 0.0;
+              return (bal < 0 || legacyBal < 0);
+            })
+            .map((f) => f.labelBn)
+            .toList();
 
         return Center(
           child: ConstrainedBox(
@@ -803,12 +796,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     SizedBox(
                       width: fundCardWidth,
                       child: _FundCard(
-                        name: 'নির্মাণ ও সাদাকাহ',
-                        icon: Icons.construction,
+                        name: 'সাদাকাহ/দান ফান্ড',
+                        icon: Icons.volunteer_activism_outlined,
                         color: const Color(0xFF1D4ED8),
-                        fund: s.fund('CONSTRUCTION'),
+                        fund: s.fund('SADAQAH'),
                         fmt: _fmt,
-                        onTap: () => _goToFund('CONSTRUCTION', 'নির্মাণ ও সাদাকাহ ফান্ড'),
+                        onTap: () => _goToFund('SADAQAH', 'সাদাকাহ/দান ফান্ড'),
                       ),
                     ),
                     SizedBox(
@@ -817,31 +810,20 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         name: 'যাকাত ফান্ড',
                         icon: Icons.volunteer_activism,
                         color: const Color(0xFF15803D),
-                        fund: s.fund('JAKAT'),
+                        fund: s.fund('ZAKAT'),
                         fmt: _fmt,
-                        onTap: () => _goToFund('JAKAT', 'যাকাত ফান্ড'),
+                        onTap: () => _goToFund('ZAKAT', 'যাকাত ফান্ড'),
                       ),
                     ),
                     SizedBox(
                       width: fundCardWidth,
                       child: _FundCard(
-                        name: 'বৃত্তি ফান্ড',
+                        name: 'তালেবে ইলম ফান্ড',
                         icon: Icons.school,
                         color: const Color(0xFF7C3AED),
-                        fund: s.fund('SCHOLARSHIP'),
+                        fund: s.fund('TALEBE_ELM'),
                         fmt: _fmt,
-                        onTap: () => _goToFund('SCHOLARSHIP', 'বৃত্তি ফান্ড'),
-                      ),
-                    ),
-                    SizedBox(
-                      width: fundCardWidth,
-                      child: _FundCard(
-                        name: 'সাদাকাহ / সাধারণ',
-                        icon: Icons.favorite,
-                        color: const Color(0xFFB45309),
-                        fund: s.fund('GENERAL'),
-                        fmt: _fmt,
-                        onTap: () => _goToFund('GENERAL', 'সাদাকাহ / সাধারণ'),
+                        onTap: () => _goToFund('TALEBE_ELM', 'তালেবে ইলমদের খেদমত ফান্ড'),
                       ),
                     ),
                   ],

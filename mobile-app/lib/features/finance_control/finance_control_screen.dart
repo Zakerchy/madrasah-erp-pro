@@ -5,6 +5,7 @@ import '../../shared/constants/app_permissions.dart';
 import '../../shared/services/api_service.dart';
 import '../../shared/services/session_service.dart';
 import '../../shared/widgets/base_scaffold.dart';
+import '../../shared/widgets/fund_type_dropdown.dart';
 
 class FinanceControlScreen extends StatefulWidget {
   const FinanceControlScreen({super.key});
@@ -20,7 +21,7 @@ class _FinanceControlScreenState extends State<FinanceControlScreen> {
   int _tabIndex = 0;
 
   String _monthKey = '';
-  String _fundType = 'GENERAL';
+  String _fundType = 'SADAQAH';
   Map<String, dynamic> _summary = {};
   List<Map<String, dynamic>> _budgets = [];
   List<Map<String, dynamic>> _approvalRequests = [];
@@ -338,14 +339,10 @@ class _FinanceControlScreenState extends State<FinanceControlScreen> {
     return _panel(
         AppLang.t('Monthly Budget', 'Monthly Budget'),
         Column(children: [
-          DropdownButtonFormField<String>(
-              initialValue: _fundType,
-              items: ['GENERAL', 'CONSTRUCTION', 'JAKAT', 'SCHOLARSHIP']
-                  .map((f) => DropdownMenuItem(value: f, child: Text(f)))
-                  .toList(),
-              onChanged: (v) => setState(() => _fundType = v ?? 'GENERAL'),
-              decoration:
-                  InputDecoration(labelText: AppLang.t('Fund', 'Fund'))),
+          FundTypeDropdown(
+              value: _fundType,
+              onChanged: (v) => setState(() => _fundType = v),
+              decoration: InputDecoration(labelText: AppLang.t('Fund', 'Fund'))),
           const SizedBox(height: 8),
           Row(children: [
             Expanded(

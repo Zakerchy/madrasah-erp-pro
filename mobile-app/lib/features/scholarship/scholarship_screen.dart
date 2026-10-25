@@ -7,6 +7,7 @@ import '../../shared/services/access_control_service.dart';
 import '../../shared/services/api_service.dart';
 import '../../shared/services/session_service.dart';
 import '../../shared/widgets/base_scaffold.dart';
+import '../../shared/widgets/fund_type_dropdown.dart';
 import 'bulk_scholarship_screen.dart';
 
 class ScholarshipScreen extends StatefulWidget {
@@ -28,7 +29,7 @@ class _ScholarshipScreenState extends State<ScholarshipScreen> {
   String _selectedBeneficiaryId = '';
   String _selectedBeneficiaryName = '';
   double _selectedBeneficiaryMonthlyNeed = 0;
-  String _fundType = 'SCHOLARSHIP';
+  String _fundType = 'TALEBE_ELM';
 
   final _school = TextEditingController(text: '0');
   final _bangla = TextEditingController(text: '0');
@@ -420,24 +421,9 @@ class _ScholarshipScreenState extends State<ScholarshipScreen> {
                         labelText: AppLang.t('অবস্থা', 'Status')),
                   ),
                   const SizedBox(height: 8),
-                  DropdownButtonFormField<String>(
-                    initialValue: _fundType,
-                    items: [
-                      DropdownMenuItem(
-                          value: 'SCHOLARSHIP',
-                          child: Text(
-                              AppLang.t('বৃত্তি ফান্ড', 'Scholarship Fund'))),
-                      DropdownMenuItem(
-                          value: 'JAKAT',
-                          child:
-                              Text(AppLang.t('যাকাত ফান্ড', 'Jakat Fund'))),
-                      DropdownMenuItem(
-                          value: 'GENERAL',
-                          child: Text(
-                              AppLang.t('সাধারণ ফান্ড', 'General Fund'))),
-                    ],
-                    onChanged: (v) =>
-                        setState(() => _fundType = v ?? 'SCHOLARSHIP'),
+                  FundTypeDropdown(
+                    value: _fundType,
+                    onChanged: (v) => setState(() => _fundType = v),
                     decoration: InputDecoration(
                         labelText: AppLang.t('ফান্ড ধরন', 'Fund Type')),
                   ),

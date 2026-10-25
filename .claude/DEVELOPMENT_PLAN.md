@@ -53,8 +53,8 @@ Scholarship Jan–Apr 2026 entries-এর date fixed করা হয়েছ�
 
 | # | Task | File | Done? |
 |---|------|------|-------|
-| 3.1 | Bulk scholarship entry — এক screen-এ সব beneficiary-র payment | `scholarship_screen.dart` | ☐ |
-| 3.2 | Monthly auto-generate — বিগত মাসের pattern থেকে new month pre-fill | `scholarship_screen.dart` | ☐ |
+| 3.1 | Bulk scholarship entry — এক screen-এ সব beneficiary-র payment | `bulk_scholarship_screen.dart` | ✅ |
+| 3.2 | Monthly auto-generate — বিগত মাসের pattern থেকে new month pre-fill | `bulk_scholarship_screen.dart` | ✅ |
 | 3.3 | Over-payment warning — monthly_need_amount-এর বেশি হলে alert | `scholarship_screen.dart` | ✅ (Phase 1.4) |
 | 3.4 | Scholarship fund balance check — পেমেন্টের আগে fund sufficient কিনা | `scholarship_screen.dart` | ✅ |
 | 3.5 | Remaining amount auto-calculate — monthly_need − paid | `scholarship_screen.dart` | ✅ (Phase 1.4) |
