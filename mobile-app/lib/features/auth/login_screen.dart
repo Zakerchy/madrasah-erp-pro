@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 
 import '../../shared/models/session_user.dart';
 import '../../shared/services/api_service.dart';
+import '../../shared/services/org_settings_service.dart';
 import '../donor/donor_login_screen.dart';
 import '../../shared/services/session_service.dart';
 
@@ -20,6 +21,12 @@ class _LoginScreenState extends State<LoginScreen> {
   final _api = ApiService();
   bool _loading = false;
   bool _pinVisible = false;
+
+  @override
+  void initState() {
+    super.initState();
+    OrgSettings.load().then((_) { if (mounted) setState(() {}); });
+  }
 
   @override
   void dispose() {
@@ -209,11 +216,21 @@ class _LoginScreenState extends State<LoginScreen> {
                         shape: BoxShape.circle,
                         border: Border.all(color: teal.withValues(alpha: 0.35)),
                       ),
-                      child: Icon(Icons.school, color: teal, size: 48),
+                      child: OrgSettings.logoUrl.isNotEmpty
+                          ? ClipOval(
+                              child: Image.network(
+                                OrgSettings.logoUrl,
+                                width: 48,
+                                height: 48,
+                                fit: BoxFit.cover,
+                                errorBuilder: (_, __, ___) => Icon(Icons.school, color: teal, size: 48),
+                              ),
+                            )
+                          : Icon(Icons.school, color: teal, size: 48),
                     ),
                     const SizedBox(height: 24),
                     Text(
-                      'মাদ্রাসা ERP',
+                      OrgSettings.nameBn,
                       textAlign: TextAlign.center,
                       style: theme.textTheme.headlineMedium?.copyWith(
                         fontWeight: FontWeight.bold,

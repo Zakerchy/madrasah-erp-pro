@@ -40,6 +40,7 @@ const CONFIG = {
     DONATION_TARGETS: 'donation_targets',
     EXPENSE_DONOR_LINKS: 'expense_donor_links',
     DONOR_NOTIFICATIONS: 'donor_notifications',
+    DONOR_REMINDER_SCHEDULES: 'donor_reminder_schedules',
   },
   ENUMS: {
     ROLE: ['ADMIN', 'ACCOUNTANT', 'FIELD_USER', 'VIEWER'],
@@ -173,6 +174,16 @@ const ACTION_PERMISSIONS = {
   autoDeductPreview: 'expenses.write',
   autoDeductCommit: 'expenses.write',
   sendDonorNotification: 'donations.write',
+  getDonorNotifRetentionDays: 'donations.view',
+  setDonorNotifRetentionDays: 'donations.write',
+  setOrgSettings: 'app_ui.manage',
+  adminUploadOrgLogo: 'app_ui.manage',
+  adminSetDonorPin: 'users.manage',
+  adminListDonorNotifications: 'donations.view',
+  adminDeleteDonorNotification: 'donations.write',
+  setDonorReminderSchedule: 'donations.write',
+  adminListDonorReminderSchedules: 'donations.view',
+  deleteDonorReminderSchedule: 'donations.write',
 };
 
 // Route both GET and POST through a single handler so the Flutter app
@@ -224,6 +235,9 @@ function handleRequest_(params) {
       return json({ ok: true, pin_hash: pinHash_(pin) });
     }
 
+    // ── Public — no auth needed (used by login screens before sign-in) ─────
+    if (action === 'getOrgSettings') return json(getOrgSettings_());
+
     // ── Donor Portal — public (no staff auth needed) ───────────────────────
     if (action === 'donorRegister') return json(donorRegister_(params.payload));
     if (action === 'donorLogin') return json(donorLogin_(params.payload));
@@ -232,6 +246,7 @@ function handleRequest_(params) {
     if (action === 'donorMyDashboard') return json(donorMyDashboard_(params.payload));
     if (action === 'donorMyTransactions') return json(donorMyTransactions_(params.payload));
     if (action === 'donorMyNotifications') return json(donorMyNotifications_(params.payload));
+    if (action === 'donorUploadSlip') return json(donorUploadSlip_(params.payload));
 
     params.action = action;
     assertActionPermission_(params, action);
@@ -424,6 +439,16 @@ function handleRequest_(params) {
     if (action === 'autoDeductPreview') return json(autoDeductPreview_(params.payload, params));
     if (action === 'autoDeductCommit') return json(autoDeductCommit_(params.payload, params));
     if (action === 'sendDonorNotification') return json(sendDonorNotification_(params.payload, params));
+    if (action === 'getDonorNotifRetentionDays') return json(getDonorNotifRetentionDaysAction_(params));
+    if (action === 'setDonorNotifRetentionDays') return json(setDonorNotifRetentionDays_(params.payload, params));
+    if (action === 'setOrgSettings') return json(setOrgSettings_(params.payload, params));
+    if (action === 'adminUploadOrgLogo') return json(adminUploadOrgLogo_(params.payload, params));
+    if (action === 'adminSetDonorPin') return json(adminSetDonorPin_(params.payload, params));
+    if (action === 'adminListDonorNotifications') return json(adminListDonorNotifications_(params));
+    if (action === 'adminDeleteDonorNotification') return json(adminDeleteDonorNotification_(params.payload, params));
+    if (action === 'setDonorReminderSchedule') return json(setDonorReminderSchedule_(params.payload, params));
+    if (action === 'adminListDonorReminderSchedules') return json(adminListDonorReminderSchedules_(params));
+    if (action === 'deleteDonorReminderSchedule') return json(deleteDonorReminderSchedule_(params.payload, params));
 
     return json({ ok: false, message: 'Unknown action: ' + action });
   } catch (err) {
@@ -3191,6 +3216,72 @@ function uid_(prefix) {
   return prefix + '_' + Utilities.getUuid().slice(0, 8);
 }
 
+// ── File uploads (donation slips, org logo) — stored in Google Drive ───────
+
+function getOrCreateUploadsFolder_() {
+  const name = 'MadrasahApp_Uploads';
+  const it = DriveApp.getFoldersByName(name);
+  if (it.hasNext()) return it.next();
+  return DriveApp.createFolder(name);
+}
+
+/** Saves a base64 image (optionally prefixed with a data: URL header) to Drive
+ *  and returns a publicly viewable URL. Shared via Script maxFileSizeBytes-safe. */
+function saveBase64Image_(base64, filename, mimeType) {
+  const commaIdx = String(base64 || '').indexOf(',');
+  const raw = commaIdx !== -1 && String(base64).slice(0, commaIdx).indexOf('base64') !== -1
+    ? String(base64).slice(commaIdx + 1)
+    : String(base64 || '');
+  const bytes = Utilities.base64Decode(raw);
+  const blob = Utilities.newBlob(bytes, mimeType || 'image/jpeg', filename || ('upload_' + Date.now() + '.jpg'));
+  const file = getOrCreateUploadsFolder_().createFile(blob);
+  file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+  return 'https://drive.google.com/uc?export=view&id=' + file.getId();
+}
+
+/** Donor auth required — upload a payment slip image, returns its URL. */
+function donorUploadSlip_(payload) {
+  payload = payload || {};
+  assertDonorAuth_(payload);
+  const base64 = payload.base64;
+  if (!base64) return { ok: false, message: 'ছবি পাওয়া যায়নি' };
+  const url = saveBase64Image_(base64, String(payload.filename || '').trim(), payload.mime_type);
+  return { ok: true, url };
+}
+
+/** Admin — upload the organization logo, returns its URL. */
+function adminUploadOrgLogo_(payload, params) {
+  payload = payload || {};
+  assertPermission_(params, 'app_ui.manage');
+  const base64 = payload.base64;
+  if (!base64) return { ok: false, message: 'ছবি পাওয়া যায়নি' };
+  const url = saveBase64Image_(base64, 'org_logo_' + Date.now() + '.png', payload.mime_type || 'image/png');
+  return { ok: true, url };
+}
+
+// ── Organization branding + bank details — shown on login, donor app, invoices ──
+
+function getOrgSettings_() {
+  const byKey = getSettingsMapByKey_();
+  return {
+    ok: true,
+    name_bn: String((byKey['org.name_bn'] || {}).value || 'মাদ্রাসা ERP'),
+    name_en: String((byKey['org.name_en'] || {}).value || 'Madrasah ERP'),
+    logo_url: String((byKey['org.logo_url'] || {}).value || ''),
+    bank_details_bn: String((byKey['org.bank_details_bn'] || {}).value || ''),
+  };
+}
+
+function setOrgSettings_(payload, params) {
+  payload = payload || {};
+  assertPermission_(params, 'app_ui.manage');
+  if (payload.name_bn !== undefined) upsertSettingTextByKey_('org.name_bn', String(payload.name_bn).trim());
+  if (payload.name_en !== undefined) upsertSettingTextByKey_('org.name_en', String(payload.name_en).trim());
+  if (payload.logo_url !== undefined) upsertSettingTextByKey_('org.logo_url', String(payload.logo_url).trim());
+  if (payload.bank_details_bn !== undefined) upsertSettingTextByKey_('org.bank_details_bn', String(payload.bank_details_bn).trim());
+  return { ok: true };
+}
+
 function nowIso() {
   return new Date().toISOString();
 }
@@ -3672,6 +3763,12 @@ function donorDonate_(payload) {
   }
   const amount_bdt = isForeign ? 0 : Number(payload.amount_bdt || 0);
 
+  const payment_method = String(payload.payment_method || 'CASH').toUpperCase();
+  const slip_url = String(payload.slip_url || '').trim();
+  if (payment_method !== 'CASH' && !slip_url) {
+    return { ok: false, message: 'পেমেন্ট স্লিপ/ছবি দিন' };
+  }
+
   const id = uid_('dtx');
   appendRow_(CONFIG.SHEETS.DONOR_TXN, {
     id,
@@ -3682,9 +3779,9 @@ function donorDonate_(payload) {
     currency,
     exchange_rate: isForeign ? 0 : 1, // set when admin confirms a foreign donation
     amount_bdt,
-    payment_method: String(payload.payment_method || 'CASH').toUpperCase(),
+    payment_method,
     txn_reference: String(payload.txn_reference || '').trim(),
-    slip_url: String(payload.slip_url || '').trim(),
+    slip_url,
     status: 'PENDING',
     confirmed_by: '',
     confirmed_at: '',
@@ -3814,6 +3911,17 @@ function approveDonor_(payload, params) {
   const status = String(payload.status || 'ACTIVE').trim(); // ACTIVE or REJECTED
   if (!id) return { ok: false, message: 'id required' };
   updateById_(CONFIG.SHEETS.DONORS, id, { status });
+  return { ok: true };
+}
+
+function adminSetDonorPin_(payload, params) {
+  payload = payload || {};
+  assertPermission_(params, 'users.manage');
+  const id = String(payload.donor_id || '').trim();
+  const pin_hash = String(payload.pin_hash || '').trim();
+  if (!id) return { ok: false, message: 'donor_id প্রয়োজন' };
+  if (!pin_hash) return { ok: false, message: 'pin_hash প্রয়োজন' };
+  updateById_(CONFIG.SHEETS.DONORS, id, { pin_hash });
   return { ok: true };
 }
 
@@ -4054,25 +4162,124 @@ function autoDeductCommit_(payload, params) {
 }
 
 /** Admin — ask donors (all, or one specific donor) to help cover a fund shortfall. */
+const DONOR_NOTIF_RETENTION_KEY_ = 'donor_notifications.retention_days';
+
+function getDonorNotifRetentionDays_() {
+  const rows = listSheetRows_(CONFIG.SHEETS.SETTINGS).data || [];
+  const row = rows.find(r => String(r.key || '').trim() === DONOR_NOTIF_RETENTION_KEY_);
+  const n = row ? Number(row.value) : 0;
+  return n > 0 ? n : 30; // default: keep 30 days
+}
+
+/** Deletes donor_notifications rows older than the configured retention window. */
+function sweepOldDonorNotifications_() {
+  const days = getDonorNotifRetentionDays_();
+  const cutoff = new Date(Date.now() - days * 86400000);
+  const sheet = getSheet_(CONFIG.SHEETS.DONOR_NOTIFICATIONS);
+  const values = sheet.getDataRange().getValues();
+  if (values.length < 2) return;
+  const headers = values[0].map(String);
+  const createdIdx = headers.indexOf('created_at');
+  if (createdIdx === -1) return;
+  for (let i = values.length - 1; i >= 1; i--) {
+    const d = new Date(values[i][createdIdx]);
+    if (!isNaN(d.getTime()) && d < cutoff) sheet.deleteRow(i + 1);
+  }
+}
+
+function getDonorNotifRetentionDaysAction_(params) {
+  assertPermission_(params, 'donations.view');
+  return { ok: true, days: getDonorNotifRetentionDays_() };
+}
+
+function setDonorNotifRetentionDays_(payload, params) {
+  payload = payload || {};
+  assertPermission_(params, 'donations.write');
+  const days = Math.max(1, Math.round(Number(payload.days || 30)));
+
+  const sheet = getSheet_(CONFIG.SHEETS.SETTINGS);
+  const values = sheet.getDataRange().getValues();
+  const headers = values[0].map(String);
+  const keyIdx = headers.indexOf('key');
+  const valueIdx = headers.indexOf('value');
+  const updatedAtIdx = headers.indexOf('updated_at');
+  for (let i = 1; i < values.length; i++) {
+    if (String(values[i][keyIdx] || '').trim() === DONOR_NOTIF_RETENTION_KEY_) {
+      sheet.getRange(i + 1, valueIdx + 1).setValue(String(days));
+      if (updatedAtIdx >= 0) sheet.getRange(i + 1, updatedAtIdx + 1).setValue(nowIso());
+      return { ok: true, days };
+    }
+  }
+  const rowObj = { key: DONOR_NOTIF_RETENTION_KEY_, value: String(days), notes: '', updated_at: nowIso() };
+  sheet.appendRow(headers.map(h => rowObj[h] !== undefined ? rowObj[h] : ''));
+  return { ok: true, days };
+}
+
 function sendDonorNotification_(payload, params) {
   payload = payload || {};
   assertPermission_(params, 'donations.write');
-  const target = String(payload.target || 'ALL').toUpperCase(); // ALL or SPECIFIC
-  const donor_id = target === 'SPECIFIC' ? String(payload.donor_id || '').trim() : '';
-  if (target === 'SPECIFIC' && !donor_id) return { ok: false, message: 'donor_id প্রয়োজন' };
+  const target = String(payload.target || 'ALL').toUpperCase(); // ALL, SPECIFIC, or MULTI
   const message_bn = String(payload.message_bn || '').trim();
   if (!message_bn) return { ok: false, message: 'মেসেজ লিখুন' };
 
-  appendRow_(CONFIG.SHEETS.DONOR_NOTIFICATIONS, {
-    id: uid_('dnt'),
-    donor_id, // blank = broadcast to every donor
-    fund_type: String(payload.fund_type || '').trim().toUpperCase(),
-    title_bn: String(payload.title_bn || '').trim(),
-    message_bn,
-    created_by: String(params.email || params.user_id || '').trim(),
-    created_at: nowIso(),
+  let donorIds; // list of recipient donor_ids, or [''] for a single broadcast row
+  if (target === 'SPECIFIC') {
+    const donor_id = String(payload.donor_id || '').trim();
+    if (!donor_id) return { ok: false, message: 'donor_id প্রয়োজন' };
+    donorIds = [donor_id];
+  } else if (target === 'MULTI') {
+    donorIds = (payload.donor_ids || []).map(d => String(d || '').trim()).filter(Boolean);
+    if (!donorIds.length) return { ok: false, message: 'অন্তত একজন দানকারী বেছে নিন' };
+  } else {
+    donorIds = ['']; // ALL — one broadcast row, blank donor_id
+  }
+
+  sweepOldDonorNotifications_();
+  const createdBy = String(params.email || params.user_id || '').trim();
+  const fund_type = String(payload.fund_type || '').trim().toUpperCase();
+  const title_bn = String(payload.title_bn || '').trim();
+  donorIds.forEach(donor_id => {
+    appendRow_(CONFIG.SHEETS.DONOR_NOTIFICATIONS, {
+      id: uid_('dnt'),
+      donor_id, // blank = broadcast to every donor
+      fund_type,
+      title_bn,
+      message_bn,
+      created_by: createdBy,
+      created_at: nowIso(),
+    });
   });
-  return { ok: true };
+  return { ok: true, sent: donorIds.length };
+}
+
+/** Admin — full notification history (used to review/delete past sends). */
+function adminListDonorNotifications_(params) {
+  assertPermission_(params, 'donations.view');
+  const rows = listSheetRows_(CONFIG.SHEETS.DONOR_NOTIFICATIONS).data || [];
+  rows.sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)));
+  return { ok: true, data: rows };
+}
+
+/** Admin — delete one notification by id, or all of them (payload.all === true). */
+function adminDeleteDonorNotification_(payload, params) {
+  payload = payload || {};
+  assertPermission_(params, 'donations.write');
+  const sheet = getSheet_(CONFIG.SHEETS.DONOR_NOTIFICATIONS);
+  const values = sheet.getDataRange().getValues();
+  if (values.length < 2) return { ok: true, removed: 0 };
+  const headers = values[0].map(String);
+  const idIdx = headers.indexOf('id');
+  let removed = 0;
+  if (payload.all === true) {
+    for (let i = values.length - 1; i >= 1; i--) { sheet.deleteRow(i + 1); removed++; }
+  } else {
+    const id = String(payload.id || '').trim();
+    if (!id) return { ok: false, message: 'id প্রয়োজন' };
+    for (let i = values.length - 1; i >= 1; i--) {
+      if (String(values[i][idIdx]) === id) { sheet.deleteRow(i + 1); removed++; break; }
+    }
+  }
+  return { ok: true, removed };
 }
 
 /** Donor auth required — notifications addressed to this donor or broadcast to all. */
@@ -4165,4 +4372,106 @@ function setupDonorNotificationsSheet() {
   sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
   sheet.getRange(1, 1, 1, headers.length).setFontWeight('bold');
   Logger.log('Created: ' + name);
+}
+
+/** One-off — run once. Creates the recurring donor-reminder schedule sheet. */
+function setupDonorReminderSchedulesSheet() {
+  const ss = SpreadsheetApp.openById(getSheetId_());
+  const name = CONFIG.SHEETS.DONOR_REMINDER_SCHEDULES;
+  if (ss.getSheetByName(name)) { Logger.log('Already exists, skip: ' + name); return; }
+  const headers = ['id', 'donor_id', 'donor_name_bn', 'fund_type', 'interval_days', 'message_bn', 'enabled', 'last_sent_at', 'created_at'];
+  const sheet = ss.insertSheet(name);
+  sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+  sheet.getRange(1, 1, 1, headers.length).setFontWeight('bold');
+  Logger.log('Created: ' + name);
+}
+
+/** Admin — create/update a donor's recurring reminder (one schedule per donor). */
+function setDonorReminderSchedule_(payload, params) {
+  payload = payload || {};
+  assertPermission_(params, 'donations.write');
+  const donor_id = String(payload.donor_id || '').trim();
+  if (!donor_id) return { ok: false, message: 'donor_id প্রয়োজন' };
+  const interval_days = Math.max(1, Math.round(Number(payload.interval_days || 30)));
+  const message_bn = String(payload.message_bn || '').trim();
+  if (!message_bn) return { ok: false, message: 'মেসেজ লিখুন' };
+  const enabled = payload.enabled !== false;
+
+  const rows = listSheetRows_(CONFIG.SHEETS.DONOR_REMINDER_SCHEDULES).data || [];
+  const existing = rows.find(r => r.donor_id === donor_id);
+  const row = {
+    donor_id,
+    donor_name_bn: String(payload.donor_name_bn || '').trim(),
+    fund_type: String(payload.fund_type || '').trim().toUpperCase(),
+    interval_days,
+    message_bn,
+    enabled,
+  };
+  if (existing) {
+    updateById_(CONFIG.SHEETS.DONOR_REMINDER_SCHEDULES, existing.id, row);
+  } else {
+    appendRow_(CONFIG.SHEETS.DONOR_REMINDER_SCHEDULES, {
+      id: uid_('drs'),
+      ...row,
+      last_sent_at: '',
+      created_at: nowIso(),
+    });
+  }
+  return { ok: true };
+}
+
+/** Admin — list all recurring reminder schedules. */
+function adminListDonorReminderSchedules_(params) {
+  assertPermission_(params, 'donations.view');
+  return { ok: true, data: listSheetRows_(CONFIG.SHEETS.DONOR_REMINDER_SCHEDULES).data || [] };
+}
+
+/** Admin — remove a donor's recurring reminder schedule. */
+function deleteDonorReminderSchedule_(payload, params) {
+  payload = payload || {};
+  assertPermission_(params, 'donations.write');
+  const id = String(payload.id || '').trim();
+  if (!id) return { ok: false, message: 'id প্রয়োজন' };
+  const sheet = getSheet_(CONFIG.SHEETS.DONOR_REMINDER_SCHEDULES);
+  const values = sheet.getDataRange().getValues();
+  const headers = values[0].map(String);
+  const idIdx = headers.indexOf('id');
+  for (let i = values.length - 1; i >= 1; i--) {
+    if (String(values[i][idIdx]) === id) { sheet.deleteRow(i + 1); break; }
+  }
+  return { ok: true };
+}
+
+/** Installed as a daily time-driven trigger — fires any due recurring reminders. */
+function runDueDonorReminders_() {
+  const schedules = listSheetRows_(CONFIG.SHEETS.DONOR_REMINDER_SCHEDULES).data || [];
+  const now = Date.now();
+  schedules.forEach(s => {
+    const enabled = s.enabled === true || s.enabled === 'TRUE' || s.enabled === '1';
+    if (!enabled) return;
+    const intervalMs = Math.max(1, Number(s.interval_days || 30)) * 86400000;
+    const lastSent = s.last_sent_at ? new Date(s.last_sent_at).getTime() : 0;
+    if (now - lastSent < intervalMs) return;
+
+    appendRow_(CONFIG.SHEETS.DONOR_NOTIFICATIONS, {
+      id: uid_('dnt'),
+      donor_id: s.donor_id,
+      fund_type: s.fund_type || '',
+      title_bn: 'রিমাইন্ডার',
+      message_bn: s.message_bn,
+      created_by: 'auto_reminder',
+      created_at: nowIso(),
+    });
+    updateById_(CONFIG.SHEETS.DONOR_REMINDER_SCHEDULES, s.id, { last_sent_at: nowIso() });
+  });
+}
+
+/** One-off — run once in the Apps Script editor to turn on daily auto-reminders.
+ *  Will trigger a Google authorization prompt the first time (new trigger scope). */
+function installDailyReminderTrigger() {
+  ScriptApp.getProjectTriggers().forEach(t => {
+    if (t.getHandlerFunction() === 'runDueDonorReminders_') ScriptApp.deleteTrigger(t);
+  });
+  ScriptApp.newTrigger('runDueDonorReminders_').timeBased().everyDays(1).atHour(8).create();
+  Logger.log('Installed: runDueDonorReminders_ will run daily around 8am.');
 }

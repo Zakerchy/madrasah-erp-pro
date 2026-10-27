@@ -48,6 +48,19 @@ class DonorApi {
   static Future<Map<String, dynamic>> listOpportunities() =>
       _post({'action': 'listDonationOpportunities'});
 
+  static Future<Map<String, dynamic>> uploadSlip(
+    String donorId,
+    String token,
+    String base64,
+    String mimeType,
+  ) =>
+      _post({'action': 'donorUploadSlip', 'payload': {
+        'donor_id': donorId,
+        'donor_token': token,
+        'base64': base64,
+        'mime_type': mimeType,
+      }});
+
   static Future<Map<String, dynamic>> donate(
     String donorId,
     String token,

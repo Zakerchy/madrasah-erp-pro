@@ -1,10 +1,16 @@
+import 'dart:convert';
+import 'package:crypto/crypto.dart';
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/app_lang.dart';
 import '../../shared/constants/fund_types.dart';
 import '../../shared/services/api_service.dart';
 import '../../shared/services/session_service.dart';
 import '../../shared/widgets/base_scaffold.dart';
+import 'donor_broadcast_screen.dart';
+
+String hashDonorPin(String pin) => sha256.convert(utf8.encode(pin.trim())).toString();
 
 class AdminDonorScreen extends StatefulWidget {
   const AdminDonorScreen({super.key});
@@ -49,6 +55,51 @@ class _AdminDonorScreenState extends State<AdminDonorScreen>
       setState(() => _targets = raw.map((e) => Map<String, dynamic>.from(e as Map)).toList());
     }
     if (mounted) setState(() => _loadingTargets = false);
+  }
+
+  Future<void> _openRetentionDialog() async {
+    final res = await _api.get('getDonorNotifRetentionDays');
+    final current = (res['ok'] == true ? res['days'] as num? : null) ?? 30;
+    final ctrl = TextEditingController(text: '$current');
+    if (!mounted) return;
+
+    final days = await showDialog<int>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(AppLang.t('বিজ্ঞপ্তি স্বয়ংক্রিয়-মুছার সময়', 'Notification auto-delete period')),
+        content: TextField(
+          controller: ctrl,
+          keyboardType: TextInputType.number,
+          decoration: InputDecoration(
+            labelText: AppLang.t('দিন সংখ্যা', 'Number of days'),
+            helperText: AppLang.t(
+              'এর বেশি পুরনো বিজ্ঞপ্তি স্বয়ংক্রিয়ভাবে মুছে যাবে',
+              'Notifications older than this are deleted automatically',
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: Text(AppLang.t('বাতিল', 'Cancel'))),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, int.tryParse(ctrl.text.trim()) ?? current.toInt()),
+            child: Text(AppLang.t('সংরক্ষণ', 'Save')),
+          ),
+        ],
+      ),
+    );
+    if (days == null || !mounted) return;
+
+    final saveRes = await _api.post('setDonorNotifRetentionDays', {
+      'user_role': SessionService.role,
+      'payload': {'days': days},
+    });
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(saveRes['ok'] == true
+            ? AppLang.t('সংরক্ষিত হয়েছে', 'Saved')
+            : (saveRes['message'] as String? ?? AppLang.t('ত্রুটি', 'Error'))),
+      ));
+    }
   }
 
   Future<void> _saveTarget(Map<String, dynamic> payload) async {
@@ -114,6 +165,14 @@ class _AdminDonorScreenState extends State<AdminDonorScreen>
     }
   }
 
+  Future<void> _resetDonorPin(String donorId, String pinHash) async {
+    await _api.post('adminSetDonorPin', {
+      'payload': {'donor_id': donorId, 'pin_hash': pinHash},
+      'user_role': SessionService.role,
+      'user_id': SessionService.userId,
+    });
+  }
+
   Future<void> _confirmTxn(String id, String status, [Map<String, dynamic>? extra]) async {
     final res = await _api.post('confirmDonation', {
       'payload': {'id': id, 'status': status, ...?extra},
@@ -140,6 +199,20 @@ class _AdminDonorScreenState extends State<AdminDonorScreen>
   Widget build(BuildContext context) {
     return BaseScaffold(
       title: AppLang.t('দানকারী ব্যবস্থাপনা', 'Donor Management'),
+      actions: [
+        IconButton(
+          icon: const Icon(Icons.campaign_outlined),
+          tooltip: AppLang.t('বিজ্ঞপ্তি ও রিমাইন্ডার', 'Notifications & Reminders'),
+          onPressed: () => Navigator.of(context).push(
+            MaterialPageRoute(builder: (_) => const DonorBroadcastScreen()),
+          ),
+        ),
+        IconButton(
+          icon: const Icon(Icons.notifications_active_outlined),
+          tooltip: AppLang.t('বিজ্ঞপ্তি স্বয়ংক্রিয়-মুছার সময়', 'Notification auto-delete period'),
+          onPressed: _openRetentionDialog,
+        ),
+      ],
       body: Column(
         children: [
           TabBar(
@@ -166,6 +239,7 @@ class _AdminDonorScreenState extends State<AdminDonorScreen>
                   donors: _allDonors,
                   loading: _loadingAll,
                   onRefresh: () => _loadAllDonors(forceRefresh: true),
+                  onResetPin: _resetDonorPin,
                 ),
                 _TxnsTab(
                   txns: _donorTxns,
@@ -259,7 +333,53 @@ class _AllDonorsTab extends StatelessWidget {
   final List<Map<String, dynamic>> donors;
   final bool loading;
   final VoidCallback onRefresh;
-  const _AllDonorsTab({required this.donors, required this.loading, required this.onRefresh});
+  final Future<void> Function(String donorId, String pinHash) onResetPin;
+  const _AllDonorsTab({
+    required this.donors, required this.loading, required this.onRefresh,
+    required this.onResetPin,
+  });
+
+  Future<void> _openResetPinDialog(BuildContext context, Map<String, dynamic> d) async {
+    final ctrl = TextEditingController();
+    final confirmed = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(AppLang.t('পিন রিসেট করুন', 'Reset PIN')),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('${d['name_bn']} (${d['phone']})'),
+            const SizedBox(height: 10),
+            TextField(
+              controller: ctrl,
+              keyboardType: TextInputType.number,
+              maxLength: 6,
+              decoration: InputDecoration(labelText: AppLang.t('নতুন পিন (৪-৬ সংখ্যা)', 'New PIN (4-6 digits)')),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: Text(AppLang.t('বাতিল', 'Cancel'))),
+          FilledButton(
+            onPressed: () {
+              final v = ctrl.text.trim();
+              if (v.length < 4) return;
+              Navigator.pop(ctx, v);
+            },
+            child: Text(AppLang.t('সংরক্ষণ', 'Save')),
+          ),
+        ],
+      ),
+    );
+    if (confirmed == null) return;
+    await onResetPin(d['id'] as String, hashDonorPin(confirmed));
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(AppLang.t('পিন রিসেট হয়েছে', 'PIN reset')),
+      ));
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -283,7 +403,17 @@ class _AllDonorsTab extends StatelessWidget {
               leading: CircleAvatar(child: Text((d['name_bn'] as String? ?? '?')[0])),
               title: Text('${d['name_bn']}  (${d['phone']})'),
               subtitle: Text('${d['country'] ?? ''} • ${d['currency_pref'] ?? 'BDT'} • ${d['status']}'),
-              trailing: _StatusChip(d['status'] as String? ?? ''),
+              trailing: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  _StatusChip(d['status'] as String? ?? ''),
+                  IconButton(
+                    icon: const Icon(Icons.lock_reset, size: 20),
+                    tooltip: AppLang.t('পিন রিসেট', 'Reset PIN'),
+                    onPressed: () => _openResetPinDialog(context, d),
+                  ),
+                ],
+              ),
             ),
           )),
         ],
@@ -357,6 +487,29 @@ class _TxnsTab extends StatelessWidget {
                       Text('${AppLang.t('পদ্ধতি', 'Method')}: ${t['payment_method'] ?? ''}'),
                       if ((t['txn_reference'] as String?)?.isNotEmpty ?? false)
                         Text('Ref: ${t['txn_reference']}'),
+                      if ((t['slip_url'] as String?)?.isNotEmpty ?? false)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 6),
+                          child: GestureDetector(
+                            onTap: () => launchUrl(Uri.parse(t['slip_url'] as String),
+                                mode: LaunchMode.externalApplication),
+                            child: Row(
+                              children: [
+                                ClipRRect(
+                                  borderRadius: BorderRadius.circular(6),
+                                  child: Image.network(
+                                    t['slip_url'] as String,
+                                    width: 56, height: 56, fit: BoxFit.cover,
+                                    errorBuilder: (_, __, ___) => const Icon(Icons.broken_image, size: 40),
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Text(AppLang.t('স্লিপ দেখুন', 'View slip'),
+                                    style: const TextStyle(decoration: TextDecoration.underline)),
+                              ],
+                            ),
+                          ),
+                        ),
                       if ((t['notes'] as String?)?.isNotEmpty ?? false)
                         Text('${AppLang.t('নোট', 'Note')}: ${t['notes']}'),
                       if (isPending) ...[

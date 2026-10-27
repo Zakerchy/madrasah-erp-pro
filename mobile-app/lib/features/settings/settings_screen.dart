@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../core/app_lang.dart';
 import '../../shared/constants/app_permissions.dart';
 import '../donor/admin_donor_screen.dart';
+import 'org_settings_screen.dart';
 import '../../shared/models/app_ui_settings.dart';
 import '../../shared/models/notification_settings.dart';
 import '../../shared/models/role_definition.dart';
@@ -1427,6 +1428,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ),
               ),
             ),
+            const SizedBox(height: 12),
+            if (SessionService.can(AppPermissions.appUiManage))
+              Card(
+                child: ListTile(
+                  leading: const Icon(Icons.business),
+                  title: Text(AppLang.t('প্রতিষ্ঠানের তথ্য', 'Organization Details')),
+                  subtitle: Text(AppLang.t('নাম, লোগো, ব্যাংক/লেনদেন বিবরণ', 'Name, logo, bank/transaction details')),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => const OrgSettingsScreen()),
+                  ),
+                ),
+              ),
             const SizedBox(height: 12),
             if (SessionService.can(AppPermissions.usersManage))
               Card(

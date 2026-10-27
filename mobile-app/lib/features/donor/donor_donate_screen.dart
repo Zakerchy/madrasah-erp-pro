@@ -1,4 +1,8 @@
+import 'dart:convert';
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 
 import '../../core/app_lang.dart';
 import '../../shared/constants/fund_types.dart';
@@ -24,6 +28,9 @@ class _DonorDonateScreenState extends State<DonorDonateScreen> {
   String _method = 'CASH';
   bool _loading = false;
   String? _error;
+  Uint8List? _slipBytes;
+  String? _slipUrl;
+  bool _uploadingSlip = false;
 
   static const _currencies = ['BDT', 'USD', 'GBP', 'EUR', 'SAR', 'AED', 'MYR', 'QAR', 'KWD', 'OMR'];
   static const _methods = ['CASH', 'BANK_TRANSFER', 'MOBILE_BANKING', 'CHEQUE', 'OTHER'];
@@ -34,8 +41,41 @@ class _DonorDonateScreenState extends State<DonorDonateScreen> {
 
   bool get _isForeign => _currency != 'BDT';
 
+  Future<void> _pickSlip() async {
+    final picked = await ImagePicker().pickImage(source: ImageSource.gallery, imageQuality: 80);
+    if (picked == null) return;
+    final bytes = await picked.readAsBytes();
+    setState(() { _slipBytes = bytes; _uploadingSlip = true; });
+    final res = await DonorApi.uploadSlip(
+      DonorSession.donorId!,
+      DonorSession.donorToken!,
+      base64Encode(bytes),
+      'image/jpeg',
+    );
+    if (!mounted) return;
+    if (res['ok'] == true) {
+      setState(() => _slipUrl = res['url'] as String);
+    } else {
+      setState(() => _slipBytes = null);
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(res['message'] as String? ?? AppLang.t('আপলোড ব্যর্থ', 'Upload failed')),
+      ));
+    }
+    setState(() => _uploadingSlip = false);
+  }
+
+  bool get _slipRequired => _method != 'CASH';
+
   Future<void> _submit() async {
     if (!(_formKey.currentState?.validate() ?? false)) return;
+    if (_uploadingSlip) return;
+    if (_slipRequired && (_slipUrl == null || _slipUrl!.isEmpty)) {
+      setState(() => _error = AppLang.t(
+        'পেমেন্ট স্লিপ/ছবি দিন (bKash/ব্যাংক/চেক পেমেন্টের জন্য আবশ্যক)',
+        'Add a payment slip/screenshot (required for bKash/bank/cheque payments)',
+      ));
+      return;
+    }
     setState(() { _loading = true; _error = null; });
     try {
       final payload = {
@@ -46,6 +86,7 @@ class _DonorDonateScreenState extends State<DonorDonateScreen> {
         'payment_method': _method,
         'txn_reference': _ref.text.trim(),
         'notes': _notes.text.trim(),
+        'slip_url': _slipUrl ?? '',
       };
       final res = await DonorApi.donate(
         DonorSession.donorId!,
@@ -183,6 +224,46 @@ class _DonorDonateScreenState extends State<DonorDonateScreen> {
                   helperText: AppLang.t('bKash/Nagad TxnID বা ব্যাংক রেফারেন্স', 'bKash/Nagad TxnID or bank reference'),
                 ),
               ),
+              const SizedBox(height: 12),
+
+              // Slip / proof of payment
+              Text(
+                _slipRequired
+                    ? AppLang.t('পেমেন্ট স্লিপ/ছবি দিন *', 'Add payment slip/screenshot *')
+                    : AppLang.t('পেমেন্ট স্লিপ/ছবি (ঐচ্ছিক)', 'Payment slip/screenshot (optional)'),
+                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+              ),
+              const SizedBox(height: 6),
+              if (_slipBytes != null)
+                Stack(
+                  children: [
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(8),
+                      child: Image.memory(_slipBytes!, height: 140, width: double.infinity, fit: BoxFit.cover),
+                    ),
+                    if (_uploadingSlip)
+                      Positioned.fill(
+                        child: Container(
+                          color: Colors.black38,
+                          child: const Center(child: CircularProgressIndicator()),
+                        ),
+                      ),
+                    Positioned(
+                      top: 4, right: 4,
+                      child: IconButton(
+                        icon: const Icon(Icons.close, color: Colors.white),
+                        style: IconButton.styleFrom(backgroundColor: Colors.black45),
+                        onPressed: () => setState(() { _slipBytes = null; _slipUrl = null; }),
+                      ),
+                    ),
+                  ],
+                )
+              else
+                OutlinedButton.icon(
+                  onPressed: _pickSlip,
+                  icon: const Icon(Icons.upload_file),
+                  label: Text(AppLang.t('ছবি যুক্ত করুন', 'Add image')),
+                ),
               const SizedBox(height: 12),
 
               // Notes

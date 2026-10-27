@@ -1,12 +1,15 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../../core/app_lang.dart';
 import '../../shared/constants/fund_types.dart';
+import '../../shared/services/org_settings_service.dart';
 import 'donor_api.dart';
 import 'donor_session.dart';
 import 'donor_login_screen.dart';
 import 'donor_donate_screen.dart';
 import 'donor_dashboard_screen.dart';
+import 'donor_notifications_screen.dart';
 import 'widgets/islamic_slider.dart';
 
 class DonorHomeScreen extends StatefulWidget {
@@ -21,12 +24,24 @@ class _DonorHomeScreenState extends State<DonorHomeScreen> {
   List<Map<String, dynamic>> _notifications = [];
   bool _loading = true;
   String? _error;
+  bool _showWelcome = true;
+  Timer? _welcomeTimer;
 
   @override
   void initState() {
     super.initState();
     _load();
     _loadNotifications();
+    OrgSettings.load().then((_) { if (mounted) setState(() {}); });
+    _welcomeTimer = Timer(const Duration(seconds: 4), () {
+      if (mounted) setState(() => _showWelcome = false);
+    });
+  }
+
+  @override
+  void dispose() {
+    _welcomeTimer?.cancel();
+    super.dispose();
   }
 
   Future<void> _load() async {
@@ -56,6 +71,25 @@ class _DonorHomeScreenState extends State<DonorHomeScreen> {
     } catch (_) {}
   }
 
+  Future<void> _showBankDetails() async {
+    await showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(AppLang.t('ব্যাংক/লেনদেন বিবরণ', 'Bank/Transaction Details')),
+        content: SingleChildScrollView(
+          child: Text(
+            OrgSettings.bankDetailsBn.isNotEmpty
+                ? OrgSettings.bankDetailsBn
+                : AppLang.t('এখনো কোনো বিবরণ যোগ করা হয়নি।', 'No details added yet.'),
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: Text(AppLang.t('ঠিক আছে', 'OK'))),
+        ],
+      ),
+    );
+  }
+
   Future<void> _logout() async {
     await DonorSession.clear();
     if (!mounted) return;
@@ -71,6 +105,22 @@ class _DonorHomeScreenState extends State<DonorHomeScreen> {
       appBar: AppBar(
         title: Text(AppLang.t('দানকারী হোম', 'Donor Home')),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.account_balance_outlined),
+            tooltip: AppLang.t('ব্যাংক/লেনদেন বিবরণ', 'Bank/Transaction Details'),
+            onPressed: _showBankDetails,
+          ),
+          IconButton(
+            icon: Badge(
+              label: Text('${_notifications.length}'),
+              isLabelVisible: _notifications.isNotEmpty,
+              child: const Icon(Icons.notifications_outlined),
+            ),
+            tooltip: AppLang.t('বিজ্ঞপ্তি', 'Notifications'),
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const DonorNotificationsScreen()),
+            ),
+          ),
           IconButton(
             icon: const Icon(Icons.bar_chart_rounded),
             tooltip: AppLang.t('আমার ড্যাশবোর্ড', 'My Dashboard'),
@@ -98,70 +148,57 @@ class _DonorHomeScreenState extends State<DonorHomeScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    // Welcome
-                    Card(
-                      color: cs.primaryContainer,
-                      child: Padding(
-                        padding: const EdgeInsets.all(16),
-                        child: Row(
-                          children: [
-                            CircleAvatar(
-                              backgroundColor: cs.primary,
-                              child: Text(
-                                DonorSession.nameBn.isNotEmpty ? DonorSession.nameBn[0] : '?',
-                                style: TextStyle(color: cs.onPrimary, fontWeight: FontWeight.bold),
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    AppLang.t('আস-সালামু আলাইকুম,', 'As-Salamu Alaykum,'),
-                                    style: const TextStyle(fontSize: 12),
-                                  ),
-                                  Text(
-                                    DonorSession.nameBn,
-                                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    if (_notifications.isNotEmpty) ...[
-                      ..._notifications.map((n) => Card(
-                            color: cs.tertiaryContainer,
-                            margin: const EdgeInsets.only(bottom: 8),
-                            child: Padding(
-                              padding: const EdgeInsets.all(12),
-                              child: Row(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Icon(Icons.campaign_outlined, color: cs.onTertiaryContainer, size: 20),
-                                  const SizedBox(width: 10),
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
+                    // Welcome — shown briefly on open, then hides to make room
+                    AnimatedSize(
+                      duration: const Duration(milliseconds: 400),
+                      curve: Curves.easeInOut,
+                      child: !_showWelcome
+                          ? const SizedBox(width: double.infinity)
+                          : Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                Card(
+                                  color: cs.primaryContainer,
+                                  child: Padding(
+                                    padding: const EdgeInsets.all(16),
+                                    child: Row(
                                       children: [
-                                        if ((n['title_bn'] as String?)?.isNotEmpty ?? false)
-                                          Text(n['title_bn'] as String,
-                                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-                                        Text(n['message_bn'] as String? ?? '', style: const TextStyle(fontSize: 13)),
+                                        CircleAvatar(
+                                          backgroundColor: cs.primary,
+                                          child: Text(
+                                            DonorSession.nameBn.isNotEmpty ? DonorSession.nameBn[0] : '?',
+                                            style: TextStyle(color: cs.onPrimary, fontWeight: FontWeight.bold),
+                                          ),
+                                        ),
+                                        const SizedBox(width: 12),
+                                        Expanded(
+                                          child: Column(
+                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                            children: [
+                                              Text(
+                                                AppLang.t('আস-সালামু আলাইকুম,', 'As-Salamu Alaykum,'),
+                                                style: const TextStyle(fontSize: 12),
+                                              ),
+                                              Text(
+                                                DonorSession.nameBn,
+                                                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
                                       ],
                                     ),
                                   ),
-                                ],
-                              ),
+                                ),
+                                const SizedBox(height: 12),
+                              ],
                             ),
-                          )),
-                      const SizedBox(height: 8),
-                    ],
+                    ),
                     const IslamicSlider(height: 150),
+                    if (_notifications.isNotEmpty) ...[
+                      const SizedBox(height: 12),
+                      _NotificationSlider(notifications: _notifications.take(5).toList()),
+                    ],
                     const SizedBox(height: 16),
                     Text(
                       AppLang.t('দানের সুযোগ', 'Donation Opportunities'),
@@ -225,6 +262,102 @@ class _DonorHomeScreenState extends State<DonorHomeScreen> {
       'target_amount': 0,
       'collected_amount': 0,
     }).toList();
+  }
+}
+
+class _NotificationSlider extends StatefulWidget {
+  final List<Map<String, dynamic>> notifications;
+  const _NotificationSlider({required this.notifications});
+
+  @override
+  State<_NotificationSlider> createState() => _NotificationSliderState();
+}
+
+class _NotificationSliderState extends State<_NotificationSlider> {
+  final _controller = PageController();
+  int _page = 0;
+  Timer? _timer;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.notifications.length > 1) {
+      _timer = Timer.periodic(const Duration(seconds: 5), (_) {
+        if (!mounted) return;
+        final next = (_page + 1) % widget.notifications.length;
+        _controller.animateToPage(
+          next,
+          duration: const Duration(milliseconds: 500),
+          curve: Curves.easeInOut,
+        );
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return GestureDetector(
+      onTap: () => Navigator.of(context).push(
+        MaterialPageRoute(builder: (_) => const DonorNotificationsScreen()),
+      ),
+      child: Container(
+        height: 70,
+        decoration: BoxDecoration(
+          color: cs.tertiaryContainer,
+          borderRadius: BorderRadius.circular(14),
+        ),
+        child: Row(
+          children: [
+            Padding(
+              padding: const EdgeInsets.only(left: 14),
+              child: Icon(Icons.campaign_outlined, color: cs.onTertiaryContainer, size: 20),
+            ),
+            Expanded(
+              child: PageView.builder(
+                controller: _controller,
+                itemCount: widget.notifications.length,
+                onPageChanged: (i) => setState(() => _page = i),
+                itemBuilder: (_, i) {
+                  final n = widget.notifications[i];
+                  return Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        if ((n['title_bn'] as String?)?.isNotEmpty ?? false)
+                          Text(n['title_bn'] as String,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: cs.onTertiaryContainer)),
+                        Text(n['message_bn'] as String? ?? '',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(fontSize: 12, color: cs.onTertiaryContainer)),
+                      ],
+                    ),
+                  );
+                },
+              ),
+            ),
+            if (widget.notifications.length > 1)
+              Padding(
+                padding: const EdgeInsets.only(right: 10),
+                child: Text('${_page + 1}/${widget.notifications.length}',
+                    style: TextStyle(fontSize: 11, color: cs.onTertiaryContainer.withValues(alpha: 0.7))),
+              ),
+          ],
+        ),
+      ),
+    );
   }
 }
 

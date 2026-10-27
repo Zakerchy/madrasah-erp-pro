@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../core/app_lang.dart';
+import '../../shared/services/org_settings_service.dart';
 import 'donor_api.dart';
 import 'donor_session.dart';
 import 'donor_home_screen.dart';
@@ -19,6 +20,12 @@ class _DonorLoginScreenState extends State<DonorLoginScreen> {
   final _pin = TextEditingController();
   bool _loading = false;
   String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    OrgSettings.load().then((_) { if (mounted) setState(() {}); });
+  }
 
   Future<void> _login() async {
     final phone = _phone.text.trim();
@@ -57,6 +64,22 @@ class _DonorLoginScreenState extends State<DonorLoginScreen> {
     super.dispose();
   }
 
+  Future<void> _showForgotPinDialog() async {
+    await showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(AppLang.t('পিন ভুলে গেছেন?', 'Forgot PIN?')),
+        content: Text(AppLang.t(
+          'আপনার নিবন্ধিত মোবাইল নম্বর নিয়ে মাদ্রাসা অফিসে বা Admin-এর সাথে যোগাযোগ করুন। Admin আপনার পিন রিসেট করে দেবেন।',
+          'Please contact the madrasah office or the Admin with your registered mobile number. The Admin will reset your PIN.',
+        )),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: Text(AppLang.t('ঠিক আছে', 'OK'))),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
@@ -71,7 +94,17 @@ class _DonorLoginScreenState extends State<DonorLoginScreen> {
               // Logo / title
               Column(
                 children: [
-                  Icon(Icons.mosque_rounded, size: 56, color: cs.primary),
+                  OrgSettings.logoUrl.isNotEmpty
+                      ? ClipOval(
+                          child: Image.network(
+                            OrgSettings.logoUrl,
+                            width: 56,
+                            height: 56,
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, __, ___) => Icon(Icons.mosque_rounded, size: 56, color: cs.primary),
+                          ),
+                        )
+                      : Icon(Icons.mosque_rounded, size: 56, color: cs.primary),
                   const SizedBox(height: 8),
                   Text(
                     AppLang.t('দানকারী পোর্টাল', 'Donor Portal'),
@@ -113,11 +146,18 @@ class _DonorLoginScreenState extends State<DonorLoginScreen> {
                   counterText: '',
                 ),
               ),
+              Align(
+                alignment: Alignment.centerRight,
+                child: TextButton(
+                  onPressed: _showForgotPinDialog,
+                  child: Text(AppLang.t('পিন ভুলে গেছেন?', 'Forgot PIN?')),
+                ),
+              ),
               if (_error != null) ...[
                 const SizedBox(height: 8),
                 Text(_error!, style: TextStyle(color: cs.error, fontSize: 13)),
               ],
-              const SizedBox(height: 16),
+              const SizedBox(height: 8),
               FilledButton(
                 onPressed: _loading ? null : _login,
                 style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(48)),
