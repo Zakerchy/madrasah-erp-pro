@@ -3507,7 +3507,7 @@ function donorRegister_(payload) {
 
   // Duplicate check
   const existing = (listSheetRows_(CONFIG.SHEETS.DONORS).data || [])
-    .find(d => d.phone === phone);
+    .find(d => String(d.phone || '').replace(/\D/g, '') === phone);
   if (existing) return { ok: false, message: 'এই নম্বর দিয়ে আগেই রেজিস্ট্রেশন হয়েছে' };
 
   const id = uid_('dn');
@@ -3515,7 +3515,7 @@ function donorRegister_(payload) {
     id,
     name_bn,
     name_en: String(payload.name_en || '').trim(),
-    phone,
+    phone: "'" + phone, // force text so Sheets doesn't strip the leading 0
     email: String(payload.email || '').trim(),
     profession: String(payload.profession || '').trim(),
     address: String(payload.address || '').trim(),
@@ -3725,7 +3725,8 @@ function approveDonor_(payload, params) {
   const id = String(payload.id || '').trim();
   const status = String(payload.status || 'ACTIVE').trim(); // ACTIVE or REJECTED
   if (!id) return { ok: false, message: 'id required' };
-  return updateById_(CONFIG.SHEETS.DONORS, id, { status });
+  updateById_(CONFIG.SHEETS.DONORS, id, { status });
+  return { ok: true };
 }
 
 function adminListDonorTransactions_(params) {
@@ -3766,7 +3767,8 @@ function confirmDonation_(payload, params) {
     });
   }
 
-  return updateById_(CONFIG.SHEETS.DONOR_TXN, id, updates);
+  updateById_(CONFIG.SHEETS.DONOR_TXN, id, updates);
+  return { ok: true };
 }
 
 function setDonationTarget_(payload, params) {
@@ -3790,7 +3792,8 @@ function setDonationTarget_(payload, params) {
   };
 
   if (existing) {
-    return updateById_(CONFIG.SHEETS.DONATION_TARGETS, existing.id, row);
+    updateById_(CONFIG.SHEETS.DONATION_TARGETS, existing.id, row);
+    return { ok: true };
   } else {
     appendRow_(CONFIG.SHEETS.DONATION_TARGETS, { id: uid_('dt'), ...row, created_at: nowIso() });
     return { ok: true };

@@ -36,6 +36,10 @@ class ApiService {
     'upsertDocument',
     'upsertUser',
     'setUserApprovalStatus',
+    'approveDonor',
+    'confirmDonation',
+    'setDonationTarget',
+    'linkExpenseToDonor',
   };
 
   static const Map<String, Duration> _readCacheTtlByAction = {
@@ -177,6 +181,18 @@ class ApiService {
     'recordFeePayment': {'listFeeDues'},
     'upsertFeeWaiver': {'listFeeDues'},
     'publishNotice': {'listInAppNotifications'},
+    'approveDonor': {'adminListPendingDonors', 'adminListAllDonors'},
+    'confirmDonation': {
+      'adminListDonorTransactions',
+      'listDonationOpportunities',
+      'dashboardSummary',
+      'monthlyReport',
+      'rangeReport',
+      'listTransactions',
+      'datasetStats',
+    },
+    'setDonationTarget': {'listDonationOpportunities'},
+    'linkExpenseToDonor': {'adminListDonorTransactions'},
     'markNoticeRead': {'listInAppNotifications'},
     'upsertDocument': {'listDocuments'},
     'upsertUser': {'listUsers'},
