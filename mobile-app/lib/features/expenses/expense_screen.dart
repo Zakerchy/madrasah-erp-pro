@@ -170,6 +170,123 @@ class _ExpenseScreenState extends State<ExpenseScreen> {
     if (mounted) setState(() => _saving = false);
   }
 
+  Future<void> _openDonorLinkSheet(Map<String, dynamic> expense) async {
+    final expenseId = expense['id'] as String?;
+    if (expenseId == null) return;
+    final fundType = (expense['fund_type'] as String?) ?? '';
+
+    List<Map<String, dynamic>> txns = [];
+    bool loading = true;
+    String? selectedTxnId;
+    final amountCtrl = TextEditingController(text: '${expense['amount'] ?? ''}');
+    final noteCtrl = TextEditingController();
+
+    Future<void> load() async {
+      final res = await _api.get('adminListDonorTransactions');
+      if (res['ok'] == true) {
+        final raw = res['data'] as List? ?? [];
+        txns = raw
+            .map((e) => Map<String, dynamic>.from(e as Map))
+            .where((t) => t['status'] == 'CONFIRMED' && t['fund_type'] == fundType)
+            .toList();
+      }
+    }
+
+    if (!mounted) return;
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setSheet) {
+          if (loading) {
+            load().then((_) {
+              loading = false;
+              setSheet(() {});
+            });
+          }
+          return Padding(
+            padding: EdgeInsets.only(
+              left: 16, right: 16, top: 16,
+              bottom: MediaQuery.of(ctx).viewInsets.bottom + 16,
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  AppLang.t('দানকারীর তহবিল থেকে ব্যয় লিংক করুন', 'Link expense to donor fund'),
+                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                ),
+                const SizedBox(height: 10),
+                if (loading)
+                  const Padding(
+                    padding: EdgeInsets.all(20),
+                    child: Center(child: CircularProgressIndicator()),
+                  )
+                else if (txns.isEmpty)
+                  Padding(
+                    padding: const EdgeInsets.all(12),
+                    child: Text(AppLang.t(
+                        'এই ফান্ডে নিশ্চিতকৃত কোনো দানকারী লেনদেন নেই',
+                        'No confirmed donor transaction for this fund')),
+                  )
+                else
+                  DropdownButtonFormField<String>(
+                    initialValue: selectedTxnId,
+                    decoration: InputDecoration(labelText: AppLang.t('দানকারী লেনদেন', 'Donor transaction')),
+                    items: txns.map((t) => DropdownMenuItem(
+                      value: t['id'] as String,
+                      child: Text('${t['donor_name_bn'] ?? ''} • ৳${t['amount_bdt']} • ${(t['created_at'] as String? ?? '').split('T').first}'),
+                    )).toList(),
+                    onChanged: (v) => setSheet(() => selectedTxnId = v),
+                  ),
+                const SizedBox(height: 10),
+                TextField(
+                  controller: amountCtrl,
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  decoration: InputDecoration(labelText: AppLang.t('ব্যবহৃত পরিমাণ (৳)', 'Amount used (৳)')),
+                ),
+                const SizedBox(height: 10),
+                TextField(
+                  controller: noteCtrl,
+                  decoration: InputDecoration(labelText: AppLang.t('মন্তব্য (ঐচ্ছিক)', 'Note (optional)')),
+                ),
+                const SizedBox(height: 16),
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton(
+                    onPressed: (selectedTxnId == null)
+                        ? null
+                        : () async {
+                            final res = await _api.post('linkExpenseToDonor', {
+                              'user_role': SessionService.role,
+                              'payload': {
+                                'expense_id': expenseId,
+                                'donor_txn_id': selectedTxnId,
+                                'amount_used': double.tryParse(amountCtrl.text.trim()) ?? 0,
+                                'notes': noteCtrl.text.trim(),
+                              },
+                            });
+                            if (ctx.mounted) Navigator.pop(ctx);
+                            if (mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                                content: Text(res['ok'] == true
+                                    ? AppLang.t('লিংক করা হয়েছে', 'Linked')
+                                    : (res['message'] as String? ?? AppLang.t('ত্রুটি', 'Error'))),
+                              ));
+                            }
+                          },
+                    child: Text(AppLang.t('লিংক করুন', 'Link')),
+                  ),
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return ValueListenableBuilder<bool>(
@@ -301,6 +418,11 @@ class _ExpenseScreenState extends State<ExpenseScreen> {
                           '${r['category'] ?? AppLang.t('খরচ', 'Expense')} • ৳${r['amount'] ?? 0}'),
                       subtitle: Text(
                           '${r['fund_type'] ?? ''} • ${r['txn_date'] ?? ''} • ${r['source_or_vendor'] ?? ''}'),
+                      trailing: IconButton(
+                        tooltip: AppLang.t('দানকারীর তহবিল থেকে ব্যয়', 'Link to donor fund'),
+                        icon: const Icon(Icons.volunteer_activism_outlined),
+                        onPressed: () => _openDonorLinkSheet(r),
+                      ),
                     ),
                   )),
           ],

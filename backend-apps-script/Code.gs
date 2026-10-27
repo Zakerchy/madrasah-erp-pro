@@ -491,6 +491,49 @@ function login_(payload) {
   };
 }
 
+// ── TEMPORARY dev-only test helper — run manually in the Apps Script editor,
+// never exposed via the public web app. Creates a throwaway ADMIN user with
+// blank pin_hash (any PIN logs in) so new admin screens can be tested on the
+// real backend without touching the chief's own staff login. Delete this and
+// run removeDevTestAdminAccount() once testing is done.
+function createDevTestAdminAccount() {
+  const email = 'dev.test.admin@local.test';
+  const users = listSheetRows_(CONFIG.SHEETS.USERS).data || [];
+  if (users.find(u => String(u.email || '').trim().toLowerCase() === email)) {
+    Logger.log('Already exists: ' + email);
+    return;
+  }
+  appendRow_(CONFIG.SHEETS.USERS, {
+    id: 'u_dev_test_admin',
+    name: 'DEV TEST ADMIN (DELETE ME)',
+    phone: '',
+    email,
+    role: 'ADMIN',
+    active: 'TRUE',
+    approval_status: 'APPROVED',
+    pin_hash: '',
+    created_at: nowIso(),
+    updated_at: nowIso(),
+  });
+  Logger.log('Created test admin: ' + email + ' (login with any PIN)');
+}
+
+function removeDevTestAdminAccount() {
+  const sheet = SpreadsheetApp.openById(getSheetId_()).getSheetByName(CONFIG.SHEETS.USERS);
+  if (!sheet) return;
+  const data = sheet.getDataRange().getValues();
+  const headers = data[0].map(h => h.toString().trim().toLowerCase());
+  const idIdx = headers.indexOf('id');
+  let removed = 0;
+  for (let i = data.length - 1; i >= 1; i--) {
+    if (String(data[i][idIdx]) === 'u_dev_test_admin') {
+      sheet.deleteRow(i + 1);
+      removed++;
+    }
+  }
+  Logger.log('Removed rows: ' + removed);
+}
+
 function createTransaction_(payload) {
   validateTransactionPayload_(payload);
 

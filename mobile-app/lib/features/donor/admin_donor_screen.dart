@@ -21,14 +21,16 @@ class _AdminDonorScreenState extends State<AdminDonorScreen>
   List<Map<String, dynamic>> _pending = [];
   List<Map<String, dynamic>> _allDonors = [];
   List<Map<String, dynamic>> _donorTxns = [];
+  List<Map<String, dynamic>> _targets = [];
   bool _loadingPending = true;
   bool _loadingAll = true;
   bool _loadingTxns = true;
+  bool _loadingTargets = true;
 
   @override
   void initState() {
     super.initState();
-    _tabs = TabController(length: 3, vsync: this);
+    _tabs = TabController(length: 4, vsync: this);
     _loadAll();
   }
 
@@ -36,6 +38,33 @@ class _AdminDonorScreenState extends State<AdminDonorScreen>
     _loadPending();
     _loadAllDonors();
     _loadDonorTxns();
+    _loadTargets();
+  }
+
+  Future<void> _loadTargets() async {
+    setState(() => _loadingTargets = true);
+    final res = await _api.post('listDonationOpportunities', {});
+    if (mounted && res['ok'] == true) {
+      final raw = res['data'] as List? ?? [];
+      setState(() => _targets = raw.map((e) => Map<String, dynamic>.from(e as Map)).toList());
+    }
+    if (mounted) setState(() => _loadingTargets = false);
+  }
+
+  Future<void> _saveTarget(Map<String, dynamic> payload) async {
+    final res = await _api.post('setDonationTarget', {
+      'payload': payload,
+      'user_role': SessionService.role,
+      'user_id': SessionService.userId,
+    });
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(res['ok'] == true
+            ? AppLang.t('সংরক্ষিত হয়েছে', 'Saved')
+            : (res['message'] as String? ?? AppLang.t('ত্রুটি', 'Error'))),
+      ));
+      if (res['ok'] == true) _loadTargets();
+    }
   }
 
   Future<void> _loadPending() async {
@@ -119,6 +148,7 @@ class _AdminDonorScreenState extends State<AdminDonorScreen>
               Tab(text: AppLang.t('অনুমোদন (${_pending.length})', 'Approvals (${_pending.length})')),
               Tab(text: AppLang.t('দানকারী', 'Donors')),
               Tab(text: AppLang.t('লেনদেন', 'Transactions')),
+              Tab(text: AppLang.t('লক্ষ্যমাত্রা', 'Targets')),
             ],
           ),
           Expanded(
@@ -139,6 +169,12 @@ class _AdminDonorScreenState extends State<AdminDonorScreen>
                   onConfirm: (id) => _confirmTxn(id, 'CONFIRMED'),
                   onReject: (id) => _confirmTxn(id, 'REJECTED'),
                   onRefresh: _loadDonorTxns,
+                ),
+                _TargetsTab(
+                  targets: _targets,
+                  loading: _loadingTargets,
+                  onSave: _saveTarget,
+                  onRefresh: _loadTargets,
                 ),
               ],
             ),
@@ -342,6 +378,135 @@ class _TxnsTab extends StatelessWidget {
     final s = (v as String?) ?? '';
     return s.length >= 10 ? s.substring(0, 10) : s;
   }
+}
+
+// ── Donation targets ─────────────────────────────────────────────────────────
+
+class _TargetsTab extends StatelessWidget {
+  final List<Map<String, dynamic>> targets;
+  final bool loading;
+  final void Function(Map<String, dynamic>) onSave;
+  final VoidCallback onRefresh;
+  const _TargetsTab({
+    required this.targets, required this.loading,
+    required this.onSave, required this.onRefresh,
+  });
+
+  Map<String, dynamic>? _findTarget(String fundKey) {
+    for (final t in targets) {
+      if (t['fund_type'] == fundKey) return t;
+    }
+    return null;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (loading) return const Center(child: CircularProgressIndicator());
+    return RefreshIndicator(
+      onRefresh: () async => onRefresh(),
+      child: ListView.builder(
+        padding: const EdgeInsets.all(12),
+        itemCount: FundTypes.all.length,
+        itemBuilder: (_, i) {
+          final ft = FundTypes.all[i];
+          final t = _findTarget(ft.key);
+          final isActive = t == null ? false : (t['is_active'] == true || t['is_active'] == 'TRUE' || t['is_active'] == '1');
+          final target = _toNum(t?['target_amount']);
+          final collected = _toNum(t?['collected_amount']);
+          return Card(
+            child: ListTile(
+              title: Text(AppLang.isEnglish.value ? ft.labelEn : ft.labelBn),
+              subtitle: target > 0
+                  ? Text(AppLang.t(
+                      'লক্ষ্য: ৳$target  •  সংগৃহীত: ৳$collected',
+                      'Target: ৳$target  •  Collected: ৳$collected',
+                    ))
+                  : Text(AppLang.t('কোনো লক্ষ্য সেট করা নেই', 'No target set')),
+              trailing: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (t != null)
+                    Icon(isActive ? Icons.visibility : Icons.visibility_off,
+                        size: 18, color: isActive ? Colors.green : Colors.grey),
+                  const SizedBox(width: 6),
+                  const Icon(Icons.edit, size: 18),
+                ],
+              ),
+              onTap: () => _openEditDialog(context, ft, t),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  Future<void> _openEditDialog(BuildContext context, FundType ft, Map<String, dynamic>? existing) async {
+    final titleBn = TextEditingController(text: existing?['title_bn'] as String? ?? ft.labelBn);
+    final titleEn = TextEditingController(text: existing?['title_en'] as String? ?? ft.labelEn);
+    final amount = TextEditingController(text: existing?['target_amount'] != null ? '${existing!['target_amount']}' : '');
+    final desc = TextEditingController(text: existing?['description_bn'] as String? ?? ft.descBn);
+    bool active = existing == null ? true : (existing['is_active'] == true || existing['is_active'] == 'TRUE' || existing['is_active'] == '1');
+
+    final result = await showDialog<Map<String, dynamic>>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setD) => AlertDialog(
+          title: Text(AppLang.isEnglish.value ? ft.labelEn : ft.labelBn),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(controller: titleBn, decoration: InputDecoration(labelText: AppLang.t('শিরোনাম (বাংলা)', 'Title (Bangla)'))),
+                const SizedBox(height: 8),
+                TextField(controller: titleEn, decoration: InputDecoration(labelText: AppLang.t('শিরোনাম (ইংরেজি)', 'Title (English)'))),
+                const SizedBox(height: 8),
+                TextField(
+                  controller: amount,
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  decoration: InputDecoration(labelText: AppLang.t('লক্ষ্য পরিমাণ (৳)', 'Target Amount (৳)')),
+                ),
+                const SizedBox(height: 8),
+                TextField(
+                  controller: desc,
+                  minLines: 2,
+                  maxLines: 4,
+                  decoration: InputDecoration(labelText: AppLang.t('বিবরণ', 'Description')),
+                ),
+                const SizedBox(height: 8),
+                SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: Text(AppLang.t('দানকারী পোর্টালে দৃশ্যমান', 'Visible on donor portal')),
+                  value: active,
+                  onChanged: (v) => setD(() => active = v),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx), child: Text(AppLang.t('বাতিল', 'Cancel'))),
+            FilledButton(
+              onPressed: () => Navigator.pop(ctx, {
+                'fund_type': ft.key,
+                'title_bn': titleBn.text.trim(),
+                'title_en': titleEn.text.trim(),
+                'target_amount': double.tryParse(amount.text.trim()) ?? 0,
+                'description_bn': desc.text.trim(),
+                'is_active': active,
+              }),
+              child: Text(AppLang.t('সংরক্ষণ', 'Save')),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (result != null) onSave(result);
+  }
+}
+
+num _toNum(dynamic v) {
+  if (v == null) return 0;
+  if (v is num) return v;
+  return num.tryParse(v.toString()) ?? 0;
 }
 
 class _StatusChip extends StatelessWidget {
