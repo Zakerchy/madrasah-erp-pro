@@ -191,7 +191,7 @@ class ApiService {
       'listTransactions',
       'datasetStats',
     },
-    'setDonationTarget': {'listDonationOpportunities'},
+    'setDonationTarget': {'listDonationOpportunities', 'adminListDonationTargets'},
     'linkExpenseToDonor': {'adminListDonorTransactions'},
     'markNoticeRead': {'listInAppNotifications'},
     'upsertDocument': {'listDocuments'},

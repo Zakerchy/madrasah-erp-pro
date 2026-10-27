@@ -165,6 +165,7 @@ const ACTION_PERMISSIONS = {
   adminListAllDonors: 'users.manage',
   approveDonor: 'users.manage',
   adminListDonorTransactions: 'donations.view',
+  adminListDonationTargets: 'donations.view',
   confirmDonation: 'donations.write',
   setDonationTarget: 'donations.write',
   linkExpenseToDonor: 'expenses.write',
@@ -411,6 +412,7 @@ function handleRequest_(params) {
     if (action === 'adminListAllDonors') return json(adminListAllDonors_(params));
     if (action === 'approveDonor') return json(approveDonor_(params.payload, params));
     if (action === 'adminListDonorTransactions') return json(adminListDonorTransactions_(params));
+    if (action === 'adminListDonationTargets') return json(adminListDonationTargets_(params));
     if (action === 'confirmDonation') return json(confirmDonation_(params.payload, params));
     if (action === 'setDonationTarget') return json(setDonationTarget_(params.payload, params));
     if (action === 'linkExpenseToDonor') return json(linkExpenseToDonor_(params.payload, params));
@@ -496,6 +498,28 @@ function login_(payload) {
 // blank pin_hash (any PIN logs in) so new admin screens can be tested on the
 // real backend without touching the chief's own staff login. Delete this and
 // run removeDevTestAdminAccount() once testing is done.
+// TEMPORARY — one-off repair for donor rows created before the phone-format
+// fix (forces the phone column to Plain Text and restores any leading 0
+// that Sheets silently stripped). Safe to run multiple times. Delete after use.
+function repairDonorPhoneColumn() {
+  const sheet = SpreadsheetApp.openById(getSheetId_()).getSheetByName(CONFIG.SHEETS.DONORS);
+  if (!sheet) return;
+  const data = sheet.getDataRange().getValues();
+  const headers = data[0].map(String);
+  const phoneIdx = headers.indexOf('phone');
+  if (phoneIdx === -1) return;
+  let fixed = 0;
+  for (let i = 1; i < data.length; i++) {
+    const cell = sheet.getRange(i + 1, phoneIdx + 1);
+    let val = String(data[i][phoneIdx] || '').replace(/\D/g, '');
+    if (val && val.length === 10) val = '0' + val; // BD mobile numbers are 11 digits
+    cell.setNumberFormat('@');
+    cell.setValue(val);
+    fixed++;
+  }
+  Logger.log('Repaired phone cells: ' + fixed);
+}
+
 function createDevTestAdminAccount() {
   const email = 'dev.test.admin@local.test';
   const users = listSheetRows_(CONFIG.SHEETS.USERS).data || [];
@@ -2117,11 +2141,26 @@ function listSheetRows_(sheetName) {
   return { ok: true, data: rows };
 }
 
-function appendRow_(sheetName, obj) {
+function appendRow_(sheetName, obj, textColumns) {
   const sheet = getSheet_(sheetName);
   const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0].map(String);
   const row = headers.map((h) => (obj[h] !== undefined ? obj[h] : ''));
   sheet.appendRow(row);
+
+  // Force these columns to Plain Text format so Sheets never auto-converts a
+  // numeric-looking string (e.g. a phone number starting with 0) into a
+  // number — this format persists for the cell, so later full-row rewrites
+  // (e.g. updateById_) keep the value as text too.
+  if (textColumns && textColumns.length) {
+    const lastRow = sheet.getLastRow();
+    textColumns.forEach((col) => {
+      const idx = headers.indexOf(col);
+      if (idx === -1) return;
+      const cell = sheet.getRange(lastRow, idx + 1);
+      cell.setNumberFormat('@');
+      if (obj[col] !== undefined) cell.setValue(String(obj[col]));
+    });
+  }
 }
 
 function upsertById_(sheetName, payload) {
@@ -3515,7 +3554,7 @@ function donorRegister_(payload) {
     id,
     name_bn,
     name_en: String(payload.name_en || '').trim(),
-    phone: "'" + phone, // force text so Sheets doesn't strip the leading 0
+    phone,
     email: String(payload.email || '').trim(),
     profession: String(payload.profession || '').trim(),
     address: String(payload.address || '').trim(),
@@ -3526,7 +3565,7 @@ function donorRegister_(payload) {
     status: 'PENDING',
     created_at: nowIso(),
     notes: String(payload.notes || '').trim(),
-  });
+  }, ['phone']); // Plain Text format — survives later full-row rewrites (e.g. approve)
   return { ok: true, message: 'রেজিস্ট্রেশন সম্পন্ন। অ্যাডমিন অনুমোদনের পর লগইন করতে পারবেন।', id };
 }
 
@@ -3769,6 +3808,35 @@ function confirmDonation_(payload, params) {
 
   updateById_(CONFIG.SHEETS.DONOR_TXN, id, updates);
   return { ok: true };
+}
+
+/** Admin — all targets (active + inactive) so admin UI can see/edit hidden ones too. */
+function adminListDonationTargets_(params) {
+  assertPermission_(params, 'donations.view');
+  const targets = listSheetRows_(CONFIG.SHEETS.DONATION_TARGETS).data || [];
+  const txns = listSheetRows_(CONFIG.SHEETS.DONOR_TXN).data || [];
+  const confirmedByFund = {};
+  txns.forEach(t => {
+    if (t.status === 'CONFIRMED') {
+      const k = String(t.fund_type || '');
+      confirmedByFund[k] = (confirmedByFund[k] || 0) + Number(t.amount_bdt || 0);
+    }
+  });
+  return {
+    ok: true,
+    data: targets.map(t => ({
+      id: t.id,
+      fund_type: t.fund_type,
+      title_bn: t.title_bn,
+      title_en: t.title_en,
+      target_amount: Number(t.target_amount || 0),
+      collected_amount: confirmedByFund[t.fund_type] || 0,
+      description_bn: t.description_bn,
+      start_date: t.start_date,
+      end_date: t.end_date,
+      is_active: t.is_active === true || t.is_active === 'TRUE' || t.is_active === '1',
+    })),
+  };
 }
 
 function setDonationTarget_(payload, params) {

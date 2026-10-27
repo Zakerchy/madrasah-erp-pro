@@ -58,7 +58,7 @@ class FundTypes {
 
   static const bia = FundType(
     key: 'BIA',
-    labelBn: 'বিয়া ফান্ড',
+    labelBn: 'বিয়ে ফান্ড',
     labelEn: 'Marriage Support Fund',
     descBn: 'অসহায় পরিবারের বিয়ের আয়োজনে সহায়তা',
   );

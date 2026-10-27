@@ -41,9 +41,9 @@ class _AdminDonorScreenState extends State<AdminDonorScreen>
     _loadTargets();
   }
 
-  Future<void> _loadTargets() async {
+  Future<void> _loadTargets({bool forceRefresh = false}) async {
     setState(() => _loadingTargets = true);
-    final res = await _api.post('listDonationOpportunities', {});
+    final res = await _api.get('adminListDonationTargets', forceRefresh: forceRefresh);
     if (mounted && res['ok'] == true) {
       final raw = res['data'] as List? ?? [];
       setState(() => _targets = raw.map((e) => Map<String, dynamic>.from(e as Map)).toList());
@@ -67,9 +67,9 @@ class _AdminDonorScreenState extends State<AdminDonorScreen>
     }
   }
 
-  Future<void> _loadPending() async {
+  Future<void> _loadPending({bool forceRefresh = false}) async {
     setState(() => _loadingPending = true);
-    final res = await _api.get('adminListPendingDonors');
+    final res = await _api.get('adminListPendingDonors', forceRefresh: forceRefresh);
     if (mounted && res['ok'] == true) {
       final raw = res['data'] as List? ?? [];
       setState(() => _pending = raw.map((e) => Map<String, dynamic>.from(e as Map)).toList());
@@ -77,9 +77,9 @@ class _AdminDonorScreenState extends State<AdminDonorScreen>
     if (mounted) setState(() => _loadingPending = false);
   }
 
-  Future<void> _loadAllDonors() async {
+  Future<void> _loadAllDonors({bool forceRefresh = false}) async {
     setState(() => _loadingAll = true);
-    final res = await _api.get('adminListAllDonors');
+    final res = await _api.get('adminListAllDonors', forceRefresh: forceRefresh);
     if (mounted && res['ok'] == true) {
       final raw = res['data'] as List? ?? [];
       setState(() => _allDonors = raw.map((e) => Map<String, dynamic>.from(e as Map)).toList());
@@ -87,9 +87,9 @@ class _AdminDonorScreenState extends State<AdminDonorScreen>
     if (mounted) setState(() => _loadingAll = false);
   }
 
-  Future<void> _loadDonorTxns() async {
+  Future<void> _loadDonorTxns({bool forceRefresh = false}) async {
     setState(() => _loadingTxns = true);
-    final res = await _api.get('adminListDonorTransactions');
+    final res = await _api.get('adminListDonorTransactions', forceRefresh: forceRefresh);
     if (mounted && res['ok'] == true) {
       final raw = res['data'] as List? ?? [];
       setState(() => _donorTxns = raw.map((e) => Map<String, dynamic>.from(e as Map)).toList());
@@ -160,21 +160,25 @@ class _AdminDonorScreenState extends State<AdminDonorScreen>
                   loading: _loadingPending,
                   onApprove: (id) => _approve(id, 'ACTIVE'),
                   onReject: (id) => _approve(id, 'REJECTED'),
-                  onRefresh: _loadPending,
+                  onRefresh: () => _loadPending(forceRefresh: true),
                 ),
-                _AllDonorsTab(donors: _allDonors, loading: _loadingAll, onRefresh: _loadAllDonors),
+                _AllDonorsTab(
+                  donors: _allDonors,
+                  loading: _loadingAll,
+                  onRefresh: () => _loadAllDonors(forceRefresh: true),
+                ),
                 _TxnsTab(
                   txns: _donorTxns,
                   loading: _loadingTxns,
                   onConfirm: (id) => _confirmTxn(id, 'CONFIRMED'),
                   onReject: (id) => _confirmTxn(id, 'REJECTED'),
-                  onRefresh: _loadDonorTxns,
+                  onRefresh: () => _loadDonorTxns(forceRefresh: true),
                 ),
                 _TargetsTab(
                   targets: _targets,
                   loading: _loadingTargets,
                   onSave: _saveTarget,
-                  onRefresh: _loadTargets,
+                  onRefresh: () => _loadTargets(forceRefresh: true),
                 ),
               ],
             ),
