@@ -5,6 +5,7 @@ import '../../shared/constants/app_permissions.dart';
 import '../../shared/services/access_control_service.dart';
 import '../../shared/services/api_service.dart';
 import '../../shared/services/session_service.dart';
+import '../../shared/constants/fund_types.dart';
 import '../../shared/widgets/base_scaffold.dart';
 import '../../shared/widgets/fund_type_dropdown.dart';
 import '../../shared/widgets/themed_date_picker.dart';
@@ -168,6 +169,252 @@ class _ExpenseScreenState extends State<ExpenseScreen> {
     }
 
     if (mounted) setState(() => _saving = false);
+  }
+
+  Future<void> _openAutoDeductSheet(Map<String, dynamic> expense) async {
+    final expenseId = expense['id'] as String?;
+    if (expenseId == null) return;
+    final fundType = (expense['fund_type'] as String?) ?? '';
+    final amountCtrl = TextEditingController(text: '${expense['amount'] ?? ''}');
+
+    bool loading = false;
+    bool previewed = false;
+    List<Map<String, dynamic>> allocations = [];
+    double covered = 0;
+    double shortfall = 0;
+    String? error;
+
+    if (!mounted) return;
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setSheet) {
+          Future<void> preview() async {
+            setSheet(() { loading = true; error = null; });
+            final res = await _api.post('autoDeductPreview', {
+              'user_role': SessionService.role,
+              'payload': {
+                'fund_type': fundType,
+                'amount': double.tryParse(amountCtrl.text.trim()) ?? 0,
+              },
+            });
+            if (res['ok'] == true) {
+              allocations = (res['allocations'] as List? ?? [])
+                  .map((e) => Map<String, dynamic>.from(e as Map))
+                  .toList();
+              covered = (res['covered'] as num? ?? 0).toDouble();
+              shortfall = (res['shortfall'] as num? ?? 0).toDouble();
+              previewed = true;
+            } else {
+              error = res['message'] as String? ?? AppLang.t('ত্রুটি', 'Error');
+            }
+            setSheet(() => loading = false);
+          }
+
+          Future<void> commit() async {
+            setSheet(() => loading = true);
+            final res = await _api.post('autoDeductCommit', {
+              'user_role': SessionService.role,
+              'payload': {
+                'expense_id': expenseId,
+                'fund_type': fundType,
+                'amount': double.tryParse(amountCtrl.text.trim()) ?? 0,
+              },
+            });
+            if (ctx.mounted) Navigator.pop(ctx);
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                content: Text(res['ok'] == true
+                    ? AppLang.t('বণ্টন সম্পন্ন হয়েছে', 'Split completed')
+                    : (res['message'] as String? ?? AppLang.t('ত্রুটি', 'Error'))),
+              ));
+              if (res['ok'] == true && (res['shortfall'] as num? ?? 0) > 0) {
+                _openNotifyDonorsDialog(fundType, (res['shortfall'] as num).toDouble());
+              }
+            }
+          }
+
+          return Padding(
+            padding: EdgeInsets.only(
+              left: 16, right: 16, top: 16,
+              bottom: MediaQuery.of(ctx).viewInsets.bottom + 16,
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  AppLang.t('স্বয়ংক্রিয় বণ্টন — একাধিক দানকারীর মধ্যে ভাগ করুন', 'Auto-split across donor balances'),
+                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                ),
+                const SizedBox(height: 10),
+                TextField(
+                  controller: amountCtrl,
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  decoration: InputDecoration(labelText: AppLang.t('মোট পরিমাণ (৳)', 'Total amount (৳)')),
+                  onChanged: (_) => setSheet(() => previewed = false),
+                ),
+                const SizedBox(height: 12),
+                if (error != null)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: Text(error!, style: const TextStyle(color: Colors.red)),
+                  ),
+                if (previewed) ...[
+                  Text(AppLang.t('যেভাবে কাটা হবে (পুরনো দান আগে):', 'Allocation (oldest donation first):'),
+                      style: const TextStyle(fontWeight: FontWeight.w600)),
+                  const SizedBox(height: 6),
+                  ...allocations.map((a) => Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 2),
+                        child: Text('• ${a['donor_name_bn'] ?? ''} — ৳${a['amount']}'),
+                      )),
+                  const SizedBox(height: 8),
+                  Text(AppLang.t('মোট কভার হয়েছে: ৳$covered', 'Total covered: ৳$covered'),
+                      style: const TextStyle(fontWeight: FontWeight.bold)),
+                  if (shortfall > 0)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 4),
+                      child: Text(
+                        AppLang.t('ঘাটতি: ৳$shortfall (এই ফান্ডে আর কোনো দানকারীর ব্যালেন্স নেই)',
+                            'Shortfall: ৳$shortfall (no more donor balance in this fund)'),
+                        style: const TextStyle(color: Colors.orange, fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                  const SizedBox(height: 16),
+                ],
+                SizedBox(
+                  width: double.infinity,
+                  child: previewed
+                      ? FilledButton(
+                          onPressed: loading || allocations.isEmpty ? null : commit,
+                          child: loading
+                              ? const SizedBox(height: 18, width: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                              : Text(AppLang.t('নিশ্চিত করে বণ্টন করুন', 'Confirm & Split')),
+                        )
+                      : FilledButton(
+                          onPressed: loading ? null : preview,
+                          child: loading
+                              ? const SizedBox(height: 18, width: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                              : Text(AppLang.t('প্রিভিউ দেখুন', 'Preview Split')),
+                        ),
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  Future<void> _openNotifyDonorsDialog(String fundType, double shortfall) async {
+    if (!mounted) return;
+    final ftDef = FundTypes.byKey(fundType);
+    final ft = AppLang.isEnglish.value ? (ftDef?.labelEn ?? fundType) : (ftDef?.labelBn ?? fundType);
+    final messageCtrl = TextEditingController(
+      text: AppLang.t(
+        'এই খাতে আরও ৳$shortfall প্রয়োজন, আপনি চাইলে অংশ নিতে পারেন। জাযাকুমুল্লাহু খাইরান',
+        'An additional ৳$shortfall is needed for this fund — you are welcome to contribute. JazakAllahu Khayran',
+      ),
+    );
+    String target = 'ALL';
+    String? selectedDonorId;
+    List<Map<String, dynamic>> donors = [];
+    bool loadingDonors = true;
+
+    await showDialog<void>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDlg) {
+          if (loadingDonors) {
+            _api.get('adminListAllDonors').then((res) {
+              if (res['ok'] == true) {
+                donors = (res['data'] as List? ?? [])
+                    .map((e) => Map<String, dynamic>.from(e as Map))
+                    .where((d) => d['status'] == 'ACTIVE')
+                    .toList();
+              }
+              setDlg(() => loadingDonors = false);
+            });
+          }
+          return AlertDialog(
+            title: Text(AppLang.t('দানকারীদের জানান', 'Notify Donors')),
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(AppLang.t('ফান্ড: $ft', 'Fund: $ft')),
+                  const SizedBox(height: 10),
+                  RadioListTile<String>(
+                    contentPadding: EdgeInsets.zero,
+                    value: 'ALL',
+                    groupValue: target,
+                    title: Text(AppLang.t('সব দানকারী', 'All donors')),
+                    onChanged: (v) => setDlg(() => target = v!),
+                  ),
+                  RadioListTile<String>(
+                    contentPadding: EdgeInsets.zero,
+                    value: 'SPECIFIC',
+                    groupValue: target,
+                    title: Text(AppLang.t('নির্দিষ্ট দানকারী', 'Specific donor')),
+                    onChanged: (v) => setDlg(() => target = v!),
+                  ),
+                  if (target == 'SPECIFIC')
+                    loadingDonors
+                        ? const Padding(
+                            padding: EdgeInsets.all(8),
+                            child: Center(child: CircularProgressIndicator(strokeWidth: 2)))
+                        : DropdownButtonFormField<String>(
+                            initialValue: selectedDonorId,
+                            decoration: InputDecoration(labelText: AppLang.t('দানকারী', 'Donor')),
+                            items: donors.map((d) => DropdownMenuItem(
+                                  value: d['id'] as String,
+                                  child: Text('${d['name_bn'] ?? ''} (${d['phone'] ?? ''})'),
+                                )).toList(),
+                            onChanged: (v) => setDlg(() => selectedDonorId = v),
+                          ),
+                  const SizedBox(height: 10),
+                  TextField(
+                    controller: messageCtrl,
+                    minLines: 3,
+                    maxLines: 6,
+                    decoration: InputDecoration(labelText: AppLang.t('মেসেজ', 'Message')),
+                  ),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(onPressed: () => Navigator.pop(ctx), child: Text(AppLang.t('বাতিল', 'Cancel'))),
+              FilledButton(
+                onPressed: (target == 'SPECIFIC' && selectedDonorId == null)
+                    ? null
+                    : () async {
+                        final res = await _api.post('sendDonorNotification', {
+                          'user_role': SessionService.role,
+                          'payload': {
+                            'target': target,
+                            if (target == 'SPECIFIC') 'donor_id': selectedDonorId,
+                            'fund_type': fundType,
+                            'message_bn': messageCtrl.text.trim(),
+                          },
+                        });
+                        if (ctx.mounted) Navigator.pop(ctx);
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                            content: Text(res['ok'] == true
+                                ? AppLang.t('পাঠানো হয়েছে', 'Sent')
+                                : (res['message'] as String? ?? AppLang.t('ত্রুটি', 'Error'))),
+                          ));
+                        }
+                      },
+                child: Text(AppLang.t('পাঠান', 'Send')),
+              ),
+            ],
+          );
+        },
+      ),
+    );
   }
 
   Future<void> _openDonorLinkSheet(Map<String, dynamic> expense) async {
@@ -418,10 +665,23 @@ class _ExpenseScreenState extends State<ExpenseScreen> {
                           '${r['category'] ?? AppLang.t('খরচ', 'Expense')} • ৳${r['amount'] ?? 0}'),
                       subtitle: Text(
                           '${r['fund_type'] ?? ''} • ${r['txn_date'] ?? ''} • ${r['source_or_vendor'] ?? ''}'),
-                      trailing: IconButton(
+                      trailing: PopupMenuButton<String>(
                         tooltip: AppLang.t('দানকারীর তহবিল থেকে ব্যয়', 'Link to donor fund'),
                         icon: const Icon(Icons.volunteer_activism_outlined),
-                        onPressed: () => _openDonorLinkSheet(r),
+                        onSelected: (v) {
+                          if (v == 'auto') _openAutoDeductSheet(r);
+                          if (v == 'manual') _openDonorLinkSheet(r);
+                        },
+                        itemBuilder: (_) => [
+                          PopupMenuItem(
+                            value: 'auto',
+                            child: Text(AppLang.t('স্বয়ংক্রিয় বণ্টন', 'Auto-split across donors')),
+                          ),
+                          PopupMenuItem(
+                            value: 'manual',
+                            child: Text(AppLang.t('নির্দিষ্ট দানকারী বেছে নিন', 'Pick a specific donor')),
+                          ),
+                        ],
                       ),
                     ),
                   )),

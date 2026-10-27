@@ -18,6 +18,7 @@ class DonorHomeScreen extends StatefulWidget {
 
 class _DonorHomeScreenState extends State<DonorHomeScreen> {
   List<Map<String, dynamic>> _opportunities = [];
+  List<Map<String, dynamic>> _notifications = [];
   bool _loading = true;
   String? _error;
 
@@ -25,6 +26,7 @@ class _DonorHomeScreenState extends State<DonorHomeScreen> {
   void initState() {
     super.initState();
     _load();
+    _loadNotifications();
   }
 
   Future<void> _load() async {
@@ -42,6 +44,16 @@ class _DonorHomeScreenState extends State<DonorHomeScreen> {
     } finally {
       if (mounted) setState(() => _loading = false);
     }
+  }
+
+  Future<void> _loadNotifications() async {
+    try {
+      final res = await DonorApi.myNotifications(DonorSession.donorId!, DonorSession.donorToken!);
+      if (res['ok'] == true && mounted) {
+        final raw = res['data'] as List? ?? [];
+        setState(() => _notifications = raw.map((e) => Map<String, dynamic>.from(e as Map)).toList());
+      }
+    } catch (_) {}
   }
 
   Future<void> _logout() async {
@@ -74,7 +86,10 @@ class _DonorHomeScreenState extends State<DonorHomeScreen> {
         ],
       ),
       body: RefreshIndicator(
-        onRefresh: _load,
+        onRefresh: () async {
+          await _load();
+          await _loadNotifications();
+        },
         child: CustomScrollView(
           slivers: [
             SliverToBoxAdapter(
@@ -118,6 +133,34 @@ class _DonorHomeScreenState extends State<DonorHomeScreen> {
                       ),
                     ),
                     const SizedBox(height: 12),
+                    if (_notifications.isNotEmpty) ...[
+                      ..._notifications.map((n) => Card(
+                            color: cs.tertiaryContainer,
+                            margin: const EdgeInsets.only(bottom: 8),
+                            child: Padding(
+                              padding: const EdgeInsets.all(12),
+                              child: Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Icon(Icons.campaign_outlined, color: cs.onTertiaryContainer, size: 20),
+                                  const SizedBox(width: 10),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        if ((n['title_bn'] as String?)?.isNotEmpty ?? false)
+                                          Text(n['title_bn'] as String,
+                                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                                        Text(n['message_bn'] as String? ?? '', style: const TextStyle(fontSize: 13)),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          )),
+                      const SizedBox(height: 8),
+                    ],
                     const IslamicSlider(height: 150),
                     const SizedBox(height: 16),
                     Text(

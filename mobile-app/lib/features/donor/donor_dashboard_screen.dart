@@ -143,6 +143,16 @@ class _SummaryTab extends StatelessWidget {
               ),
             ],
           ),
+          if ((s['total_charge_bdt'] as num? ?? 0) > 0) ...[
+            const SizedBox(height: 10),
+            Text(
+              AppLang.t(
+                'ব্যাংক/বিকাশ চার্জ বাবদ মোট ৳${_fmt(s['total_charge_bdt'])} কাটা হয়েছে',
+                'Total ৳${_fmt(s['total_charge_bdt'])} deducted as bank/bKash charges',
+              ),
+              style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant),
+            ),
+          ],
           const SizedBox(height: 16),
 
           // Fund breakdown
@@ -246,7 +256,7 @@ class _LedgerTab extends StatelessWidget {
               style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
             ),
             subtitle: Text(
-              '৳ ${t['amount_bdt']}  •  ${_formatDate(t['created_at'])}',
+              '${pending && (t['currency'] as String?) != 'BDT' ? '${t['amount_foreign']} ${t['currency']}' : '৳ ${t['amount_bdt']}'}  •  ${_formatDate(t['created_at'])}',
               style: const TextStyle(fontSize: 12),
             ),
             trailing: _StatusChip(status),
@@ -258,7 +268,9 @@ class _LedgerTab extends StatelessWidget {
                   children: [
                     if ((t['currency'] as String?) != 'BDT' && (t['amount_foreign'] as num?) != null)
                       _row(AppLang.t('বিদেশী মুদ্রা', 'Foreign Amount'),
-                        '${t['amount_foreign']} ${t['currency']}  (রেট: ${t['exchange_rate']})'),
+                        confirmed
+                            ? '${t['amount_foreign']} ${t['currency']}  (রেট: ${t['exchange_rate']})'
+                            : '${t['amount_foreign']} ${t['currency']}'),
                     _row(AppLang.t('পদ্ধতি', 'Method'), _methodLabel(t['payment_method'] as String?)),
                     if ((t['txn_reference'] as String?)?.isNotEmpty ?? false)
                       _row(AppLang.t('রেফারেন্স', 'Reference'), t['txn_reference'] as String),
@@ -266,6 +278,10 @@ class _LedgerTab extends StatelessWidget {
                       _row(AppLang.t('নোট', 'Note'), t['notes'] as String),
                     if (confirmed && (t['confirmed_at'] as String?)?.isNotEmpty == true)
                       _row(AppLang.t('নিশ্চিত', 'Confirmed'), _formatDate(t['confirmed_at'])),
+                    if (confirmed && (t['transfer_charge_bdt'] as num? ?? 0) > 0) ...[
+                      _row(AppLang.t('ব্যাংক/বিকাশ চার্জ', 'Bank/bKash Charge'), '৳ ${t['transfer_charge_bdt']}'),
+                      _row(AppLang.t('মাদ্রাসা পেয়েছে', 'Madrasah Received'), '৳ ${t['net_amount_bdt']}'),
+                    ],
                     // Linked expenses
                     if ((t['expense_links'] as List?)?.isNotEmpty == true) ...[
                       const SizedBox(height: 6),

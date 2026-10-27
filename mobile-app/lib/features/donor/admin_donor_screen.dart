@@ -114,9 +114,9 @@ class _AdminDonorScreenState extends State<AdminDonorScreen>
     }
   }
 
-  Future<void> _confirmTxn(String id, String status) async {
+  Future<void> _confirmTxn(String id, String status, [Map<String, dynamic>? extra]) async {
     final res = await _api.post('confirmDonation', {
-      'payload': {'id': id, 'status': status},
+      'payload': {'id': id, 'status': status, ...?extra},
       'user_role': SessionService.role,
       'user_id': SessionService.userId,
     });
@@ -170,7 +170,7 @@ class _AdminDonorScreenState extends State<AdminDonorScreen>
                 _TxnsTab(
                   txns: _donorTxns,
                   loading: _loadingTxns,
-                  onConfirm: (id) => _confirmTxn(id, 'CONFIRMED'),
+                  onConfirm: (id, extra) => _confirmTxn(id, 'CONFIRMED', extra),
                   onReject: (id) => _confirmTxn(id, 'REJECTED'),
                   onRefresh: () => _loadDonorTxns(forceRefresh: true),
                 ),
@@ -297,7 +297,7 @@ class _AllDonorsTab extends StatelessWidget {
 class _TxnsTab extends StatelessWidget {
   final List<Map<String, dynamic>> txns;
   final bool loading;
-  final void Function(String) onConfirm;
+  final void Function(String id, Map<String, dynamic> extra) onConfirm;
   final void Function(String) onReject;
   final VoidCallback onRefresh;
   const _TxnsTab({
@@ -320,12 +320,16 @@ class _TxnsTab extends StatelessWidget {
         itemBuilder: (_, i) {
           final t = all[i];
           final isPending = t['status'] == 'PENDING';
+          final isForeign = (t['currency'] as String?) != 'BDT';
           final ft = FundTypes.byKey(t['fund_type'] as String?);
+          final titleAmount = (isPending && isForeign)
+              ? '${t['amount_foreign']} ${t['currency']}'
+              : '৳${t['amount_bdt']}';
           return Card(
             child: ExpansionTile(
               leading: _StatusChip(t['status'] as String? ?? ''),
               title: Text(
-                '${t['donor_name_bn'] ?? ''}  •  ৳${t['amount_bdt']}',
+                '${t['donor_name_bn'] ?? ''}  •  $titleAmount',
                 style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
               ),
               subtitle: Text(
@@ -338,8 +342,18 @@ class _TxnsTab extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      if ((t['currency'] as String?) != 'BDT')
-                        Text('${t['amount_foreign']} ${t['currency']}  @ ${t['exchange_rate']}'),
+                      if (isForeign && !isPending)
+                        Text('${t['amount_foreign']} ${t['currency']}  @ ৳${t['exchange_rate']}'),
+                      if (isForeign && isPending)
+                        Text(AppLang.t(
+                          'BDT-তে কত জমা হয়েছে নিশ্চিত করার সময় লিখুন',
+                          'Enter the BDT amount received when confirming',
+                        )),
+                      if (!isPending && (_toNum(t['transfer_charge_bdt']) > 0))
+                        Text(AppLang.t(
+                          'চার্জ: ৳${t['transfer_charge_bdt']}  •  মাদ্রাসা পেয়েছে: ৳${t['net_amount_bdt']}',
+                          'Charge: ৳${t['transfer_charge_bdt']}  •  Madrasah received: ৳${t['net_amount_bdt']}',
+                        )),
                       Text('${AppLang.t('পদ্ধতি', 'Method')}: ${t['payment_method'] ?? ''}'),
                       if ((t['txn_reference'] as String?)?.isNotEmpty ?? false)
                         Text('Ref: ${t['txn_reference']}'),
@@ -351,7 +365,7 @@ class _TxnsTab extends StatelessWidget {
                           children: [
                             Expanded(
                               child: FilledButton.icon(
-                                onPressed: () => onConfirm(t['id'] as String),
+                                onPressed: () => _openConfirmDialog(context, t, isForeign),
                                 icon: const Icon(Icons.check, size: 16),
                                 label: Text(AppLang.t('নিশ্চিত করুন', 'Confirm')),
                               ),
@@ -376,6 +390,66 @@ class _TxnsTab extends StatelessWidget {
         },
       ),
     );
+  }
+
+  Future<void> _openConfirmDialog(BuildContext context, Map<String, dynamic> t, bool isForeign) async {
+    final receivedCtrl = TextEditingController();
+    final chargeCtrl = TextEditingController();
+    final formKey = GlobalKey<FormState>();
+
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(AppLang.t('দান নিশ্চিত করুন', 'Confirm Donation')),
+        content: Form(
+          key: formKey,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (isForeign) ...[
+                Text(AppLang.t(
+                  'দানকারী পাঠিয়েছেন: ${t['amount_foreign']} ${t['currency']}',
+                  'Donor sent: ${t['amount_foreign']} ${t['currency']}',
+                )),
+                const SizedBox(height: 10),
+                TextFormField(
+                  controller: receivedCtrl,
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  decoration: InputDecoration(labelText: AppLang.t('প্রাপ্ত পরিমাণ (৳) *', 'Received Amount (৳) *')),
+                  validator: (v) => (double.tryParse(v ?? '') ?? 0) <= 0
+                      ? AppLang.t('পরিমাণ দিন', 'Enter amount') : null,
+                ),
+                const SizedBox(height: 10),
+              ],
+              TextFormField(
+                controller: chargeCtrl,
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                decoration: InputDecoration(
+                  labelText: AppLang.t('ব্যাংক/বিকাশ চার্জ (ঐচ্ছিক)', 'Bank/bKash Charge (optional)'),
+                ),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(AppLang.t('বাতিল', 'Cancel'))),
+          FilledButton(
+            onPressed: () {
+              if (!(formKey.currentState?.validate() ?? false)) return;
+              Navigator.pop(ctx, true);
+            },
+            child: Text(AppLang.t('নিশ্চিত করুন', 'Confirm')),
+          ),
+        ],
+      ),
+    );
+
+    if (result == true) {
+      onConfirm(t['id'] as String, {
+        if (isForeign) 'received_amount_bdt': double.tryParse(receivedCtrl.text.trim()) ?? 0,
+        'transfer_charge_bdt': double.tryParse(chargeCtrl.text.trim()) ?? 0,
+      });
+    }
   }
 
   String _date(dynamic v) {

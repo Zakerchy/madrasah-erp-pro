@@ -70,4 +70,10 @@ class DonorApi {
         'donor_id': donorId,
         'donor_token': token,
       }});
+
+  static Future<Map<String, dynamic>> myNotifications(String donorId, String token) =>
+      _post({'action': 'donorMyNotifications', 'payload': {
+        'donor_id': donorId,
+        'donor_token': token,
+      }});
 }

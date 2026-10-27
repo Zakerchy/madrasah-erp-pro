@@ -39,6 +39,7 @@ const CONFIG = {
     DONOR_TXN: 'donor_transactions',
     DONATION_TARGETS: 'donation_targets',
     EXPENSE_DONOR_LINKS: 'expense_donor_links',
+    DONOR_NOTIFICATIONS: 'donor_notifications',
   },
   ENUMS: {
     ROLE: ['ADMIN', 'ACCOUNTANT', 'FIELD_USER', 'VIEWER'],
@@ -169,6 +170,9 @@ const ACTION_PERMISSIONS = {
   confirmDonation: 'donations.write',
   setDonationTarget: 'donations.write',
   linkExpenseToDonor: 'expenses.write',
+  autoDeductPreview: 'expenses.write',
+  autoDeductCommit: 'expenses.write',
+  sendDonorNotification: 'donations.write',
 };
 
 // Route both GET and POST through a single handler so the Flutter app
@@ -227,6 +231,7 @@ function handleRequest_(params) {
     if (action === 'donorDonate') return json(donorDonate_(params.payload));
     if (action === 'donorMyDashboard') return json(donorMyDashboard_(params.payload));
     if (action === 'donorMyTransactions') return json(donorMyTransactions_(params.payload));
+    if (action === 'donorMyNotifications') return json(donorMyNotifications_(params.payload));
 
     params.action = action;
     assertActionPermission_(params, action);
@@ -416,6 +421,9 @@ function handleRequest_(params) {
     if (action === 'confirmDonation') return json(confirmDonation_(params.payload, params));
     if (action === 'setDonationTarget') return json(setDonationTarget_(params.payload, params));
     if (action === 'linkExpenseToDonor') return json(linkExpenseToDonor_(params.payload, params));
+    if (action === 'autoDeductPreview') return json(autoDeductPreview_(params.payload, params));
+    if (action === 'autoDeductCommit') return json(autoDeductCommit_(params.payload, params));
+    if (action === 'sendDonorNotification') return json(sendDonorNotification_(params.payload, params));
 
     return json({ ok: false, message: 'Unknown action: ' + action });
   } catch (err) {
@@ -518,6 +526,21 @@ function repairDonorPhoneColumn() {
     fixed++;
   }
   Logger.log('Repaired phone cells: ' + fixed);
+}
+
+// One-off — run once in the Apps Script editor. Adds the two columns needed
+// for the currency/charge-adjustment flow to the donor_transactions sheet.
+// Safe to run multiple times (skips columns that already exist).
+function addDonorTxnChargeColumns() {
+  const sheet = SpreadsheetApp.openById(getSheetId_()).getSheetByName(CONFIG.SHEETS.DONOR_TXN);
+  if (!sheet) { Logger.log('donor_transactions sheet not found'); return; }
+  const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0].map(String);
+  const toAdd = ['transfer_charge_bdt', 'net_amount_bdt'].filter((h) => headers.indexOf(h) === -1);
+  if (!toAdd.length) { Logger.log('Already up to date'); return; }
+  const startCol = sheet.getLastColumn() + 1;
+  sheet.getRange(1, startCol, 1, toAdd.length).setValues([toAdd]);
+  sheet.getRange(1, startCol, 1, toAdd.length).setFontWeight('bold');
+  Logger.log('Added columns: ' + toAdd.join(', '));
 }
 
 function createDevTestAdminAccount() {
@@ -3635,8 +3658,19 @@ function donorDonate_(payload) {
   const donor = assertDonorAuth_(payload);
   const fund_type = String(payload.fund_type || '').trim().toUpperCase();
   if (!fund_type) return { ok: false, message: 'ফান্ড নির্বাচন করুন' };
-  const amount_bdt = Number(payload.amount_bdt || 0);
-  if (amount_bdt <= 0) return { ok: false, message: 'পরিমাণ দিন' };
+
+  const currency = String(payload.currency || 'BDT').toUpperCase();
+  const isForeign = currency !== 'BDT';
+  const amount_foreign = Number(payload.amount_foreign || 0);
+  // BDT donations: donor knows and enters the exact BDT amount.
+  // Foreign donations: donor only knows the foreign amount — admin fills in
+  // the actual BDT received (and so the real exchange rate) when confirming.
+  if (isForeign) {
+    if (amount_foreign <= 0) return { ok: false, message: 'পরিমাণ দিন' };
+  } else if (Number(payload.amount_bdt || 0) <= 0) {
+    return { ok: false, message: 'পরিমাণ দিন' };
+  }
+  const amount_bdt = isForeign ? 0 : Number(payload.amount_bdt || 0);
 
   const id = uid_('dtx');
   appendRow_(CONFIG.SHEETS.DONOR_TXN, {
@@ -3644,9 +3678,9 @@ function donorDonate_(payload) {
     donor_id: donor.id,
     donor_name_bn: donor.name_bn,
     fund_type,
-    amount_foreign: Number(payload.amount_foreign || 0),
-    currency: String(payload.currency || 'BDT').toUpperCase(),
-    exchange_rate: Number(payload.exchange_rate || 1),
+    amount_foreign,
+    currency,
+    exchange_rate: isForeign ? 0 : 1, // set when admin confirms a foreign donation
     amount_bdt,
     payment_method: String(payload.payment_method || 'CASH').toUpperCase(),
     txn_reference: String(payload.txn_reference || '').trim(),
@@ -3654,6 +3688,8 @@ function donorDonate_(payload) {
     status: 'PENDING',
     confirmed_by: '',
     confirmed_at: '',
+    transfer_charge_bdt: 0,
+    net_amount_bdt: 0,
     notes: String(payload.notes || '').trim(),
     created_at: nowIso(),
   });
@@ -3667,13 +3703,21 @@ function donorMyDashboard_(payload) {
   const txns = (listSheetRows_(CONFIG.SHEETS.DONOR_TXN).data || [])
     .filter(t => t.donor_id === donor.id);
 
-  const totalBdt = txns.filter(t => t.status === 'CONFIRMED')
-    .reduce((s, t) => s + Number(t.amount_bdt || 0), 0);
+  const confirmed = txns.filter(t => t.status === 'CONFIRMED');
+  const grossTotal = confirmed.reduce((s, t) => s + Number(t.amount_bdt || 0), 0);
+  // net_amount_bdt may be blank on old rows confirmed before this field existed.
+  const netTotal = confirmed.reduce((s, t) => {
+    const net = t.net_amount_bdt === '' || t.net_amount_bdt === undefined
+      ? Number(t.amount_bdt || 0)
+      : Number(t.net_amount_bdt || 0);
+    return s + net;
+  }, 0);
+  const chargeTotal = grossTotal - netTotal;
   const pendingCount = txns.filter(t => t.status === 'PENDING').length;
 
-  // Fund-wise breakdown (confirmed only)
+  // Fund-wise breakdown (confirmed only, gross donated amount)
   const byFund = {};
-  txns.filter(t => t.status === 'CONFIRMED').forEach(t => {
+  confirmed.forEach(t => {
     const k = t.fund_type;
     byFund[k] = (byFund[k] || 0) + Number(t.amount_bdt || 0);
   });
@@ -3696,9 +3740,10 @@ function donorMyDashboard_(payload) {
       currency_pref: donor.currency_pref || 'BDT',
     },
     summary: {
-      total_donated_bdt: totalBdt,
+      total_donated_bdt: grossTotal,
+      total_charge_bdt: chargeTotal,
       total_used_bdt: usedAmount,
-      balance_bdt: totalBdt - usedAmount,
+      balance_bdt: netTotal - usedAmount,
       pending_count: pendingCount,
     },
     by_fund: byFund,
@@ -3731,6 +3776,10 @@ function donorMyTransactions_(payload) {
       amount_foreign: Number(t.amount_foreign || 0),
       currency: t.currency,
       exchange_rate: Number(t.exchange_rate || 1),
+      transfer_charge_bdt: Number(t.transfer_charge_bdt || 0),
+      net_amount_bdt: t.net_amount_bdt === '' || t.net_amount_bdt === undefined
+        ? Number(t.amount_bdt || 0)
+        : Number(t.net_amount_bdt || 0),
       payment_method: t.payment_method,
       txn_reference: t.txn_reference,
       slip_url: t.slip_url,
@@ -3794,12 +3843,39 @@ function confirmDonation_(payload, params) {
 
   // If confirming, also create a fund_transaction IN entry
   if (status === 'CONFIRMED') {
+    const isForeign = String(txn.currency || 'BDT').toUpperCase() !== 'BDT';
+    let amount_bdt = Number(txn.amount_bdt || 0);
+    let exchange_rate = Number(txn.exchange_rate || 1);
+
+    if (isForeign) {
+      // Donor only knew the foreign amount — admin enters what actually
+      // landed in BDT, and the real rate is derived from that.
+      const received = Number(payload.received_amount_bdt || 0);
+      if (received <= 0) return { ok: false, message: 'প্রাপ্ত BDT পরিমাণ দিন' };
+      amount_bdt = received;
+      const amount_foreign = Number(txn.amount_foreign || 0);
+      exchange_rate = amount_foreign > 0 ? received / amount_foreign : 0;
+    }
+
+    const charge = Number(payload.transfer_charge_bdt || 0);
+    if (charge < 0) return { ok: false, message: 'চার্জ ঋণাত্মক হতে পারবে না' };
+    if (charge > amount_bdt) return { ok: false, message: 'চার্জ মোট পরিমাণের বেশি হতে পারবে না' };
+    const net_amount_bdt = amount_bdt - charge;
+
+    updates.amount_bdt = amount_bdt;
+    updates.exchange_rate = exchange_rate;
+    updates.transfer_charge_bdt = charge;
+    updates.net_amount_bdt = net_amount_bdt;
+
+    let notes = 'দানকারী: ' + (txn.donor_name_bn || txn.donor_id) + (txn.txn_reference ? ' | Ref: ' + txn.txn_reference : '');
+    if (charge > 0) notes += ' | চার্জ: ৳' + charge;
+
     createTransaction_({
       txn_date: nowIso().substring(0, 10),
       fund_type: txn.fund_type,
       direction: 'IN',
-      amount: Number(txn.amount_bdt || 0),
-      notes: 'দানকারী: ' + (txn.donor_name_bn || txn.donor_id) + (txn.txn_reference ? ' | Ref: ' + txn.txn_reference : ''),
+      amount: net_amount_bdt,
+      notes,
       source_or_vendor: txn.payment_method || 'CASH',
       reference: id,
       created_by: confirmedBy,
@@ -3887,6 +3963,130 @@ function linkExpenseToDonor_(payload, params) {
   return { ok: true };
 }
 
+// ── Auto-deduct: split an expense amount across confirmed donor balances,
+// oldest donation first (FIFO), so admin doesn't have to pick one donor
+// by hand every time. ──────────────────────────────────────────────────────
+
+function computeDonorTxnRemaining_(fundType) {
+  const txns = (listSheetRows_(CONFIG.SHEETS.DONOR_TXN).data || [])
+    .filter(t => t.status === 'CONFIRMED' && String(t.fund_type || '').toUpperCase() === fundType);
+  const links = listSheetRows_(CONFIG.SHEETS.EXPENSE_DONOR_LINKS).data || [];
+  const usedByTxn = {};
+  links.forEach(l => {
+    const k = l.donor_txn_id;
+    usedByTxn[k] = (usedByTxn[k] || 0) + Number(l.amount_used || 0);
+  });
+  return txns
+    .map(t => {
+      const gross = t.net_amount_bdt === '' || t.net_amount_bdt === undefined
+        ? Number(t.amount_bdt || 0)
+        : Number(t.net_amount_bdt || 0);
+      const used = usedByTxn[t.id] || 0;
+      return {
+        donor_txn_id: t.id,
+        donor_id: t.donor_id,
+        donor_name_bn: t.donor_name_bn,
+        remaining: gross - used,
+        created_at: t.created_at,
+      };
+    })
+    .filter(r => r.remaining > 0.009)
+    .sort((a, b) => String(a.created_at).localeCompare(String(b.created_at))); // oldest donation first
+}
+
+function computeAutoDeductPlan_(fundType, amountNeeded) {
+  const pool = computeDonorTxnRemaining_(fundType);
+  let remaining = Number(amountNeeded || 0);
+  const allocations = [];
+  for (const r of pool) {
+    if (remaining <= 0.009) break;
+    const take = Math.min(r.remaining, remaining);
+    allocations.push({
+      donor_txn_id: r.donor_txn_id,
+      donor_id: r.donor_id,
+      donor_name_bn: r.donor_name_bn,
+      amount: Math.round(take * 100) / 100,
+    });
+    remaining -= take;
+  }
+  const covered = Number(amountNeeded || 0) - remaining;
+  return {
+    allocations,
+    covered: Math.round(covered * 100) / 100,
+    shortfall: Math.round(Math.max(remaining, 0) * 100) / 100,
+  };
+}
+
+/** Dry run — admin reviews the split before committing. */
+function autoDeductPreview_(payload, params) {
+  payload = payload || {};
+  assertPermission_(params, 'expenses.write');
+  const fund_type = String(payload.fund_type || '').trim().toUpperCase();
+  const amount = Number(payload.amount || 0);
+  if (!fund_type) return { ok: false, message: 'fund_type প্রয়োজন' };
+  if (amount <= 0) return { ok: false, message: 'amount প্রয়োজন' };
+  return { ok: true, ...computeAutoDeductPlan_(fund_type, amount) };
+}
+
+/** Commits the split as real expense_donor_links rows (recomputed fresh, not trusting the client's preview). */
+function autoDeductCommit_(payload, params) {
+  payload = payload || {};
+  assertPermission_(params, 'expenses.write');
+  const expense_id = String(payload.expense_id || '').trim();
+  const fund_type = String(payload.fund_type || '').trim().toUpperCase();
+  const amount = Number(payload.amount || 0);
+  if (!expense_id) return { ok: false, message: 'expense_id প্রয়োজন' };
+  if (!fund_type) return { ok: false, message: 'fund_type প্রয়োজন' };
+  if (amount <= 0) return { ok: false, message: 'amount প্রয়োজন' };
+
+  const plan = computeAutoDeductPlan_(fund_type, amount);
+  plan.allocations.forEach(a => {
+    appendRow_(CONFIG.SHEETS.EXPENSE_DONOR_LINKS, {
+      id: uid_('edl'),
+      expense_id,
+      donor_txn_id: a.donor_txn_id,
+      amount_used: a.amount,
+      notes: 'স্বয়ংক্রিয় বণ্টন',
+      created_at: nowIso(),
+    });
+  });
+  return { ok: true, allocations: plan.allocations, covered: plan.covered, shortfall: plan.shortfall };
+}
+
+/** Admin — ask donors (all, or one specific donor) to help cover a fund shortfall. */
+function sendDonorNotification_(payload, params) {
+  payload = payload || {};
+  assertPermission_(params, 'donations.write');
+  const target = String(payload.target || 'ALL').toUpperCase(); // ALL or SPECIFIC
+  const donor_id = target === 'SPECIFIC' ? String(payload.donor_id || '').trim() : '';
+  if (target === 'SPECIFIC' && !donor_id) return { ok: false, message: 'donor_id প্রয়োজন' };
+  const message_bn = String(payload.message_bn || '').trim();
+  if (!message_bn) return { ok: false, message: 'মেসেজ লিখুন' };
+
+  appendRow_(CONFIG.SHEETS.DONOR_NOTIFICATIONS, {
+    id: uid_('dnt'),
+    donor_id, // blank = broadcast to every donor
+    fund_type: String(payload.fund_type || '').trim().toUpperCase(),
+    title_bn: String(payload.title_bn || '').trim(),
+    message_bn,
+    created_by: String(params.email || params.user_id || '').trim(),
+    created_at: nowIso(),
+  });
+  return { ok: true };
+}
+
+/** Donor auth required — notifications addressed to this donor or broadcast to all. */
+function donorMyNotifications_(payload) {
+  payload = payload || {};
+  const donor = assertDonorAuth_(payload);
+  const all = listSheetRows_(CONFIG.SHEETS.DONOR_NOTIFICATIONS).data || [];
+  const mine = all
+    .filter(n => !n.donor_id || n.donor_id === donor.id)
+    .sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)))
+    .slice(0, 30);
+  return { ok: true, data: mine };
+}
+
 // Fund key migration — একবার run করুন
 function migrateFundKeys() {
   const ss = SpreadsheetApp.openById(getSheetId_());
@@ -3953,4 +4153,16 @@ function setupDonorSheets() {
     Logger.log('Created: ' + def.name);
   }
   Logger.log('setupDonorSheets complete.');
+}
+
+/** One-off — run once. Creates the donor_notifications sheet. */
+function setupDonorNotificationsSheet() {
+  const ss = SpreadsheetApp.openById(getSheetId_());
+  const name = CONFIG.SHEETS.DONOR_NOTIFICATIONS;
+  if (ss.getSheetByName(name)) { Logger.log('Already exists, skip: ' + name); return; }
+  const headers = ['id', 'donor_id', 'fund_type', 'title_bn', 'message_bn', 'created_by', 'created_at'];
+  const sheet = ss.insertSheet(name);
+  sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+  sheet.getRange(1, 1, 1, headers.length).setFontWeight('bold');
+  Logger.log('Created: ' + name);
 }

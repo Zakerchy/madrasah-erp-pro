@@ -15,7 +15,6 @@ class DonorDonateScreen extends StatefulWidget {
 class _DonorDonateScreenState extends State<DonorDonateScreen> {
   final _amountBdt = TextEditingController();
   final _amountForeign = TextEditingController();
-  final _rate = TextEditingController();
   final _ref = TextEditingController();
   final _notes = TextEditingController();
   final _formKey = GlobalKey<FormState>();
@@ -35,25 +34,15 @@ class _DonorDonateScreenState extends State<DonorDonateScreen> {
 
   bool get _isForeign => _currency != 'BDT';
 
-  void _recalcBdt() {
-    if (!_isForeign) return;
-    final foreign = double.tryParse(_amountForeign.text) ?? 0;
-    final rate = double.tryParse(_rate.text) ?? 0;
-    if (foreign > 0 && rate > 0) {
-      _amountBdt.text = (foreign * rate).toStringAsFixed(2);
-    }
-  }
-
   Future<void> _submit() async {
     if (!(_formKey.currentState?.validate() ?? false)) return;
     setState(() { _loading = true; _error = null; });
     try {
       final payload = {
         'fund_type': _fundType,
-        'amount_bdt': double.tryParse(_amountBdt.text) ?? 0,
+        'amount_bdt': _isForeign ? 0 : (double.tryParse(_amountBdt.text) ?? 0),
         'amount_foreign': _isForeign ? (double.tryParse(_amountForeign.text) ?? 0) : 0,
         'currency': _currency,
-        'exchange_rate': _isForeign ? (double.tryParse(_rate.text) ?? 1) : 1,
         'payment_method': _method,
         'txn_reference': _ref.text.trim(),
         'notes': _notes.text.trim(),
@@ -94,7 +83,7 @@ class _DonorDonateScreenState extends State<DonorDonateScreen> {
 
   @override
   void dispose() {
-    _amountBdt.dispose(); _amountForeign.dispose(); _rate.dispose();
+    _amountBdt.dispose(); _amountForeign.dispose();
     _ref.dispose(); _notes.dispose();
     super.dispose();
   }
@@ -135,60 +124,40 @@ class _DonorDonateScreenState extends State<DonorDonateScreen> {
                   border: const OutlineInputBorder(),
                 ),
                 items: _currencies.map((c) => DropdownMenuItem(value: c, child: Text(c))).toList(),
-                onChanged: (v) => setState(() { _currency = v ?? 'BDT'; _amountForeign.clear(); _rate.clear(); }),
+                onChanged: (v) => setState(() { _currency = v ?? 'BDT'; _amountForeign.clear(); _amountBdt.clear(); }),
               ),
               const SizedBox(height: 12),
 
               if (_isForeign) ...[
-                Row(
-                  children: [
-                    Expanded(
-                      child: TextFormField(
-                        controller: _amountForeign,
-                        keyboardType: TextInputType.number,
-                        decoration: InputDecoration(
-                          labelText: AppLang.t('পরিমাণ ($_currency)', 'Amount ($_currency)'),
-                          border: const OutlineInputBorder(),
-                        ),
-                        onChanged: (_) => _recalcBdt(),
-                        validator: (v) => (double.tryParse(v ?? '') ?? 0) <= 0
-                            ? AppLang.t('পরিমাণ দিন', 'Enter amount') : null,
-                      ),
+                TextFormField(
+                  controller: _amountForeign,
+                  keyboardType: TextInputType.number,
+                  decoration: InputDecoration(
+                    labelText: AppLang.t('পরিমাণ ($_currency) *', 'Amount ($_currency) *'),
+                    border: const OutlineInputBorder(),
+                    helperText: AppLang.t(
+                      'BDT-তে কত জমা হয়েছে তা অ্যাডমিন নিশ্চিত করার সময় যোগ করবেন',
+                      'Admin will add the BDT amount received when confirming',
                     ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: TextFormField(
-                        controller: _rate,
-                        keyboardType: TextInputType.number,
-                        decoration: InputDecoration(
-                          labelText: AppLang.t('রেট (BDT-তে)', 'Rate in BDT'),
-                          border: const OutlineInputBorder(),
-                        ),
-                        onChanged: (_) => _recalcBdt(),
-                        validator: (v) => (double.tryParse(v ?? '') ?? 0) <= 0
-                            ? AppLang.t('রেট দিন', 'Enter rate') : null,
-                      ),
-                    ),
-                  ],
+                  ),
+                  validator: (v) => (double.tryParse(v ?? '') ?? 0) <= 0
+                      ? AppLang.t('পরিমাণ দিন', 'Enter amount') : null,
+                ),
+                const SizedBox(height: 12),
+              ] else ...[
+                TextFormField(
+                  controller: _amountBdt,
+                  keyboardType: TextInputType.number,
+                  decoration: InputDecoration(
+                    labelText: AppLang.t('পরিমাণ (টাকা) *', 'Amount (BDT) *'),
+                    prefixText: '৳ ',
+                    border: const OutlineInputBorder(),
+                  ),
+                  validator: (v) => (double.tryParse(v ?? '') ?? 0) <= 0
+                      ? AppLang.t('পরিমাণ দিন', 'Enter amount') : null,
                 ),
                 const SizedBox(height: 12),
               ],
-
-              // BDT amount
-              TextFormField(
-                controller: _amountBdt,
-                keyboardType: TextInputType.number,
-                readOnly: _isForeign,
-                decoration: InputDecoration(
-                  labelText: AppLang.t('পরিমাণ (টাকা) *', 'Amount (BDT) *'),
-                  prefixText: '৳ ',
-                  border: const OutlineInputBorder(),
-                  helperText: _isForeign ? AppLang.t('স্বয়ংক্রিয়ভাবে হিসাব হয়েছে', 'Auto-calculated') : null,
-                ),
-                validator: (v) => (double.tryParse(v ?? '') ?? 0) <= 0
-                    ? AppLang.t('পরিমাণ দিন', 'Enter amount') : null,
-              ),
-              const SizedBox(height: 12),
 
               // Payment method
               DropdownButtonFormField<String>(
