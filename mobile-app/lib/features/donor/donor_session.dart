@@ -13,6 +13,7 @@ class DonorSession {
   static String? get donorId => _donorId;
   static String? get donorToken => _donorToken;
   static String get nameBn => (_donor?['name_bn'] ?? '') as String;
+  static String get phone => (_donor?['phone'] ?? '') as String;
   static String get currencyPref => (_donor?['currency_pref'] ?? 'BDT') as String;
 
   static Future<void> load() async {

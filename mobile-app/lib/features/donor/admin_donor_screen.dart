@@ -8,6 +8,7 @@ import '../../shared/constants/fund_types.dart';
 import '../../shared/services/api_service.dart';
 import '../../shared/services/session_service.dart';
 import '../../shared/widgets/base_scaffold.dart';
+import '../../shared/widgets/donation_invoice_screen.dart';
 import 'donor_broadcast_screen.dart';
 
 String hashDonorPin(String pin) => sha256.convert(utf8.encode(pin.trim())).toString();
@@ -243,6 +244,7 @@ class _AdminDonorScreenState extends State<AdminDonorScreen>
                 ),
                 _TxnsTab(
                   txns: _donorTxns,
+                  donors: _allDonors,
                   loading: _loadingTxns,
                   onConfirm: (id, extra) => _confirmTxn(id, 'CONFIRMED', extra),
                   onReject: (id) => _confirmTxn(id, 'REJECTED'),
@@ -426,14 +428,22 @@ class _AllDonorsTab extends StatelessWidget {
 
 class _TxnsTab extends StatelessWidget {
   final List<Map<String, dynamic>> txns;
+  final List<Map<String, dynamic>> donors;
   final bool loading;
   final void Function(String id, Map<String, dynamic> extra) onConfirm;
   final void Function(String) onReject;
   final VoidCallback onRefresh;
   const _TxnsTab({
-    required this.txns, required this.loading,
+    required this.txns, required this.donors, required this.loading,
     required this.onConfirm, required this.onReject, required this.onRefresh,
   });
+
+  String _donorPhone(String? donorId) {
+    for (final d in donors) {
+      if (d['id'] == donorId) return (d['phone'] as String?) ?? '';
+    }
+    return '';
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -532,6 +542,20 @@ class _TxnsTab extends StatelessWidget {
                               ),
                             ),
                           ],
+                        ),
+                      ],
+                      if (t['status'] == 'CONFIRMED') ...[
+                        const SizedBox(height: 8),
+                        OutlinedButton.icon(
+                          onPressed: () => Navigator.of(context).push(MaterialPageRoute(
+                            builder: (_) => DonationInvoiceScreen(
+                              txn: t,
+                              donorName: (t['donor_name_bn'] as String?) ?? '',
+                              donorPhone: _donorPhone(t['donor_id'] as String?),
+                            ),
+                          )),
+                          icon: const Icon(Icons.receipt_long_outlined, size: 16),
+                          label: Text(AppLang.t('রশিদ দেখুন', 'View Receipt')),
                         ),
                       ],
                     ],

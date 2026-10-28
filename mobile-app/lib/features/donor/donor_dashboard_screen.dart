@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/app_lang.dart';
 import '../../shared/constants/fund_types.dart';
+import '../../shared/widgets/donation_invoice_screen.dart';
 import 'donor_api.dart';
 import 'donor_session.dart';
 
@@ -295,6 +296,23 @@ class _LedgerTab extends StatelessWidget {
                             style: const TextStyle(fontSize: 12)),
                         );
                       })),
+                    ],
+                    if (confirmed) ...[
+                      const SizedBox(height: 10),
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: OutlinedButton.icon(
+                          onPressed: () => Navigator.of(context).push(MaterialPageRoute(
+                            builder: (_) => DonationInvoiceScreen(
+                              txn: t,
+                              donorName: DonorSession.nameBn,
+                              donorPhone: DonorSession.phone,
+                            ),
+                          )),
+                          icon: const Icon(Icons.receipt_long_outlined, size: 16),
+                          label: Text(AppLang.t('রশিদ দেখুন', 'View Receipt')),
+                        ),
+                      ),
                     ],
                   ],
                 ),
