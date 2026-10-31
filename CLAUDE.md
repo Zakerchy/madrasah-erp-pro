@@ -69,6 +69,15 @@ Numeric-looking strings (phone numbers with leading zeros) get silently coerced 
 (`appendRow_` and `updateById_`), not just once, or a later full-row rewrite re-triggers
 the auto-detection and corrupts the value again.
 
+## Fast backend check (do this before any browser-based verification)
+`npm run check:backend` (or `node local-check/backend-smoke.mjs`) hits the **live** Apps
+Script backend directly over HTTP — no Flutter build, no browser — and checks public
+endpoints, staff login, donor login, and a few authenticated donor reads. It's read-only
+against real data, safe to run anytime, and catches a broken deploy or payload-shape bug
+in seconds instead of a full UI click-through. Still do the real end-to-end browser
+verification afterwards per the rule below — this only replaces the "did the deploy even
+work" first pass.
+
 ## Verification standard (per chief's rule)
 Never report a fix/feature done from passing analyzer/tests alone — confirm it against
 the real running app with real data (live Apps Script backend, not mocked), end to end

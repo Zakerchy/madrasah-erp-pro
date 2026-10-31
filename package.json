@@ -8,6 +8,7 @@
     "migrate": "node tools/migrate_excel_to_normalized.js",
     "check:server": "node local-check/server.mjs",
     "check:smoke": "node local-check/smoke-test.mjs",
+    "check:backend": "node local-check/backend-smoke.mjs",
     "admin:web": "node local-check/server.mjs",
     "build:web:vercel": "./tools/vercel-build.sh",
     "app:web": "./tools/run-local-web.sh web-server",
