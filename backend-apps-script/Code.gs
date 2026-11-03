@@ -3236,7 +3236,13 @@ function saveBase64Image_(base64, filename, mimeType) {
   const blob = Utilities.newBlob(bytes, mimeType || 'image/jpeg', filename || ('upload_' + Date.now() + '.jpg'));
   const file = getOrCreateUploadsFolder_().createFile(blob);
   file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
-  return 'https://drive.google.com/uc?export=view&id=' + file.getId();
+  // Note: 'drive.google.com/uc?export=view' does NOT send CORS headers, so it
+  // silently fails to load inside the Flutter web app (CanvasKit renderer
+  // fetches images via XHR, which the browser blocks without CORS). The
+  // lh3.googleusercontent.com thumbnail host (what 'drive.google.com/thumbnail'
+  // redirects to) does send 'Access-Control-Allow-Origin: *', so use that
+  // directly for every image URL the app will ever <img>/Image.network load.
+  return 'https://lh3.googleusercontent.com/d/' + file.getId();
 }
 
 /** Donor auth required — upload a payment slip image, returns its URL. */
