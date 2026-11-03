@@ -96,12 +96,16 @@ class _DonorLoginScreenState extends State<DonorLoginScreen> {
                 children: [
                   OrgSettings.logoUrl.isNotEmpty
                       ? ClipOval(
-                          child: Image.network(
-                            OrgSettings.logoUrl,
+                          child: SizedBox(
                             width: 56,
                             height: 56,
-                            fit: BoxFit.cover,
-                            errorBuilder: (_, __, ___) => Icon(Icons.mosque_rounded, size: 56, color: cs.primary),
+                            child: Image.network(
+                              OrgSettings.logoUrl,
+                              width: 56,
+                              height: 56,
+                              fit: BoxFit.cover,
+                              errorBuilder: (_, __, ___) => Icon(Icons.mosque_rounded, size: 56, color: cs.primary),
+                            ),
                           ),
                         )
                       : Icon(Icons.mosque_rounded, size: 56, color: cs.primary),

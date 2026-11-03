@@ -209,24 +209,32 @@ class _LoginScreenState extends State<LoginScreen> {
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
                     // Logo / Title
-                    Container(
-                      padding: const EdgeInsets.all(20),
-                      decoration: BoxDecoration(
-                        color: teal.withValues(alpha: 0.18),
-                        shape: BoxShape.circle,
-                        border: Border.all(color: teal.withValues(alpha: 0.35)),
+                    Center(
+                      child: Container(
+                        width: 88,
+                        height: 88,
+                        padding: const EdgeInsets.all(20),
+                        decoration: BoxDecoration(
+                          color: teal.withValues(alpha: 0.18),
+                          shape: BoxShape.circle,
+                          border: Border.all(color: teal.withValues(alpha: 0.35)),
+                        ),
+                        child: OrgSettings.logoUrl.isNotEmpty
+                            ? ClipOval(
+                                child: SizedBox(
+                                  width: 48,
+                                  height: 48,
+                                  child: Image.network(
+                                    OrgSettings.logoUrl,
+                                    width: 48,
+                                    height: 48,
+                                    fit: BoxFit.cover,
+                                    errorBuilder: (_, __, ___) => Icon(Icons.school, color: teal, size: 48),
+                                  ),
+                                ),
+                              )
+                            : Icon(Icons.school, color: teal, size: 48),
                       ),
-                      child: OrgSettings.logoUrl.isNotEmpty
-                          ? ClipOval(
-                              child: Image.network(
-                                OrgSettings.logoUrl,
-                                width: 48,
-                                height: 48,
-                                fit: BoxFit.cover,
-                                errorBuilder: (_, __, ___) => Icon(Icons.school, color: teal, size: 48),
-                              ),
-                            )
-                          : Icon(Icons.school, color: teal, size: 48),
                     ),
                     const SizedBox(height: 24),
                     Text(

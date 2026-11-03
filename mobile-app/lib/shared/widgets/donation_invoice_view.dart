@@ -74,10 +74,14 @@ class DonationInvoiceView extends StatelessWidget {
               if (OrgSettings.logoUrl.isNotEmpty)
                 ClipRRect(
                   borderRadius: BorderRadius.circular(8),
-                  child: Image.network(
-                    OrgSettings.logoUrl,
-                    width: 60, height: 60, fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) => const Icon(Icons.business, size: 50, color: Color(0xFF14786B)),
+                  child: SizedBox(
+                    width: 60,
+                    height: 60,
+                    child: Image.network(
+                      OrgSettings.logoUrl,
+                      width: 60, height: 60, fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) => const Icon(Icons.business, size: 50, color: Color(0xFF14786B)),
+                    ),
                   ),
                 )
               else
