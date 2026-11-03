@@ -42,7 +42,16 @@ class _DonorDonateScreenState extends State<DonorDonateScreen> {
   bool get _isForeign => _currency != 'BDT';
 
   Future<void> _pickSlip() async {
-    final picked = await ImagePicker().pickImage(source: ImageSource.gallery, imageQuality: 80);
+    XFile? picked;
+    try {
+      picked = await ImagePicker().pickImage(source: ImageSource.gallery, imageQuality: 80);
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(AppLang.t('ছবি বাছাই ব্যর্থ, আবার চেষ্টা করুন', 'Could not open image picker, please try again')),
+      ));
+      return;
+    }
     if (picked == null) return;
     final bytes = await picked.readAsBytes();
     setState(() { _slipBytes = bytes; _uploadingSlip = true; });

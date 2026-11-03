@@ -47,7 +47,16 @@ class _OrgSettingsScreenState extends State<OrgSettingsScreen> {
   }
 
   Future<void> _pickLogo() async {
-    final picked = await ImagePicker().pickImage(source: ImageSource.gallery, imageQuality: 85);
+    XFile? picked;
+    try {
+      picked = await ImagePicker().pickImage(source: ImageSource.gallery, imageQuality: 85);
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(AppLang.t('ছবি বাছাই ব্যর্থ, আবার চেষ্টা করুন', 'Could not open image picker, please try again')),
+      ));
+      return;
+    }
     if (picked == null) return;
     final bytes = await picked.readAsBytes();
     setState(() { _pickedBytes = bytes; _uploading = true; });
