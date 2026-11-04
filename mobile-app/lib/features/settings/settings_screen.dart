@@ -1,3 +1,4 @@
+import '../../shared/widgets/app_loader.dart';
 import 'package:flutter/material.dart';
 
 import '../../core/app_lang.dart';
@@ -779,7 +780,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     if (_loadingNotify)
                       const Padding(
                         padding: EdgeInsets.symmetric(vertical: 12),
-                        child: Center(child: CircularProgressIndicator()),
+                        child: Center(child: AppLoader()),
                       )
                     else ...[
                       SwitchListTile(
@@ -896,7 +897,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       if (_loadingNotifyEvents)
                         const Padding(
                           padding: EdgeInsets.symmetric(vertical: 10),
-                          child: Center(child: CircularProgressIndicator()),
+                          child: Center(child: AppLoader()),
                         )
                       else if (_notifyEvents.isEmpty)
                         Text(
@@ -949,7 +950,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     if (_loadingUiRange)
                       const Padding(
                         padding: EdgeInsets.symmetric(vertical: 12),
-                        child: Center(child: CircularProgressIndicator()),
+                        child: Center(child: AppLoader()),
                       )
                     else ...[
                       Row(
@@ -1078,7 +1079,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     if (_loadingRoles)
                       const Padding(
                         padding: EdgeInsets.symmetric(vertical: 12),
-                        child: Center(child: CircularProgressIndicator()),
+                        child: Center(child: AppLoader()),
                       )
                     else ...[
                       TextField(
@@ -1276,7 +1277,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             if (_loadingUsers)
               const Padding(
                 padding: EdgeInsets.all(16),
-                child: Center(child: CircularProgressIndicator()),
+                child: Center(child: AppLoader()),
               )
             else if (_users.isEmpty)
               Text(AppLang.t('কোনো ব্যবহারকারী নেই', 'No users found'))
@@ -1476,7 +1477,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       if (_loadingAudit)
                         const Padding(
                           padding: EdgeInsets.symmetric(vertical: 12),
-                          child: Center(child: CircularProgressIndicator()),
+                          child: Center(child: AppLoader()),
                         )
                       else if (_auditRows.isEmpty)
                         Text(AppLang.t(

@@ -1,3 +1,4 @@
+import '../../shared/widgets/app_loader.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
@@ -291,7 +292,7 @@ class _FeeDuesScreenState extends State<FeeDuesScreen> {
               icon: const Icon(Icons.refresh)),
         ],
         body: _loading
-            ? const Center(child: CircularProgressIndicator())
+            ? const Center(child: AppLoader())
             : LayoutBuilder(builder: (context, constraints) {
                 final wide = constraints.maxWidth >= 980;
                 return ListView(

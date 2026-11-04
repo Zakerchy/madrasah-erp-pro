@@ -1,3 +1,4 @@
+import '../../shared/widgets/app_loader.dart';
 import 'package:flutter/material.dart';
 
 import '../../core/app_lang.dart';
@@ -468,7 +469,7 @@ class _ExpenseScreenState extends State<ExpenseScreen> {
                 if (loading)
                   const Padding(
                     padding: EdgeInsets.all(20),
-                    child: Center(child: CircularProgressIndicator()),
+                    child: Center(child: AppLoader()),
                   )
                 else if (txns.isEmpty)
                   Padding(
@@ -656,7 +657,7 @@ class _ExpenseScreenState extends State<ExpenseScreen> {
             if (_loadingList)
               const Padding(
                 padding: EdgeInsets.all(16),
-                child: Center(child: CircularProgressIndicator()),
+                child: Center(child: AppLoader()),
               )
             else
               ..._rows.map((r) => Card(

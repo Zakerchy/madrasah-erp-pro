@@ -1,3 +1,4 @@
+import 'app_loader.dart';
 import 'package:flutter/material.dart';
 
 import '../constants/app_permissions.dart';
@@ -58,13 +59,13 @@ class _GuardedRouteState extends State<GuardedRoute> {
     if (widget.routeName == AppRoutes.login) return widget.child;
     if (!SessionService.isLoggedIn) {
       return const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
+        body: Center(child: AppLoader()),
       );
     }
     final permission = widget.permission;
     if (permission != null && !SessionService.can(permission)) {
       return const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
+        body: Center(child: AppLoader()),
       );
     }
     return widget.child;

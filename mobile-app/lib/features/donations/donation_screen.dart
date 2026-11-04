@@ -1,3 +1,4 @@
+import '../../shared/widgets/app_loader.dart';
 import 'package:flutter/material.dart';
 
 import '../../core/app_lang.dart';
@@ -361,7 +362,7 @@ class _DonationScreenState extends State<DonationScreen> {
             if (_loadingList)
               const Padding(
                 padding: EdgeInsets.all(16),
-                child: Center(child: CircularProgressIndicator()),
+                child: Center(child: AppLoader()),
               )
             else if (_rows.isEmpty)
               Padding(

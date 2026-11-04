@@ -1,3 +1,4 @@
+import '../../shared/widgets/app_loader.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:share_plus/share_plus.dart';
@@ -377,7 +378,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
               ),
             ),
             const SizedBox(height: 12),
-            if (_loading) const Center(child: CircularProgressIndicator()),
+            if (_loading) const Center(child: AppLoader()),
             if (_error != null)
               Text(
                 '${AppLang.t('ত্রুটি', 'Error')}: $_error',

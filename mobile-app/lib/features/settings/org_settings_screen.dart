@@ -1,3 +1,4 @@
+import '../../shared/widgets/app_loader.dart';
 import 'dart:convert';
 import 'dart:typed_data';
 
@@ -102,7 +103,7 @@ class _OrgSettingsScreenState extends State<OrgSettingsScreen> {
     return BaseScaffold(
       title: AppLang.t('প্রতিষ্ঠানের তথ্য', 'Organization Details'),
       body: _loading
-          ? const Center(child: CircularProgressIndicator())
+          ? const Center(child: AppLoader())
           : ListView(
               padding: const EdgeInsets.all(16),
               children: [

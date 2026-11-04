@@ -1,3 +1,4 @@
+import '../../shared/widgets/app_loader.dart';
 import 'dart:convert';
 import 'package:crypto/crypto.dart';
 import 'package:flutter/material.dart';
@@ -280,7 +281,7 @@ class _PendingTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (loading) return const Center(child: CircularProgressIndicator());
+    if (loading) return const Center(child: AppLoader());
     if (donors.isEmpty) return Center(child: Text(AppLang.t('কোনো মুলতুবি নেই', 'No pending approvals')));
     return RefreshIndicator(
       onRefresh: () async => onRefresh(),
@@ -385,7 +386,7 @@ class _AllDonorsTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (loading) return const Center(child: CircularProgressIndicator());
+    if (loading) return const Center(child: AppLoader());
     if (donors.isEmpty) return Center(child: Text(AppLang.t('কোনো দানকারী নেই', 'No donors')));
     final active = donors.where((d) => d['status'] == 'ACTIVE').length;
     return RefreshIndicator(
@@ -447,7 +448,7 @@ class _TxnsTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (loading) return const Center(child: CircularProgressIndicator());
+    if (loading) return const Center(child: AppLoader());
     if (txns.isEmpty) return Center(child: Text(AppLang.t('কোনো লেনদেন নেই', 'No transactions')));
     final pending = txns.where((t) => t['status'] == 'PENDING').toList();
     final rest = txns.where((t) => t['status'] != 'PENDING').toList();
@@ -656,7 +657,7 @@ class _TargetsTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (loading) return const Center(child: CircularProgressIndicator());
+    if (loading) return const Center(child: AppLoader());
     return RefreshIndicator(
       onRefresh: () async => onRefresh(),
       child: ListView.builder(

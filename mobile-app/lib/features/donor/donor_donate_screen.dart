@@ -1,3 +1,4 @@
+import '../../shared/widgets/app_loader.dart';
 import 'dart:convert';
 import 'dart:typed_data';
 
@@ -254,7 +255,7 @@ class _DonorDonateScreenState extends State<DonorDonateScreen> {
                       Positioned.fill(
                         child: Container(
                           color: Colors.black38,
-                          child: const Center(child: CircularProgressIndicator()),
+                          child: const Center(child: AppLoader()),
                         ),
                       ),
                     Positioned(

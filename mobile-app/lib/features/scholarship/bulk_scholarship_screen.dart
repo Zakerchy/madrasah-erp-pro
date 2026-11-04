@@ -1,3 +1,4 @@
+import '../../shared/widgets/app_loader.dart';
 import 'package:flutter/material.dart';
 
 import '../../core/app_lang.dart';
@@ -283,7 +284,7 @@ class _BulkScholarshipScreenState extends State<BulkScholarshipScreen> {
       builder: (context, _, __) => BaseScaffold(
         title: AppLang.t('বাল্ক বৃত্তি প্রদান', 'Bulk Scholarship Entry'),
         body: _loading
-            ? const Center(child: CircularProgressIndicator())
+            ? const Center(child: AppLoader())
             : Column(
                 children: [
                   // Header controls

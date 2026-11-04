@@ -1,3 +1,4 @@
+import '../../shared/widgets/app_loader.dart';
 import 'dart:async';
 import 'package:flutter/material.dart';
 
@@ -211,7 +212,7 @@ class _DonorHomeScreenState extends State<DonorHomeScreen> {
             ),
 
             if (_loading)
-              const SliverFillRemaining(child: Center(child: CircularProgressIndicator()))
+              const SliverFillRemaining(child: Center(child: AppLoader()))
             else if (_error != null)
               SliverFillRemaining(
                 child: Center(

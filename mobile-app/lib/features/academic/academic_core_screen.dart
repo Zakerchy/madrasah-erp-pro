@@ -1,3 +1,4 @@
+import '../../shared/widgets/app_loader.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:share_plus/share_plus.dart';
@@ -370,7 +371,7 @@ class _AcademicCoreScreenState extends State<AcademicCoreScreen> {
           ),
         ],
         body: _loading
-            ? const Center(child: CircularProgressIndicator())
+            ? const Center(child: AppLoader())
             : LayoutBuilder(
                 builder: (context, constraints) {
                   final wide = constraints.maxWidth >= 980;

@@ -1,3 +1,4 @@
+import '../../shared/widgets/app_loader.dart';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -198,7 +199,7 @@ class _CommunicationDocumentsScreenState
               icon: const Icon(Icons.refresh))
         ],
         body: _loading
-            ? const Center(child: CircularProgressIndicator())
+            ? const Center(child: AppLoader())
             : LayoutBuilder(builder: (context, constraints) {
                 final wide = constraints.maxWidth >= 980;
                 return ListView(

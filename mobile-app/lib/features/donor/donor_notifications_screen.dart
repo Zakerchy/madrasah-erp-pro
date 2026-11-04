@@ -1,3 +1,4 @@
+import '../../shared/widgets/app_loader.dart';
 import 'package:flutter/material.dart';
 
 import '../../core/app_lang.dart';
@@ -44,7 +45,7 @@ class _DonorNotificationsScreenState extends State<DonorNotificationsScreen> {
     return Scaffold(
       appBar: AppBar(title: Text(AppLang.t('বিজ্ঞপ্তি', 'Notifications'))),
       body: _loading
-          ? const Center(child: CircularProgressIndicator())
+          ? const Center(child: AppLoader())
           : RefreshIndicator(
               onRefresh: _load,
               child: _notifications.isEmpty

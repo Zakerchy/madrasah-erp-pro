@@ -68,14 +68,20 @@
     .boot-logo {
       width: 74px;
       height: 74px;
-      border-radius: 24px;
+      border-radius: 50%;
       display: grid;
       place-items: center;
+      overflow: hidden;
       background: rgba(25, 183, 165, 0.12);
       border: 1px solid rgba(25, 183, 165, 0.35);
       box-shadow: 0 16px 40px rgba(0, 0, 0, 0.28);
       font-size: 34px;
       font-weight: 700;
+    }
+    .boot-logo img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
     }
     .boot-spinner {
       width: 34px;
@@ -101,7 +107,7 @@
 </head>
 <body>
   <div id="boot-splash" aria-live="polite">
-    <div class="boot-logo">M</div>
+    <div class="boot-logo"><img src="boot-logo.png" alt="" /></div>
     <div class="boot-spinner" aria-hidden="true"></div>
     <div class="boot-title">Madrasah ERP Pro</div>
     <div class="boot-subtitle">ডেটা ও অ্যাপ লোড হচ্ছে...</div>

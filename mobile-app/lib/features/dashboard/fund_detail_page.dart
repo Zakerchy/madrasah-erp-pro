@@ -1,3 +1,4 @@
+import '../../shared/widgets/app_loader.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
@@ -212,7 +213,7 @@ class _FundDetailPageState extends State<FundDetailPage> {
           // Transaction list
           Expanded(
             child: _loading
-                ? const Center(child: CircularProgressIndicator())
+                ? const Center(child: AppLoader())
                 : _error != null
                     ? Center(
                         child: Column(

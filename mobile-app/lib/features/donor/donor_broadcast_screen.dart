@@ -1,3 +1,4 @@
+import '../../shared/widgets/app_loader.dart';
 import 'package:flutter/material.dart';
 
 import '../../core/app_lang.dart';
@@ -309,7 +310,7 @@ class _DonorBroadcastScreenState extends State<DonorBroadcastScreen>
         children: [
           // Sent
           _loadingSent
-              ? const Center(child: CircularProgressIndicator())
+              ? const Center(child: AppLoader())
               : _sent.isEmpty
                   ? Center(child: Text(AppLang.t('কোনো বিজ্ঞপ্তি পাঠানো হয়নি', 'No notifications sent')))
                   : RefreshIndicator(
@@ -351,7 +352,7 @@ class _DonorBroadcastScreenState extends State<DonorBroadcastScreen>
                     ),
           // Schedules
           _loadingSchedules
-              ? const Center(child: CircularProgressIndicator())
+              ? const Center(child: AppLoader())
               : _schedules.isEmpty
                   ? Center(child: Text(AppLang.t('কোনো রিমাইন্ডার শিডিউল নেই', 'No reminder schedules')))
                   : RefreshIndicator(

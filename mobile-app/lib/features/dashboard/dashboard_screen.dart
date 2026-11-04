@@ -1,3 +1,4 @@
+import '../../shared/widgets/app_loader.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -628,7 +629,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           ],
         ),
         body: _loading
-            ? const Center(child: CircularProgressIndicator())
+            ? const Center(child: AppLoader())
             : _error != null
                 ? _ErrorView(error: _error!, onRetry: _load)
                 : _buildBody(),
@@ -1599,7 +1600,7 @@ class _RecentTransactionsCard extends StatelessWidget {
             ),
             const SizedBox(height: 10),
             if (loading)
-              const Center(child: CircularProgressIndicator())
+              const Center(child: AppLoader())
             else if (rows.isEmpty)
               Text(
                 'এই মাসে কোনো transaction data পাওয়া যায়নি।',
@@ -1703,7 +1704,7 @@ class _PremiumStatusCard extends StatelessWidget {
             ),
             const SizedBox(height: 10),
             if (loading)
-              const Center(child: CircularProgressIndicator())
+              const Center(child: AppLoader())
             else ...[
               Wrap(
                 spacing: 10,

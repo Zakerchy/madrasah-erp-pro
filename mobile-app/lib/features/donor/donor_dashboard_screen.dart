@@ -1,3 +1,4 @@
+import '../../shared/widgets/app_loader.dart';
 import 'package:flutter/material.dart';
 
 import '../../core/app_lang.dart';
@@ -91,7 +92,7 @@ class _SummaryTab extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    if (loading) return const Center(child: CircularProgressIndicator());
+    if (loading) return const Center(child: AppLoader());
     if (summary == null) {
       return Center(
         child: TextButton(onPressed: onRefresh, child: Text(AppLang.t('আবার চেষ্টা', 'Retry'))),
@@ -222,7 +223,7 @@ class _LedgerTab extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    if (loading) return const Center(child: CircularProgressIndicator());
+    if (loading) return const Center(child: AppLoader());
     if (txns.isEmpty) return Center(child: Text(AppLang.t('কোনো দান নেই', 'No donations yet')));
 
     return RefreshIndicator(

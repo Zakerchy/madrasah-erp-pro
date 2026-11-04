@@ -1,3 +1,4 @@
+import '../../shared/widgets/app_loader.dart';
 import 'package:flutter/material.dart';
 
 import '../../core/app_lang.dart';
@@ -264,7 +265,7 @@ class _ScholarshipScreenState extends State<ScholarshipScreen> {
       builder: (context, isEn, _) => BaseScaffold(
         title: AppLang.t('বৃত্তি', 'Scholarship'),
         body: _loading
-            ? const Center(child: CircularProgressIndicator())
+            ? const Center(child: AppLoader())
             : ListView(
                 padding: const EdgeInsets.all(16),
                 children: [
