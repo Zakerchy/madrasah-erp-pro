@@ -95,14 +95,19 @@ class _DonorLoginScreenState extends State<DonorLoginScreen> {
               Column(
                 children: [
                   OrgSettings.logoUrl.isNotEmpty
-                      ? ClipOval(
-                          child: SizedBox(
-                            width: 56,
-                            height: 56,
+                      ? Container(
+                          width: 64,
+                          height: 64,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            border: Border.all(color: cs.primary.withValues(alpha: 0.35)),
+                          ),
+                          padding: const EdgeInsets.all(3),
+                          child: ClipOval(
                             child: Image.network(
                               OrgSettings.logoUrl,
-                              width: 56,
-                              height: 56,
+                              width: 58,
+                              height: 58,
                               fit: BoxFit.cover,
                               errorBuilder: (_, __, ___) => Icon(Icons.mosque_rounded, size: 56, color: cs.primary),
                             ),

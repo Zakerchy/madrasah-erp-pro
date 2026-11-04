@@ -213,7 +213,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       child: Container(
                         width: 88,
                         height: 88,
-                        padding: const EdgeInsets.all(20),
+                        padding: EdgeInsets.all(OrgSettings.logoUrl.isNotEmpty ? 4 : 20),
                         decoration: BoxDecoration(
                           color: teal.withValues(alpha: 0.18),
                           shape: BoxShape.circle,
@@ -222,12 +222,12 @@ class _LoginScreenState extends State<LoginScreen> {
                         child: OrgSettings.logoUrl.isNotEmpty
                             ? ClipOval(
                                 child: SizedBox(
-                                  width: 48,
-                                  height: 48,
+                                  width: 80,
+                                  height: 80,
                                   child: Image.network(
                                     OrgSettings.logoUrl,
-                                    width: 48,
-                                    height: 48,
+                                    width: 80,
+                                    height: 80,
                                     fit: BoxFit.cover,
                                     errorBuilder: (_, __, ___) => Icon(Icons.school, color: teal, size: 48),
                                   ),
