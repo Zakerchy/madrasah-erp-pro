@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import '../../shared/models/session_user.dart';
 import '../../shared/services/api_service.dart';
 import '../../shared/services/org_settings_service.dart';
+import '../../shared/widgets/org_logo.dart';
 import '../donor/donor_login_screen.dart';
 import '../../shared/services/session_service.dart';
 
@@ -213,27 +214,13 @@ class _LoginScreenState extends State<LoginScreen> {
                       child: Container(
                         width: 88,
                         height: 88,
-                        padding: EdgeInsets.all(OrgSettings.logoUrl.isNotEmpty ? 4 : 20),
+                        padding: const EdgeInsets.all(4),
                         decoration: BoxDecoration(
                           color: teal.withValues(alpha: 0.18),
                           shape: BoxShape.circle,
                           border: Border.all(color: teal.withValues(alpha: 0.35)),
                         ),
-                        child: OrgSettings.logoUrl.isNotEmpty
-                            ? ClipOval(
-                                child: SizedBox(
-                                  width: 80,
-                                  height: 80,
-                                  child: Image.network(
-                                    OrgSettings.logoUrl,
-                                    width: 80,
-                                    height: 80,
-                                    fit: BoxFit.cover,
-                                    errorBuilder: (_, __, ___) => Icon(Icons.school, color: teal, size: 48),
-                                  ),
-                                ),
-                              )
-                            : Icon(Icons.school, color: teal, size: 48),
+                        child: const ClipOval(child: OrgLogo(size: 80)),
                       ),
                     ),
                     const SizedBox(height: 24),

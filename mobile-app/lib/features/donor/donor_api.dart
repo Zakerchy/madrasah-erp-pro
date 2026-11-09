@@ -89,4 +89,7 @@ class DonorApi {
         'donor_id': donorId,
         'donor_token': token,
       }});
+
+  static Future<Map<String, dynamic>> submitParticipationRequest(Map<String, dynamic> payload) =>
+      _post({'action': 'submitParticipationRequest', 'payload': payload});
 }

@@ -3,8 +3,12 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../../core/app_lang.dart';
+import '../../core/theme.dart';
+import '../../shared/constants/fund_types.dart';
 import '../../shared/services/org_settings_service.dart';
+import '../../shared/widgets/org_logo.dart';
 import '../auth/login_screen.dart';
+import '../donor/donor_api.dart';
 import '../donor/donor_login_screen.dart';
 
 /// Public home page — the first thing any visitor sees, no login needed.
@@ -23,11 +27,11 @@ class LandingScreen extends StatefulWidget {
 }
 
 class _LandingScreenState extends State<LandingScreen> {
-  static const _green = Color(0xFF0E4D3A);
-  static const _greenDark = Color(0xFF083024);
-  static const _gold = Color(0xFFC9A227);
-  static const _goldLight = Color(0xFFE6C861);
-  static const _cream = Color(0xFFFBF8F0);
+  static const _green = AppBrand.green;
+  static const _greenDark = AppBrand.greenDark;
+  static const _gold = AppBrand.gold;
+  static const _goldLight = AppBrand.goldLight;
+  static const _cream = AppBrand.cream;
 
   @override
   void initState() {
@@ -41,8 +45,23 @@ class _LandingScreenState extends State<LandingScreen> {
     Navigator.of(context).push(MaterialPageRoute(builder: (_) => const DonorLoginScreen()));
   }
 
+  void _openDonorPortalForFund(String fundKey) {
+    Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => DonorLoginScreen(initialFundType: fundKey)),
+    );
+  }
+
   void _openStaffLogin() {
     Navigator.of(context).push(MaterialPageRoute(builder: (_) => const LoginScreen()));
+  }
+
+  void _openParticipationForm({String? fundKey}) {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _ParticipationSheet(initialFundKey: fundKey),
+    );
   }
 
   @override
@@ -106,6 +125,62 @@ class _LandingScreenState extends State<LandingScreen> {
                           // gold scalloped divider into the cream body
                           const _ScallopDivider(),
                         ],
+                      ),
+                    ),
+
+                    // ── Our ongoing projects: donate or apply to participate ──
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(20, 24, 20, 4),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            AppLang.t('আমাদের চলমান প্রকল্পসমূহ', 'Our Ongoing Projects'),
+                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: _greenDark),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            AppLang.t(
+                              'যেকোনো খাতে সরাসরি দান করুন, অথবা প্রকল্পে অংশগ্রহণের আবেদন করুন',
+                              'Donate directly to any fund, or apply to participate in a project',
+                            ),
+                            style: const TextStyle(fontSize: 12.5, color: Color(0xFF5A5A5A)),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                    SizedBox(
+                      height: 176,
+                      child: ListView.separated(
+                        scrollDirection: Axis.horizontal,
+                        padding: const EdgeInsets.symmetric(horizontal: 20),
+                        itemCount: FundTypes.donorVisible.length,
+                        separatorBuilder: (_, __) => const SizedBox(width: 12),
+                        itemBuilder: (_, i) {
+                          final fund = FundTypes.donorVisible[i];
+                          return _ProjectCard(
+                            fund: fund,
+                            onDonate: () => _openDonorPortalForFund(fund.key),
+                          );
+                        },
+                      ),
+                    ),
+                    const SizedBox(height: 18),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 20),
+                      child: OutlinedButton.icon(
+                        onPressed: () => _openParticipationForm(),
+                        icon: const Icon(Icons.how_to_reg_rounded, size: 18, color: _green),
+                        label: Text(
+                          AppLang.t('প্রকল্পে অংশগ্রহণের আবেদন করুন', 'Apply to Participate in a Project'),
+                          style: const TextStyle(color: _green, fontWeight: FontWeight.w600),
+                        ),
+                        style: OutlinedButton.styleFrom(
+                          minimumSize: const Size.fromHeight(46),
+                          side: const BorderSide(color: _gold, width: 1.2),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
                       ),
                     ),
 
@@ -249,20 +324,9 @@ class _TopBar extends StatelessWidget {
       ),
       child: Row(
         children: [
-          _GoldRing(
+          const _GoldRing(
             size: 42,
-            child: ClipOval(
-              child: Container(
-                color: Colors.white,
-                child: OrgSettings.logoUrl.isNotEmpty
-                    ? Image.network(
-                        OrgSettings.logoUrl,
-                        fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) => const Icon(Icons.mosque_rounded, size: 18, color: _green),
-                      )
-                    : const Icon(Icons.mosque_rounded, size: 18, color: _green),
-              ),
-            ),
+            child: ClipOval(child: OrgLogo(size: 34)),
           ),
           Expanded(
             child: Padding(
@@ -633,6 +697,321 @@ class _PillarTile extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+IconData _fundIcon(String key) {
+  switch (key) {
+    case 'ZAKAT':
+      return Icons.account_balance_rounded;
+    case 'TALEBE_ELM':
+      return Icons.school_rounded;
+    case 'YATIM':
+      return Icons.family_restroom_rounded;
+    case 'BIA':
+      return Icons.favorite_rounded;
+    case 'EID':
+      return Icons.card_giftcard_rounded;
+    case 'IFTAR':
+      return Icons.restaurant_rounded;
+    case 'FITRA':
+      return Icons.volunteer_activism_rounded;
+    case 'LIBRARY':
+      return Icons.menu_book_rounded;
+    case 'WATER':
+      return Icons.water_drop_rounded;
+    default:
+      return Icons.mosque_rounded;
+  }
+}
+
+/// One project/fund card in the horizontal "Our Ongoing Projects" strip.
+class _ProjectCard extends StatelessWidget {
+  final FundType fund;
+  final VoidCallback onDonate;
+  const _ProjectCard({required this.fund, required this.onDonate});
+
+  static const _green = _LandingScreenState._green;
+  static const _greenDark = _LandingScreenState._greenDark;
+  static const _gold = _LandingScreenState._gold;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 172,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: _gold.withValues(alpha: 0.45)),
+        boxShadow: [
+          BoxShadow(color: _greenDark.withValues(alpha: 0.05), blurRadius: 10, offset: const Offset(0, 4)),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(color: _green.withValues(alpha: 0.08), shape: BoxShape.circle),
+            child: Icon(_fundIcon(fund.key), color: _green, size: 18),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            AppLang.t(fund.labelBn, fund.labelEn),
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12.5, color: _greenDark, height: 1.3),
+          ),
+          const SizedBox(height: 4),
+          Expanded(
+            child: Text(
+              fund.descBn,
+              maxLines: 3,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(fontSize: 10.5, color: Color(0xFF6B6B6B), height: 1.3),
+            ),
+          ),
+          SizedBox(
+            width: double.infinity,
+            height: 32,
+            child: ElevatedButton(
+              onPressed: onDonate,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: _green,
+                foregroundColor: Colors.white,
+                padding: EdgeInsets.zero,
+                elevation: 0,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              ),
+              child: Text(
+                AppLang.t('দান করুন', 'Donate'),
+                style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Bottom sheet: a visitor applies to participate in / support a project.
+/// Public — no donor login needed, just captures the lead for admin follow-up.
+class _ParticipationSheet extends StatefulWidget {
+  final String? initialFundKey;
+  const _ParticipationSheet({this.initialFundKey});
+
+  @override
+  State<_ParticipationSheet> createState() => _ParticipationSheetState();
+}
+
+class _ParticipationSheetState extends State<_ParticipationSheet> {
+  static const _green = _LandingScreenState._green;
+  static const _greenDark = _LandingScreenState._greenDark;
+  static const _gold = _LandingScreenState._gold;
+
+  final _name = TextEditingController();
+  final _phone = TextEditingController();
+  final _email = TextEditingController();
+  final _message = TextEditingController();
+  String? _fundKey;
+  bool _loading = false;
+  String? _error;
+  bool _done = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _fundKey = widget.initialFundKey;
+  }
+
+  @override
+  void dispose() {
+    _name.dispose();
+    _phone.dispose();
+    _email.dispose();
+    _message.dispose();
+    super.dispose();
+  }
+
+  Future<void> _submit() async {
+    final name = _name.text.trim();
+    final phone = _phone.text.trim();
+    if (name.isEmpty || phone.isEmpty) {
+      setState(() => _error = AppLang.t('নাম ও মোবাইল নম্বর দিন', 'Enter name and mobile number'));
+      return;
+    }
+    setState(() { _loading = true; _error = null; });
+    try {
+      final res = await DonorApi.submitParticipationRequest({
+        'name': name,
+        'phone': phone,
+        'email': _email.text.trim(),
+        'fund_interest': _fundKey ?? '',
+        'message': _message.text.trim(),
+      });
+      if (!mounted) return;
+      if (res['ok'] == true) {
+        setState(() => _done = true);
+      } else {
+        setState(() => _error = res['message'] as String? ?? AppLang.t('ত্রুটি হয়েছে', 'Something went wrong'));
+      }
+    } catch (e) {
+      setState(() => _error = AppLang.t('সংযোগ ত্রুটি', 'Connection error'));
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+      child: Container(
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
+          border: Border(top: BorderSide(color: _gold, width: 1.4)),
+        ),
+        padding: const EdgeInsets.fromLTRB(20, 14, 20, 24),
+        child: SingleChildScrollView(
+          child: _done ? _buildDone(context) : _buildForm(context),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDone(BuildContext context) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        const SizedBox(height: 8),
+        const Icon(Icons.check_circle_rounded, color: _green, size: 48),
+        const SizedBox(height: 12),
+        Text(
+          AppLang.t('জাযাকাল্লাহু খাইরান!', 'JazakAllahu Khayran!'),
+          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: _greenDark),
+        ),
+        const SizedBox(height: 6),
+        Text(
+          AppLang.t(
+            'আপনার আবেদন গ্রহণ করা হয়েছে। অ্যাডমিন শীঘ্রই যোগাযোগ করবেন।',
+            'Your application has been received. The admin will contact you soon.',
+          ),
+          textAlign: TextAlign.center,
+          style: const TextStyle(fontSize: 13, color: Color(0xFF5A5A5A)),
+        ),
+        const SizedBox(height: 20),
+        SizedBox(
+          width: double.infinity,
+          child: FilledButton(
+            onPressed: () => Navigator.of(context).pop(),
+            style: FilledButton.styleFrom(backgroundColor: _green),
+            child: Text(AppLang.t('বন্ধ করুন', 'Close')),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildForm(BuildContext context) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Center(
+          child: Container(
+            width: 40,
+            height: 4,
+            margin: const EdgeInsets.only(bottom: 14),
+            decoration: BoxDecoration(color: _gold.withValues(alpha: 0.4), borderRadius: BorderRadius.circular(2)),
+          ),
+        ),
+        Text(
+          AppLang.t('প্রকল্পে অংশগ্রহণের আবেদন', 'Apply to Participate'),
+          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: _greenDark),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          AppLang.t(
+            'আপনার তথ্য দিন, অ্যাডমিন আপনার সাথে যোগাযোগ করবেন।',
+            'Share your details and the admin will get in touch.',
+          ),
+          style: const TextStyle(fontSize: 12, color: Color(0xFF6B6B6B)),
+        ),
+        const SizedBox(height: 16),
+        TextField(
+          controller: _name,
+          decoration: InputDecoration(
+            labelText: AppLang.t('নাম *', 'Name *'),
+            border: const OutlineInputBorder(),
+          ),
+        ),
+        const SizedBox(height: 12),
+        TextField(
+          controller: _phone,
+          keyboardType: TextInputType.phone,
+          decoration: InputDecoration(
+            labelText: AppLang.t('মোবাইল নম্বর *', 'Mobile Number *'),
+            border: const OutlineInputBorder(),
+          ),
+        ),
+        const SizedBox(height: 12),
+        TextField(
+          controller: _email,
+          keyboardType: TextInputType.emailAddress,
+          decoration: InputDecoration(
+            labelText: AppLang.t('ইমেইল (ঐচ্ছিক)', 'Email (optional)'),
+            border: const OutlineInputBorder(),
+          ),
+        ),
+        const SizedBox(height: 12),
+        DropdownButtonFormField<String>(
+          initialValue: _fundKey,
+          decoration: InputDecoration(
+            labelText: AppLang.t('আগ্রহের প্রকল্প (ঐচ্ছিক)', 'Project of interest (optional)'),
+            border: const OutlineInputBorder(),
+          ),
+          items: FundTypes.donorVisible
+              .map((f) => DropdownMenuItem(value: f.key, child: Text(AppLang.t(f.labelBn, f.labelEn))))
+              .toList(),
+          onChanged: (v) => setState(() => _fundKey = v),
+        ),
+        const SizedBox(height: 12),
+        TextField(
+          controller: _message,
+          minLines: 2,
+          maxLines: 4,
+          decoration: InputDecoration(
+            labelText: AppLang.t('বার্তা (ঐচ্ছিক)', 'Message (optional)'),
+            border: const OutlineInputBorder(),
+          ),
+        ),
+        if (_error != null) ...[
+          const SizedBox(height: 8),
+          Text(_error!, style: const TextStyle(color: Colors.red, fontSize: 12.5)),
+        ],
+        const SizedBox(height: 16),
+        SizedBox(
+          height: 50,
+          child: ElevatedButton(
+            onPressed: _loading ? null : _submit,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: _green,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+                side: const BorderSide(color: _gold, width: 1.1),
+              ),
+            ),
+            child: _loading
+                ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                : Text(AppLang.t('আবেদন পাঠান', 'Submit Application'), style: const TextStyle(fontWeight: FontWeight.bold)),
+          ),
+        ),
+      ],
     );
   }
 }

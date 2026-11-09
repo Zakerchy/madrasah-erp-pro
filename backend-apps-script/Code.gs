@@ -41,6 +41,7 @@ const CONFIG = {
     EXPENSE_DONOR_LINKS: 'expense_donor_links',
     DONOR_NOTIFICATIONS: 'donor_notifications',
     DONOR_REMINDER_SCHEDULES: 'donor_reminder_schedules',
+    PARTICIPATION_REQUESTS: 'participation_requests',
   },
   ENUMS: {
     ROLE: ['ADMIN', 'ACCOUNTANT', 'FIELD_USER', 'VIEWER'],
@@ -247,6 +248,7 @@ function handleRequest_(params) {
     if (action === 'donorMyTransactions') return json(donorMyTransactions_(params.payload));
     if (action === 'donorMyNotifications') return json(donorMyNotifications_(params.payload));
     if (action === 'donorUploadSlip') return json(donorUploadSlip_(params.payload));
+    if (action === 'submitParticipationRequest') return json(submitParticipationRequest_(params.payload));
 
     params.action = action;
     assertActionPermission_(params, action);
@@ -3689,6 +3691,46 @@ function donorRegister_(payload) {
     notes: String(payload.notes || '').trim(),
   }, ['phone']); // Plain Text format — survives later full-row rewrites (e.g. approve)
   return { ok: true, message: 'রেজিস্ট্রেশন সম্পন্ন। অ্যাডমিন অনুমোদনের পর লগইন করতে পারবেন।', id };
+}
+
+/** Public — no auth. A visitor from the landing page applying to
+ *  participate in / support a specific project (not a monetary donation —
+ *  that still goes through donor registration + login). Just captures the
+ *  lead for the admin to follow up with by phone. */
+function submitParticipationRequest_(payload) {
+  payload = payload || {};
+  const name = String(payload.name || '').trim();
+  const phone = String(payload.phone || '').trim().replace(/\D/g, '');
+  if (!name) return { ok: false, message: 'নাম দিন' };
+  if (!phone || phone.length < 10) return { ok: false, message: 'সঠিক ফোন নম্বর দিন' };
+
+  appendRow_(CONFIG.SHEETS.PARTICIPATION_REQUESTS, {
+    id: uid_('pr'),
+    name,
+    phone,
+    email: String(payload.email || '').trim(),
+    fund_interest: String(payload.fund_interest || '').trim(),
+    message: String(payload.message || '').trim(),
+    status: 'NEW',
+    created_at: nowIso(),
+  }, ['phone']);
+  return { ok: true, message: 'ধন্যবাদ! আপনার আবেদন গ্রহণ করা হয়েছে। অ্যাডমিন শীঘ্রই যোগাযোগ করবেন।' };
+}
+
+/** One-off setup — run manually once from the Apps Script editor (same
+ *  convention as setupDonorNotificationsSheet). Creates the sheet tab that
+ *  submitParticipationRequest_ writes to, with the exact header row
+ *  appendRow_ needs. Safe to re-run — does nothing if the tab already exists. */
+function setupParticipationRequestsSheet() {
+  const ss = SpreadsheetApp.openById(getSheetId_());
+  if (ss.getSheetByName(CONFIG.SHEETS.PARTICIPATION_REQUESTS)) return 'Already exists — nothing to do.';
+  const sheet = ss.insertSheet(CONFIG.SHEETS.PARTICIPATION_REQUESTS);
+  sheet.getRange(1, 1, 1, 8).setValues([[
+    'id', 'name', 'phone', 'email', 'fund_interest', 'message', 'status', 'created_at',
+  ]]);
+  sheet.getRange(1, 1, 1, 8).setFontWeight('bold');
+  sheet.setFrozenRows(1);
+  return 'Created participation_requests sheet.';
 }
 
 /** Public — no auth. Phone + pin_hash login. */

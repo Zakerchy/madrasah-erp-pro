@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import '../../core/app_lang.dart';
 import '../constants/fund_types.dart';
 import '../services/org_settings_service.dart';
+import 'org_logo.dart';
 
 /// The printable/shareable donation receipt — rendered to a fixed-size
 /// canvas so it captures identically as a PNG regardless of screen size.
@@ -71,21 +72,10 @@ class DonationInvoiceView extends StatelessWidget {
           // Header: org branding
           Row(
             children: [
-              if (OrgSettings.logoUrl.isNotEmpty)
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(8),
-                  child: SizedBox(
-                    width: 60,
-                    height: 60,
-                    child: Image.network(
-                      OrgSettings.logoUrl,
-                      width: 60, height: 60, fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) => const Icon(Icons.business, size: 50, color: Color(0xFF14786B)),
-                    ),
-                  ),
-                )
-              else
-                const Icon(Icons.business, size: 50, color: Color(0xFF14786B)),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(8),
+                child: const SizedBox(width: 60, height: 60, child: OrgLogo(size: 60)),
+              ),
               const SizedBox(width: 14),
               Expanded(
                 child: Column(

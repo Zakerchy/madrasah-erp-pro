@@ -11,7 +11,11 @@ import 'donor_api.dart';
 import 'donor_session.dart';
 
 class DonorDonateScreen extends StatefulWidget {
-  const DonorDonateScreen({super.key});
+  /// Preselects the fund dropdown — used when a visitor arrives here from
+  /// a specific project card on the public landing page.
+  final String? initialFundType;
+
+  const DonorDonateScreen({super.key, this.initialFundType});
 
   @override
   State<DonorDonateScreen> createState() => _DonorDonateScreenState();
@@ -24,7 +28,7 @@ class _DonorDonateScreenState extends State<DonorDonateScreen> {
   final _notes = TextEditingController();
   final _formKey = GlobalKey<FormState>();
 
-  String _fundType = 'SADAQAH';
+  late String _fundType = widget.initialFundType ?? 'SADAQAH';
   String _currency = 'BDT';
   String _method = 'CASH';
   bool _loading = false;

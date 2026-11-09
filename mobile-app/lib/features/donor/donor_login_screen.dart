@@ -2,14 +2,21 @@ import 'package:flutter/material.dart';
 
 import '../../core/app_lang.dart';
 import '../../shared/services/org_settings_service.dart';
+import '../../shared/widgets/org_logo.dart';
 import 'donor_api.dart';
 import 'donor_session.dart';
+import 'donor_donate_screen.dart';
 import 'donor_home_screen.dart';
 import 'donor_signup_screen.dart';
 import 'widgets/islamic_slider.dart';
 
 class DonorLoginScreen extends StatefulWidget {
-  const DonorLoginScreen({super.key});
+  /// When set (e.g. a visitor tapped "Donate" on a specific fund from the
+  /// public landing page), a successful login goes straight to the donate
+  /// form with this fund preselected, instead of the donor home screen.
+  final String? initialFundType;
+
+  const DonorLoginScreen({super.key, this.initialFundType});
 
   @override
   State<DonorLoginScreen> createState() => _DonorLoginScreenState();
@@ -44,9 +51,21 @@ class _DonorLoginScreenState extends State<DonorLoginScreen> {
           Map<String, dynamic>.from(res['donor'] as Map),
         );
         if (!mounted) return;
-        Navigator.of(context).pushReplacement(
-          MaterialPageRoute(builder: (_) => const DonorHomeScreen()),
-        );
+        if (widget.initialFundType != null) {
+          // Land on the home screen first so the donate screen's own
+          // "back"/"done" navigation behaves exactly like the normal flow.
+          Navigator.of(context).pushAndRemoveUntil(
+            MaterialPageRoute(builder: (_) => const DonorHomeScreen()),
+            (route) => false,
+          );
+          Navigator.of(context).push(
+            MaterialPageRoute(builder: (_) => DonorDonateScreen(initialFundType: widget.initialFundType)),
+          );
+        } else {
+          Navigator.of(context).pushReplacement(
+            MaterialPageRoute(builder: (_) => const DonorHomeScreen()),
+          );
+        }
       } else {
         setState(() => _error = res['message'] as String? ?? AppLang.t('লগইন ব্যর্থ', 'Login failed'));
       }
@@ -94,26 +113,16 @@ class _DonorLoginScreenState extends State<DonorLoginScreen> {
               // Logo / title
               Column(
                 children: [
-                  OrgSettings.logoUrl.isNotEmpty
-                      ? Container(
-                          width: 64,
-                          height: 64,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            border: Border.all(color: cs.primary.withValues(alpha: 0.35)),
-                          ),
-                          padding: const EdgeInsets.all(3),
-                          child: ClipOval(
-                            child: Image.network(
-                              OrgSettings.logoUrl,
-                              width: 58,
-                              height: 58,
-                              fit: BoxFit.cover,
-                              errorBuilder: (_, __, ___) => Icon(Icons.mosque_rounded, size: 56, color: cs.primary),
-                            ),
-                          ),
-                        )
-                      : Icon(Icons.mosque_rounded, size: 56, color: cs.primary),
+                  Container(
+                    width: 64,
+                    height: 64,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      border: Border.all(color: cs.primary.withValues(alpha: 0.35)),
+                    ),
+                    padding: const EdgeInsets.all(3),
+                    child: const ClipOval(child: OrgLogo(size: 58)),
+                  ),
                   const SizedBox(height: 8),
                   Text(
                     AppLang.t('দানকারী পোর্টাল', 'Donor Portal'),
