@@ -146,3 +146,48 @@ npx clasp push
 /Users/zakerchy/Desktop/MadrasahApp/.local-tools/flutter/bin/flutter analyze --no-fatal-infos
 ```
 (working dir: `mobile-app/`)
+
+---
+
+## `clasp run` enable করা (একবার — তারপর Claude নিজেই function run করতে পারবে)
+
+`clasp push` কাজ করে কিন্তু `clasp run` করতে গেলে `NOT_FOUND` error আসে।
+কারণ: Apps Script Execution API + GCP OAuth credentials সেট করা নেই।
+
+### ধাপ ১ — Apps Script-এ GCP project link করুন
+1. https://script.google.com → Madrasah project খুলুন
+2. **Project Settings** (বাম পাশে gear icon) → "Google Cloud Platform (GCP) Project" section
+3. **Change project** → আপনার GCP Project Number দিন
+   (GCP Console → https://console.cloud.google.com → project select → Dashboard → Project number)
+
+### ধাপ ২ — Execution API enable করুন
+1. GCP Console → **APIs & Services** → **Library**
+2. "Apps Script API" খুঁজুন → **Enable**
+
+### ধাপ ৩ — OAuth Desktop credentials তৈরি করুন
+1. GCP Console → **APIs & Services** → **Credentials**
+2. **Create Credentials** → **OAuth client ID**
+3. Application type: **Desktop app** → নাম দিন (যেমন "clasp-madrasah")
+4. **Download JSON** → ফাইলটা save করুন (যেমন `credentials.json`)
+
+### ধাপ ৪ — clasp কে credentials দিন
+```bash
+cd /Users/zakerchy/Desktop/MadrasahApp/madrasah-erp-pro/backend-apps-script
+npx clasp login --creds /path/to/credentials.json
+```
+এটা browser খুলবে → Google account দিয়ে authorize করুন।
+একটা `.clasprc.json` বা `~/.clasprc.json` তৈরি হবে।
+
+### ধাপ ৫ — test করুন
+```bash
+npx clasp run setupDonorSheets
+npx clasp run migrateFundKeys
+```
+সফল হলে output আসবে, NOT_FOUND আসবে না।
+
+### ⚠️ সমস্যা হলে
+- `Error: Script function not found` → function name ঠিক আছে কিনা দেখুন (case-sensitive)
+- `Error: User has not enabled the Apps Script API` → ধাপ ২ আবার করুন
+- `Insufficient Permission` → `.clasprc.json` এ `oauth2ClientSettings` আছে কিনা দেখুন; `npx clasp login --creds` আবার করুন
+
+এই setup একবার করলেই হবে — পরে নতুন session-এ Claude `npx clasp run <functionName>` দিয়েই সরাসরি Apps Script function চালাতে পারবে।
