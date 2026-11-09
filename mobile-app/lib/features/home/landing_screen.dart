@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../../core/app_lang.dart';
@@ -50,225 +52,171 @@ class _LandingScreenState extends State<LandingScreen> {
     return Scaffold(
       backgroundColor: _cream,
       body: SafeArea(
-        child: SingleChildScrollView(
-          child: Column(
-            children: [
-              // ── Hero band: deep green, gold trim ────────────────────────
-              Container(
-                width: double.infinity,
-                decoration: const BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [_greenDark, _green],
-                  ),
-                ),
+        child: Column(
+          children: [
+            // ── Top bar: logo left, name centered, portal/login on the right ──
+            _TopBar(onDonorPortal: _openDonorPortal, onStaffLogin: _openStaffLogin),
+
+            Expanded(
+              child: SingleChildScrollView(
                 child: Column(
                   children: [
-                    const SizedBox(height: 34),
-                    _GoldRing(
-                      size: 128,
-                      child: ClipOval(
-                        child: Container(
-                          color: Colors.white,
-                          child: OrgSettings.logoUrl.isNotEmpty
-                              ? Image.network(
-                                  OrgSettings.logoUrl,
-                                  fit: BoxFit.cover,
-                                  errorBuilder: (_, __, ___) =>
-                                      const Icon(Icons.mosque_rounded, size: 56, color: _green),
-                                )
-                              : const Icon(Icons.mosque_rounded, size: 56, color: _green),
+                    // ── Hero band: deep green, gold trim ────────────────────
+                    Container(
+                      width: double.infinity,
+                      decoration: const BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                          colors: [_greenDark, _green],
                         ),
                       ),
-                    ),
-                    const SizedBox(height: 20),
-                    const Text(
-                      'بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ',
-                      style: TextStyle(fontSize: 16, color: _goldLight, letterSpacing: 0.6),
-                    ),
-                    const SizedBox(height: 12),
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 24),
-                      child: Text(
-                        OrgSettings.nameBn,
-                        textAlign: TextAlign.center,
-                        style: const TextStyle(
-                          fontSize: 26,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
-                          height: 1.25,
-                        ),
+                      child: Column(
+                        children: [
+                          const SizedBox(height: 26),
+                          const Text(
+                            'بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ',
+                            style: TextStyle(fontSize: 16, color: _goldLight, letterSpacing: 0.6),
+                          ),
+                          const SizedBox(height: 10),
+                          Text(
+                            AppLang.t('আস-সালামু আলাইকুম ওয়া রাহমাতুল্লাহ', 'As-salamu alaykum wa rahmatullah'),
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(color: Colors.white70, fontSize: 13.5),
+                          ),
+                          const SizedBox(height: 18),
+                          Wrap(
+                            spacing: 10,
+                            runSpacing: 10,
+                            alignment: WrapAlignment.center,
+                            children: [
+                              _InfoPill(icon: Icons.calendar_today_rounded, text: AppLang.t('প্রতিষ্ঠাকাল ২০১২', 'Est. 2012')),
+                              _InfoPill(icon: Icons.location_on_rounded, text: AppLang.t('পূর্ব নাসিরাবাদ, চট্টগ্রাম', 'East Nasirabad, Chattogram')),
+                            ],
+                          ),
+                          const SizedBox(height: 24),
+                          Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 20),
+                            child: ConstrainedBox(
+                              constraints: const BoxConstraints(maxWidth: 600),
+                              child: const _VerseSlider(),
+                            ),
+                          ),
+                          const SizedBox(height: 28),
+                          // gold scalloped divider into the cream body
+                          const _ScallopDivider(),
+                        ],
                       ),
                     ),
-                    const SizedBox(height: 6),
-                    Text(
-                      AppLang.t('আস-সালামু আলাইকুম ওয়া রাহমাতুল্লাহ', 'As-salamu alaykum wa rahmatullah'),
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(color: Colors.white70, fontSize: 13.5),
-                    ),
-                    const SizedBox(height: 20),
-                    Wrap(
-                      spacing: 10,
-                      runSpacing: 10,
-                      alignment: WrapAlignment.center,
-                      children: [
-                        _InfoPill(icon: Icons.calendar_today_rounded, text: AppLang.t('প্রতিষ্ঠাকাল ২০১২', 'Est. 2012')),
-                        _InfoPill(icon: Icons.location_on_rounded, text: AppLang.t('পূর্ব নাসিরাবাদ, চট্টগ্রাম', 'East Nasirabad, Chattogram')),
-                      ],
-                    ),
-                    const SizedBox(height: 28),
-                    // gold scalloped divider into the cream body
-                    const _ScallopDivider(),
-                  ],
-                ),
-              ),
 
-              Padding(
-                padding: const EdgeInsets.fromLTRB(20, 24, 20, 36),
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 640),
-                  child: Column(
-                    children: [
-                      // ── About / mission ──────────────────────────────────
-                      _GoldBorderCard(
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(20, 24, 20, 36),
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: 640),
                         child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
+                            // ── About / mission ──────────────────────────────────
+                            _GoldBorderCard(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    children: [
+                                      Container(
+                                        padding: const EdgeInsets.all(8),
+                                        decoration: BoxDecoration(
+                                          color: _green.withValues(alpha: 0.08),
+                                          shape: BoxShape.circle,
+                                        ),
+                                        child: const Icon(Icons.auto_stories_rounded, color: _green, size: 20),
+                                      ),
+                                      const SizedBox(width: 10),
+                                      Text(
+                                        AppLang.t('আমাদের সম্পর্কে', 'About Us'),
+                                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 17, color: _greenDark),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 14),
+                                  Text(
+                                    about.isNotEmpty ? about : _defaultAbout,
+                                    style: const TextStyle(fontSize: 14.5, height: 1.75, color: Color(0xFF3A3A3A)),
+                                  ),
+                                ],
+                              ),
+                            ),
+
+                            const SizedBox(height: 20),
+
+                            // ── Our pillars ──────────────────────────────────────
                             Row(
                               children: [
-                                Container(
-                                  padding: const EdgeInsets.all(8),
-                                  decoration: BoxDecoration(
-                                    color: _green.withValues(alpha: 0.08),
-                                    shape: BoxShape.circle,
+                                Expanded(
+                                  child: _PillarTile(
+                                    icon: Icons.menu_book_rounded,
+                                    title: AppLang.t('কুরআন-সুন্নাহ', 'Qur\'an & Sunnah'),
                                   ),
-                                  child: const Icon(Icons.auto_stories_rounded, color: _green, size: 20),
                                 ),
-                                const SizedBox(width: 10),
-                                Text(
-                                  AppLang.t('আমাদের সম্পর্কে', 'About Us'),
-                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 17, color: _greenDark),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: _PillarTile(
+                                    icon: Icons.favorite_rounded,
+                                    title: AppLang.t('নৈতিক গঠন', 'Moral Formation'),
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: _PillarTile(
+                                    icon: Icons.volunteer_activism_rounded,
+                                    title: AppLang.t('জনসেবা', 'Community Service'),
+                                  ),
                                 ),
                               ],
                             ),
-                            const SizedBox(height: 14),
-                            Text(
-                              about.isNotEmpty ? about : _defaultAbout,
-                              style: const TextStyle(fontSize: 14.5, height: 1.75, color: Color(0xFF3A3A3A)),
-                            ),
-                          ],
-                        ),
-                      ),
 
-                      const SizedBox(height: 20),
+                            const SizedBox(height: 28),
 
-                      // ── Our pillars ──────────────────────────────────────
-                      Row(
-                        children: [
-                          Expanded(
-                            child: _PillarTile(
-                              icon: Icons.menu_book_rounded,
-                              title: AppLang.t('কুরআন-সুন্নাহ', 'Qur\'an & Sunnah'),
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: _PillarTile(
-                              icon: Icons.favorite_rounded,
-                              title: AppLang.t('নৈতিক গঠন', 'Moral Formation'),
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: _PillarTile(
-                              icon: Icons.volunteer_activism_rounded,
-                              title: AppLang.t('জনসেবা', 'Community Service'),
-                            ),
-                          ),
-                        ],
-                      ),
-
-                      const SizedBox(height: 20),
-
-                      // ── Ayah ─────────────────────────────────────────────
-                      Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.all(20),
-                        decoration: BoxDecoration(
-                          gradient: const LinearGradient(
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                            colors: [_green, _greenDark],
-                          ),
-                          borderRadius: BorderRadius.circular(18),
-                          border: Border.all(color: _gold, width: 1.2),
-                        ),
-                        child: Column(
-                          children: [
-                            const Text(
-                              'وَأَقِيمُوا الصَّلَاةَ وَآتُوا الزَّكَاةَ وَمَا تُقَدِّمُوا لِأَنفُسِكُم مِّنْ خَيْرٍ تَجِدُوهُ عِندَ اللَّهِ',
-                              textAlign: TextAlign.center,
-                              style: TextStyle(color: _goldLight, fontSize: 16, height: 1.7),
-                            ),
-                            const SizedBox(height: 10),
-                            Text(
-                              AppLang.t(
-                                'নামায কায়েম করো, যাকাত আদায় করো, এবং নিজেদের জন্য যা কল্যাণ পাঠাবে তা আল্লাহর কাছে পাবে।',
-                                'Establish prayer, give zakat, and whatever good you put forth for yourselves, you will find it with Allah.',
+                            // ── CTAs ──────────────────────────────────────────────
+                            SizedBox(
+                              width: double.infinity,
+                              height: 54,
+                              child: ElevatedButton.icon(
+                                onPressed: _openDonorPortal,
+                                icon: const Icon(Icons.volunteer_activism_rounded),
+                                label: Text(
+                                  AppLang.t('দান করুন / দানকারী পোর্টাল', 'Donate / Donor Portal'),
+                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15.5),
+                                ),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: _green,
+                                  foregroundColor: Colors.white,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(14),
+                                    side: const BorderSide(color: _gold, width: 1.2),
+                                  ),
+                                  elevation: 0,
+                                ),
                               ),
-                              textAlign: TextAlign.center,
-                              style: const TextStyle(color: Colors.white, fontSize: 13, height: 1.6),
                             ),
-                            const SizedBox(height: 8),
-                            Text(
-                              AppLang.t('— সূরা বাকারাহ, ২:১১০', '— Surah Al-Baqarah, 2:110'),
-                              style: const TextStyle(color: Colors.white54, fontSize: 11.5),
+
+                            const SizedBox(height: 20),
+                            TextButton.icon(
+                              onPressed: _openStaffLogin,
+                              icon: const Icon(Icons.admin_panel_settings_outlined, size: 18, color: _green),
+                              label: Text(
+                                AppLang.t('স্টাফ লগইন', 'Staff Login'),
+                                style: const TextStyle(color: _green, fontWeight: FontWeight.w600),
+                              ),
                             ),
                           ],
                         ),
                       ),
-
-                      const SizedBox(height: 28),
-
-                      // ── CTAs ──────────────────────────────────────────────
-                      SizedBox(
-                        width: double.infinity,
-                        height: 54,
-                        child: ElevatedButton.icon(
-                          onPressed: _openDonorPortal,
-                          icon: const Icon(Icons.volunteer_activism_rounded),
-                          label: Text(
-                            AppLang.t('দান করুন / দানকারী পোর্টাল', 'Donate / Donor Portal'),
-                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15.5),
-                          ),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: _green,
-                            foregroundColor: Colors.white,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(14),
-                              side: const BorderSide(color: _gold, width: 1.2),
-                            ),
-                            elevation: 0,
-                          ),
-                        ),
-                      ),
-
-                      const SizedBox(height: 20),
-                      TextButton.icon(
-                        onPressed: _openStaffLogin,
-                        icon: const Icon(Icons.admin_panel_settings_outlined, size: 18, color: _green),
-                        label: Text(
-                          AppLang.t('স্টাফ লগইন', 'Staff Login'),
-                          style: const TextStyle(color: _green, fontWeight: FontWeight.w600),
-                        ),
-                      ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
@@ -278,6 +226,262 @@ class _LandingScreenState extends State<LandingScreen> {
       'আল-মদীনাতুল মুনাওওয়ারাহ্‌ কমপ্লেক্স ২০১২ সাল থেকে পূর্ব নাসিরাবাদ, চট্টগ্রামে একটি দ্বীনি শিক্ষা প্রতিষ্ঠান হিসেবে পরিচালিত হয়ে আসছে। '
       'আমাদের লক্ষ্য কুরআন-সুন্নাহর আলোকে শিক্ষার্থীদের নৈতিক, আত্মিক ও ধর্মীয় শিক্ষায় গড়ে তোলা। আপনাদের দান ও সহযোগিতা আমাদের এই দ্বীনি খেদমত '
       'অব্যাহত রাখতে সাহায্য করে — জাযাকাল্লাহু খাইরান।';
+}
+
+/// Sticky top bar: logo on the left, org name centered, a portal/login
+/// dropdown on the right — the public page's quick-access nav.
+class _TopBar extends StatelessWidget {
+  final VoidCallback onDonorPortal;
+  final VoidCallback onStaffLogin;
+  const _TopBar({required this.onDonorPortal, required this.onStaffLogin});
+
+  static const _green = _LandingScreenState._green;
+  static const _greenDark = _LandingScreenState._greenDark;
+  static const _gold = _LandingScreenState._gold;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        border: Border(bottom: BorderSide(color: _gold.withValues(alpha: 0.35))),
+      ),
+      child: Row(
+        children: [
+          _GoldRing(
+            size: 42,
+            child: ClipOval(
+              child: Container(
+                color: Colors.white,
+                child: OrgSettings.logoUrl.isNotEmpty
+                    ? Image.network(
+                        OrgSettings.logoUrl,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) => const Icon(Icons.mosque_rounded, size: 18, color: _green),
+                      )
+                    : const Icon(Icons.mosque_rounded, size: 18, color: _green),
+              ),
+            ),
+          ),
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+              child: Text(
+                OrgSettings.nameBn,
+                textAlign: TextAlign.center,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: _greenDark),
+              ),
+            ),
+          ),
+          PopupMenuButton<int>(
+            onSelected: (v) => v == 0 ? onDonorPortal() : onStaffLogin(),
+            offset: const Offset(0, 46),
+            color: Colors.white,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+              side: BorderSide(color: _gold.withValues(alpha: 0.5)),
+            ),
+            itemBuilder: (_) => [
+              PopupMenuItem(
+                value: 0,
+                child: Row(
+                  children: [
+                    const Icon(Icons.volunteer_activism_rounded, size: 18, color: _green),
+                    const SizedBox(width: 10),
+                    Text(AppLang.t('দানকারী পোর্টাল', 'Donor Portal')),
+                  ],
+                ),
+              ),
+              PopupMenuItem(
+                value: 1,
+                child: Row(
+                  children: [
+                    const Icon(Icons.admin_panel_settings_outlined, size: 18, color: _green),
+                    const SizedBox(width: 10),
+                    Text(AppLang.t('স্টাফ লগইন', 'Staff Login')),
+                  ],
+                ),
+              ),
+            ],
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+              decoration: BoxDecoration(
+                color: _green.withValues(alpha: 0.07),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: _gold.withValues(alpha: 0.5)),
+              ),
+              child: const Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.account_circle_outlined, size: 18, color: _green),
+                  SizedBox(width: 4),
+                  Icon(Icons.keyboard_arrow_down_rounded, size: 16, color: _green),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _VerseSlide {
+  final String arabic;
+  final String bangla;
+  final String source;
+  const _VerseSlide({required this.arabic, required this.bangla, required this.source});
+}
+
+const _verseSlides = [
+  _VerseSlide(
+    arabic: 'وَأَقِيمُواْ الصَّلاَةَ وَآتُواْ الزَّكَاةَ وَمَا تُقَدِّمُواْ لِأَنفُسِكُم مِّنْ خَيْرٍ تَجِدُوهُ عِندَ اللّهِ',
+    bangla: 'নামায কায়েম করো, যাকাত আদায় করো, এবং নিজেদের জন্য যা কল্যাণ পাঠাবে তা আল্লাহর কাছে পাবে।',
+    source: 'সূরা বাকারাহ, ২:১১০',
+  ),
+  _VerseSlide(
+    arabic: 'مَن ذَا الَّذِي يُقْرِضُ اللَّهَ قَرْضًا حَسَنًا فَيُضَاعِفَهُ لَهُ وَلَهُ أَجْرٌ كَرِيمٌ',
+    bangla: 'কে আল্লাহকে উত্তম ঋণ দেবে, যা তিনি তার জন্য বহুগুণে বৃদ্ধি করে দেবেন এবং তার জন্য রয়েছে সম্মানজনক পুরস্কার।',
+    source: 'সূরা হাদীদ, ৫৭:১১',
+  ),
+  _VerseSlide(
+    arabic: 'إِنَّ الْمُصَّدِّقِينَ وَالْمُصَّدِّقَاتِ وَأَقْرَضُوا اللَّهَ قَرْضًا حَسَنًا يُضَاعَفُ لَهُمْ',
+    bangla: 'যে পুরুষ ও নারীরা সাদাকাহ দেয় এবং আল্লাহকে উত্তম ঋণ দেয়, তাদের পুরস্কার বহুগুণে বাড়িয়ে দেওয়া হবে।',
+    source: 'সূরা হাদীদ, ৫৭:১৮',
+  ),
+  _VerseSlide(
+    arabic: '',
+    bangla: '"সদকা কখনো সম্পদ কমায় না।"',
+    source: 'হাদীস — সহীহ মুসলিম',
+  ),
+  _VerseSlide(
+    arabic: '',
+    bangla: '"তোমাদের মধ্যে উত্তম সেই, যে মানুষের সবচেয়ে বেশি উপকার করে।"',
+    source: 'হাদীস — আল-মুজামুল আওসাত',
+  ),
+];
+
+/// Auto-rotating carousel of Qur'an/Hadith sayings about charity, styled to
+/// match the landing page (white card, gold border, deep-green text) so it
+/// reads as part of the same design language, not a bolted-on widget.
+class _VerseSlider extends StatefulWidget {
+  const _VerseSlider();
+
+  @override
+  State<_VerseSlider> createState() => _VerseSliderState();
+}
+
+class _VerseSliderState extends State<_VerseSlider> {
+  static const _green = _LandingScreenState._green;
+  static const _greenDark = _LandingScreenState._greenDark;
+  static const _gold = _LandingScreenState._gold;
+
+  final _controller = PageController();
+  int _page = 0;
+  Timer? _timer;
+
+  @override
+  void initState() {
+    super.initState();
+    _timer = Timer.periodic(const Duration(seconds: 6), (_) {
+      if (!mounted || !_controller.hasClients) return;
+      final next = (_page + 1) % _verseSlides.length;
+      _controller.animateToPage(next, duration: const Duration(milliseconds: 600), curve: Curves.easeInOut);
+    });
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 190,
+      padding: const EdgeInsets.symmetric(vertical: 16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: _gold, width: 1.2),
+        boxShadow: [
+          BoxShadow(color: _greenDark.withValues(alpha: 0.18), blurRadius: 16, offset: const Offset(0, 6)),
+        ],
+      ),
+      child: Column(
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.format_quote_rounded, color: _gold.withValues(alpha: 0.7), size: 18),
+              const SizedBox(width: 6),
+              Text(
+                AppLang.t('দান সম্পর্কে', 'On Charity'),
+                style: const TextStyle(color: _gold, fontWeight: FontWeight.bold, fontSize: 12, letterSpacing: 0.4),
+              ),
+            ],
+          ),
+          Expanded(
+            child: PageView.builder(
+              controller: _controller,
+              itemCount: _verseSlides.length,
+              onPageChanged: (i) => setState(() => _page = i),
+              itemBuilder: (_, i) {
+                final s = _verseSlides[i];
+                return Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      if (s.arabic.isNotEmpty)
+                        Text(
+                          s.arabic,
+                          textAlign: TextAlign.center,
+                          textDirection: TextDirection.rtl,
+                          style: const TextStyle(fontSize: 14, color: _green, fontFamily: 'serif', height: 1.7, fontWeight: FontWeight.w600),
+                        ),
+                      if (s.arabic.isNotEmpty) const SizedBox(height: 8),
+                      Text(
+                        s.bangla,
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(fontSize: 13, color: Color(0xFF3A3A3A), height: 1.5),
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        '— ${s.source}',
+                        style: TextStyle(fontSize: 11, color: _gold.withValues(alpha: 0.9), fontStyle: FontStyle.italic),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
+          ),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: List.generate(
+              _verseSlides.length,
+              (i) => AnimatedContainer(
+                duration: const Duration(milliseconds: 300),
+                margin: const EdgeInsets.symmetric(horizontal: 3),
+                width: _page == i ? 16 : 6,
+                height: 6,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(3),
+                  color: _page == i ? _green : _gold.withValues(alpha: 0.35),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 class _GoldRing extends StatelessWidget {
