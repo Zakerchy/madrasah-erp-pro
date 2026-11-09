@@ -3275,6 +3275,7 @@ function getOrgSettings_() {
     name_en: String((byKey['org.name_en'] || {}).value || 'Madrasah ERP'),
     logo_url: String((byKey['org.logo_url'] || {}).value || ''),
     bank_details_bn: String((byKey['org.bank_details_bn'] || {}).value || ''),
+    about_bn: String((byKey['org.about_bn'] || {}).value || ''),
   };
 }
 
@@ -3285,6 +3286,7 @@ function setOrgSettings_(payload, params) {
   if (payload.name_en !== undefined) upsertSettingTextByKey_('org.name_en', String(payload.name_en).trim());
   if (payload.logo_url !== undefined) upsertSettingTextByKey_('org.logo_url', String(payload.logo_url).trim());
   if (payload.bank_details_bn !== undefined) upsertSettingTextByKey_('org.bank_details_bn', String(payload.bank_details_bn).trim());
+  if (payload.about_bn !== undefined) upsertSettingTextByKey_('org.about_bn', String(payload.about_bn).trim());
   return { ok: true };
 }
 

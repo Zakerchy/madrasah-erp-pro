@@ -31,7 +31,7 @@ class _GuardedRouteState extends State<GuardedRoute> {
     if (_checked) return;
     _checked = true;
     WidgetsBinding.instance.addPostFrameCallback((_) async {
-      if (!mounted || widget.routeName == AppRoutes.login) return;
+      if (!mounted || widget.routeName == AppRoutes.login || widget.routeName == AppRoutes.landing) return;
       if (!SessionService.isLoggedIn) {
         await AccessControlService.showLoginRequiredDialog(
           context,
@@ -56,7 +56,7 @@ class _GuardedRouteState extends State<GuardedRoute> {
 
   @override
   Widget build(BuildContext context) {
-    if (widget.routeName == AppRoutes.login) return widget.child;
+    if (widget.routeName == AppRoutes.login || widget.routeName == AppRoutes.landing) return widget.child;
     if (!SessionService.isLoggedIn) {
       return const Scaffold(
         body: Center(child: AppLoader()),

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../features/auth/login_screen.dart';
+import '../features/home/landing_screen.dart';
 import '../features/academic/academic_foundation_screen.dart';
 import '../features/academic/academic_core_screen.dart';
 import '../features/beneficiaries/beneficiaries_screen.dart';
@@ -49,10 +50,11 @@ class _MadrasahErpProAppState extends State<MadrasahErpProApp> {
       theme: buildTheme(),
       darkTheme: buildDarkTheme(),
       themeMode: ThemeMode.dark,
-      initialRoute: AppRoutes.login,
+      initialRoute: AppRoutes.landing,
       onGenerateRoute: (settings) {
-        final name = settings.name ?? AppRoutes.login;
+        final name = settings.name ?? AppRoutes.landing;
         final routes = <String, Widget>{
+          AppRoutes.landing: const LandingScreen(),
           AppRoutes.login: const LoginScreen(),
           AppRoutes.dashboard: const DashboardScreen(),
           AppRoutes.academic: const AcademicFoundationScreen(),

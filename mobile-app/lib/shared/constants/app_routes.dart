@@ -1,6 +1,7 @@
 import 'app_permissions.dart';
 
 class AppRoutes {
+  static const landing = '/';
   static const login = '/login';
   static const dashboard = '/dashboard';
   static const academic = '/academic';

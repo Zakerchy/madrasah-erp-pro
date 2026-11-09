@@ -10,6 +10,7 @@ class OrgSettings {
   static String nameEn = 'Madrasah ERP';
   static String logoUrl = '';
   static String bankDetailsBn = '';
+  static String aboutBn = '';
   static bool loaded = false;
 
   static Future<void> load({bool forceRefresh = false}) async {
@@ -20,6 +21,7 @@ class OrgSettings {
         nameEn = (res['name_en'] as String?)?.trim().isNotEmpty == true ? res['name_en'] as String : nameEn;
         logoUrl = (res['logo_url'] as String?) ?? '';
         bankDetailsBn = (res['bank_details_bn'] as String?) ?? '';
+        aboutBn = (res['about_bn'] as String?) ?? '';
         loaded = true;
       }
     } catch (_) {

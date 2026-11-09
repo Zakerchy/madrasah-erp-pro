@@ -23,6 +23,7 @@ class _OrgSettingsScreenState extends State<OrgSettingsScreen> {
   final _nameBn = TextEditingController();
   final _nameEn = TextEditingController();
   final _bankDetails = TextEditingController();
+  final _aboutBn = TextEditingController();
   String _logoUrl = '';
   Uint8List? _pickedBytes;
   bool _loading = true;
@@ -42,6 +43,7 @@ class _OrgSettingsScreenState extends State<OrgSettingsScreen> {
       _nameBn.text = OrgSettings.nameBn;
       _nameEn.text = OrgSettings.nameEn;
       _bankDetails.text = OrgSettings.bankDetailsBn;
+      _aboutBn.text = OrgSettings.aboutBn;
       _logoUrl = OrgSettings.logoUrl;
       _loading = false;
     });
@@ -86,6 +88,7 @@ class _OrgSettingsScreenState extends State<OrgSettingsScreen> {
         'name_en': _nameEn.text.trim(),
         'logo_url': _logoUrl,
         'bank_details_bn': _bankDetails.text.trim(),
+        'about_bn': _aboutBn.text.trim(),
       },
     });
     if (mounted) {
@@ -157,6 +160,20 @@ class _OrgSettingsScreenState extends State<OrgSettingsScreen> {
                     helperText: AppLang.t(
                       'এটা দানকারী অ্যাপের top bar থেকে সবাই দেখতে পাবে (bKash/bank account ইত্যাদি লিখুন)',
                       'Visible to all donors from the app top bar (write bKash/bank account etc.)',
+                    ),
+                    border: const OutlineInputBorder(),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: _aboutBn,
+                  minLines: 4,
+                  maxLines: 10,
+                  decoration: InputDecoration(
+                    labelText: AppLang.t('আমাদের সম্পর্কে / মিশন', 'About Us / Mission'),
+                    helperText: AppLang.t(
+                      'এটা পাবলিক হোমপেজে (লগইনের আগে) সবাই দেখতে পাবেন',
+                      'Shown to everyone on the public home page (before login)',
                     ),
                     border: const OutlineInputBorder(),
                   ),
