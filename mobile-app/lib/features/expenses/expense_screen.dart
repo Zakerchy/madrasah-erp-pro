@@ -347,19 +347,23 @@ class _ExpenseScreenState extends State<ExpenseScreen> {
                 children: [
                   Text(AppLang.t('ফান্ড: $ft', 'Fund: $ft')),
                   const SizedBox(height: 10),
-                  RadioListTile<String>(
-                    contentPadding: EdgeInsets.zero,
-                    value: 'ALL',
+                  RadioGroup<String>(
                     groupValue: target,
-                    title: Text(AppLang.t('সব দানকারী', 'All donors')),
                     onChanged: (v) => setDlg(() => target = v!),
-                  ),
-                  RadioListTile<String>(
-                    contentPadding: EdgeInsets.zero,
-                    value: 'SPECIFIC',
-                    groupValue: target,
-                    title: Text(AppLang.t('নির্দিষ্ট দানকারী', 'Specific donor')),
-                    onChanged: (v) => setDlg(() => target = v!),
+                    child: Column(
+                      children: [
+                        RadioListTile<String>(
+                          contentPadding: EdgeInsets.zero,
+                          value: 'ALL',
+                          title: Text(AppLang.t('সব দানকারী', 'All donors')),
+                        ),
+                        RadioListTile<String>(
+                          contentPadding: EdgeInsets.zero,
+                          value: 'SPECIFIC',
+                          title: Text(AppLang.t('নির্দিষ্ট দানকারী', 'Specific donor')),
+                        ),
+                      ],
+                    ),
                   ),
                   if (target == 'SPECIFIC')
                     loadingDonors

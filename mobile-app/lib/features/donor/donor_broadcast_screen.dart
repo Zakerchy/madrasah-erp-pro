@@ -166,17 +166,23 @@ class _DonorBroadcastScreenState extends State<DonorBroadcastScreen>
                 ),
                 const SizedBox(height: 8),
                 if (!recurring) ...[
-                  RadioListTile<String>(
-                    contentPadding: EdgeInsets.zero,
-                    value: 'ALL', groupValue: target,
-                    title: Text(AppLang.t('সব দানকারী', 'All donors')),
+                  RadioGroup<String>(
+                    groupValue: target,
                     onChanged: (v) => setDlg(() => target = v!),
-                  ),
-                  RadioListTile<String>(
-                    contentPadding: EdgeInsets.zero,
-                    value: 'MULTI', groupValue: target,
-                    title: Text(AppLang.t('তালিকা থেকে বেছে নিন', 'Select from list')),
-                    onChanged: (v) => setDlg(() => target = v!),
+                    child: Column(
+                      children: [
+                        RadioListTile<String>(
+                          contentPadding: EdgeInsets.zero,
+                          value: 'ALL',
+                          title: Text(AppLang.t('সব দানকারী', 'All donors')),
+                        ),
+                        RadioListTile<String>(
+                          contentPadding: EdgeInsets.zero,
+                          value: 'MULTI',
+                          title: Text(AppLang.t('তালিকা থেকে বেছে নিন', 'Select from list')),
+                        ),
+                      ],
+                    ),
                   ),
                   if (target == 'MULTI')
                     SizedBox(
