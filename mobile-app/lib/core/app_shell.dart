@@ -49,7 +49,7 @@ class _MadrasahErpProAppState extends State<MadrasahErpProApp> {
       title: AppLang.t('মাদ্রাসা ERP Pro', 'Madrasah ERP Pro'),
       theme: buildTheme(),
       darkTheme: buildDarkTheme(),
-      themeMode: ThemeMode.dark,
+      themeMode: ThemeMode.light,
       initialRoute: AppRoutes.landing,
       onGenerateRoute: (settings) {
         final name = settings.name ?? AppRoutes.landing;

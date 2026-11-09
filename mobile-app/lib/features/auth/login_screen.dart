@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../core/app_lang.dart';
 import '../../shared/models/session_user.dart';
 import '../../shared/services/api_service.dart';
 import '../../shared/services/org_settings_service.dart';
@@ -65,14 +66,14 @@ class _LoginScreenState extends State<LoginScreen> {
       } else if (res['offline'] == true &&
           SessionService.loginFromOfflineCredential(email: email, pinHash: pinHash)) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('অফলাইন লগইন সফল')),
+          SnackBar(content: Text(AppLang.t('অফলাইন লগইন সফল', 'Offline login successful'))),
         );
         Navigator.pushNamedAndRemoveUntil(context, '/dashboard', (r) => false);
       } else {
-        _showError(res['message'] ?? res['error'] ?? 'লগইন ব্যর্থ হয়েছে');
+        _showError(res['message'] ?? res['error'] ?? AppLang.t('লগইন ব্যর্থ হয়েছে', 'Login failed'));
       }
     } catch (e) {
-      if (mounted) _showError('ত্রুটি: $e');
+      if (mounted) _showError('${AppLang.t('ত্রুটি', 'Error')}: $e');
     }
 
     if (mounted) setState(() => _loading = false);
@@ -98,21 +99,22 @@ class _LoginScreenState extends State<LoginScreen> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              const Text(
-                'পিন রিসেট',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              Text(
+                AppLang.t('পিন রিসেট', 'Reset PIN'),
+                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 8),
-              const Text(
-                'আপনার ইমেইল দিন। Admin-এর কাছে একটি রিসেট লিংক পাঠানো হবে।',
-                style: TextStyle(fontSize: 13, color: Colors.grey),
+              Text(
+                AppLang.t('আপনার ইমেইল দিন। Admin-এর কাছে একটি রিসেট লিংক পাঠানো হবে।',
+                    'Enter your email. A reset link will be sent to the Admin.'),
+                style: const TextStyle(fontSize: 13, color: Colors.grey),
               ),
               const SizedBox(height: 16),
               TextField(
                 controller: emailCtrl,
                 keyboardType: TextInputType.emailAddress,
                 decoration: InputDecoration(
-                  labelText: 'ইমেইল',
+                  labelText: AppLang.t('ইমেইল', 'Email'),
                   prefixIcon: const Icon(Icons.email_outlined),
                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                 ),
@@ -125,7 +127,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         final email = emailCtrl.text.trim().toLowerCase();
                         if (!email.contains('@')) {
                           ScaffoldMessenger.of(ctx).showSnackBar(
-                            const SnackBar(content: Text('সঠিক ইমেইল দিন')),
+                            SnackBar(content: Text(AppLang.t('সঠিক ইমেইল দিন', 'Enter a valid email'))),
                           );
                           return;
                         }
@@ -141,8 +143,8 @@ class _LoginScreenState extends State<LoginScreen> {
                         messenger.showSnackBar(
                           SnackBar(
                             content: Text(res['message'] ?? (res['ok'] == true
-                                ? 'রিসেট লিংক পাঠানো হয়েছে'
-                                : 'ব্যর্থ হয়েছে')),
+                                ? AppLang.t('রিসেট লিংক পাঠানো হয়েছে', 'Reset link sent')
+                                : AppLang.t('ব্যর্থ হয়েছে', 'Failed'))),
                             backgroundColor: res['ok'] == true
                                 ? Colors.green.shade700
                                 : Colors.red.shade700,
@@ -234,7 +236,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                     const SizedBox(height: 6),
                     Text(
-                      'আস-সালামু আলাইকুম',
+                      AppLang.t('আস-সালামু আলাইকুম', 'As-salamu alaikum'),
                       textAlign: TextAlign.center,
                       style: theme.textTheme.bodyMedium?.copyWith(
                         color: scheme.onSurfaceVariant,
@@ -248,7 +250,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       keyboardType: TextInputType.emailAddress,
                       textInputAction: TextInputAction.next,
                       decoration: InputDecoration(
-                        labelText: 'ইমেইল',
+                        labelText: AppLang.t('ইমেইল', 'Email'),
                         hintText: 'example@gmail.com',
                         prefixIcon: const Icon(Icons.email_outlined),
                         border: OutlineInputBorder(
@@ -257,8 +259,8 @@ class _LoginScreenState extends State<LoginScreen> {
                       ),
                       validator: (v) {
                         final val = v?.trim() ?? '';
-                        if (val.isEmpty) return 'ইমেইল দিন';
-                        if (!val.contains('@')) return 'সঠিক ইমেইল দিন';
+                        if (val.isEmpty) return AppLang.t('ইমেইল দিন', 'Enter email');
+                        if (!val.contains('@')) return AppLang.t('সঠিক ইমেইল দিন', 'Enter a valid email');
                         return null;
                       },
                     ),
@@ -276,8 +278,8 @@ class _LoginScreenState extends State<LoginScreen> {
                         LengthLimitingTextInputFormatter(6),
                       ],
                       decoration: InputDecoration(
-                        labelText: 'পিন',
-                        hintText: '৪-৬ সংখ্যার পিন',
+                        labelText: AppLang.t('পিন', 'PIN'),
+                        hintText: AppLang.t('৪-৬ সংখ্যার পিন', '4-6 digit PIN'),
                         prefixIcon: const Icon(Icons.lock_outline),
                         suffixIcon: IconButton(
                           icon: Icon(_pinVisible ? Icons.visibility_off : Icons.visibility),
@@ -289,8 +291,8 @@ class _LoginScreenState extends State<LoginScreen> {
                       ),
                       validator: (v) {
                         final val = v?.trim() ?? '';
-                        if (val.isEmpty) return 'পিন দিন';
-                        if (val.length < 4) return 'পিন কমপক্ষে ৪ সংখ্যার';
+                        if (val.isEmpty) return AppLang.t('পিন দিন', 'Enter PIN');
+                        if (val.length < 4) return AppLang.t('পিন কমপক্ষে ৪ সংখ্যার', 'PIN must be at least 4 digits');
                         return null;
                       },
                     ),
@@ -301,7 +303,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       alignment: Alignment.centerRight,
                       child: TextButton(
                         onPressed: _loading ? null : _showResetPinSheet,
-                        child: const Text('পিন ভুলে গেছেন?'),
+                        child: Text(AppLang.t('পিন ভুলে গেছেন?', 'Forgot PIN?')),
                       ),
                     ),
                     const SizedBox(height: 8),
@@ -341,7 +343,9 @@ class _LoginScreenState extends State<LoginScreen> {
                             const SizedBox(width: 10),
                           ],
                           Text(
-                            _loading ? 'প্রবেশ করা হচ্ছে...' : 'প্রবেশ করুন',
+                            _loading
+                                ? AppLang.t('প্রবেশ করা হচ্ছে...', 'Signing in...')
+                                : AppLang.t('প্রবেশ করুন', 'Sign in'),
                             style: const TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.bold,
@@ -363,7 +367,10 @@ class _LoginScreenState extends State<LoginScreen> {
                         ),
                       ),
                       child: Text(
-                        'নতুন ব্যবহারকারী হতে চাইলে Admin-এর সাথে যোগাযোগ করুন। Admin আপনার ইমেইল ও পিন সেট করে দেবেন।',
+                        AppLang.t(
+                          'নতুন ব্যবহারকারী হতে চাইলে Admin-এর সাথে যোগাযোগ করুন। Admin আপনার ইমেইল ও পিন সেট করে দেবেন।',
+                          'To become a new user, contact the Admin. The Admin will set up your email and PIN.',
+                        ),
                         textAlign: TextAlign.center,
                         style: TextStyle(fontSize: 13, color: scheme.onSurface),
                       ),
@@ -374,7 +381,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         MaterialPageRoute(builder: (_) => const DonorLoginScreen()),
                       ),
                       icon: const Icon(Icons.volunteer_activism, size: 18),
-                      label: const Text('দানকারী পোর্টাল'),
+                      label: Text(AppLang.t('দানকারী পোর্টাল', 'Donor Portal')),
                       style: OutlinedButton.styleFrom(
                         minimumSize: const Size.fromHeight(44),
                       ),
