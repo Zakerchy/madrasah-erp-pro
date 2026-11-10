@@ -82,3 +82,24 @@ work" first pass.
 Never report a fix/feature done from passing analyzer/tests alone — confirm it against
 the real running app with real data (live Apps Script backend, not mocked), end to end
 (e.g. admin resets a donor PIN → actually log in as that donor with the new PIN).
+
+## Global brand standard — set once, apply everywhere, don't re-ask (per chief's rule)
+- **Theme**: `mobile-app/lib/core/theme.dart` is the single source of truth for colors
+  (`AppBrand` class: deep green + gold + cream). `buildTheme()`/`buildDarkTheme()` both
+  derive from it. **Default `themeMode` is `ThemeMode.light`** (`app_shell.dart`) — the
+  whole portal (not just the public landing page) should look like the light/cream/gold/
+  green landing page. Any new screen just uses `Theme.of(context).colorScheme` and
+  inherits this automatically — don't hardcode colors per screen.
+- **Logo**: `mobile-app/lib/shared/widgets/org_logo.dart` (`OrgLogo` widget) is the single
+  source of truth for the org logo everywhere (bundled asset fallback + live
+  `OrgSettings.logoUrl` override). Never use a generic `Icon` as a logo placeholder — use
+  `OrgLogo`.
+- **Bilingual (Bangla + English)**: `mobile-app/lib/core/app_lang.dart` (`AppLang`) is the
+  global i18n switch — `AppLang.t('বাংলা', 'English')` wraps every user-facing string, a
+  `ValueNotifier<bool> isEnglish` drives live switching with no rebuild wiring needed
+  beyond listening to it (see `app_shell.dart`), and the toggle lives in Settings. This
+  pattern is already used 800+ times across the app. **Any new screen or new string must
+  use `AppLang.t(bn, en)` from the start** — don't ship Bangla-only UI and leave English
+  for later; it just has to be redone.
+- These three are already set up project-wide — don't rediscover or re-decide them, just
+  use the existing `AppBrand`/`OrgLogo`/`AppLang` primitives for all new work.
