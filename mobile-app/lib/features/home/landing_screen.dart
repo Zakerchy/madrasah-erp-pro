@@ -6,6 +6,7 @@ import '../../core/app_lang.dart';
 import '../../core/theme.dart';
 import '../../shared/constants/fund_types.dart';
 import '../../shared/services/org_settings_service.dart';
+import '../../shared/services/pwa_runtime_service.dart';
 import '../../shared/widgets/org_logo.dart';
 import '../auth/login_screen.dart';
 import '../donor/donor_api.dart';
@@ -64,6 +65,18 @@ class _LandingScreenState extends State<LandingScreen> {
     );
   }
 
+  Future<void> _installWebApp() async {
+    final opened = await pwaRuntimeService.promptInstall();
+    if (opened || !mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          pwaRuntimeService.installHelpMessage(isEnglish: AppLang.isEnglish.value),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final about = OrgSettings.aboutBn.trim();
@@ -74,7 +87,11 @@ class _LandingScreenState extends State<LandingScreen> {
         child: Column(
           children: [
             // ── Top bar: logo left, name centered, portal/login on the right ──
-            _TopBar(onDonorPortal: _openDonorPortal, onStaffLogin: _openStaffLogin),
+            _TopBar(
+              onDonorPortal: _openDonorPortal,
+              onStaffLogin: _openStaffLogin,
+              onInstall: _installWebApp,
+            ),
 
             Expanded(
               child: SingleChildScrollView(
@@ -308,7 +325,8 @@ class _LandingScreenState extends State<LandingScreen> {
 class _TopBar extends StatelessWidget {
   final VoidCallback onDonorPortal;
   final VoidCallback onStaffLogin;
-  const _TopBar({required this.onDonorPortal, required this.onStaffLogin});
+  final VoidCallback onInstall;
+  const _TopBar({required this.onDonorPortal, required this.onStaffLogin, required this.onInstall});
 
   static const _green = _LandingScreenState._green;
   static const _greenDark = _LandingScreenState._greenDark;
@@ -338,6 +356,34 @@ class _TopBar extends StatelessWidget {
                 overflow: TextOverflow.ellipsis,
                 style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: _greenDark),
               ),
+            ),
+          ),
+          ValueListenableBuilder<bool>(
+            valueListenable: pwaRuntimeService.standaloneMode,
+            builder: (_, standalone, __) => ValueListenableBuilder<bool>(
+              valueListenable: pwaRuntimeService.installAvailable,
+              builder: (_, installAvailable, __) {
+                if (standalone || !installAvailable) return const SizedBox.shrink();
+                return Padding(
+                  padding: const EdgeInsets.only(right: 8),
+                  child: TextButton.icon(
+                    onPressed: onInstall,
+                    icon: const Icon(Icons.install_mobile_rounded, size: 18, color: _green),
+                    label: Text(
+                      AppLang.t('অ্যাপ ইনস্টল', 'Install App'),
+                      style: const TextStyle(color: _green, fontWeight: FontWeight.bold, fontSize: 13),
+                    ),
+                    style: TextButton.styleFrom(
+                      backgroundColor: _green.withValues(alpha: 0.07),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                        side: BorderSide(color: _gold.withValues(alpha: 0.5)),
+                      ),
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                    ),
+                  ),
+                );
+              },
             ),
           ),
           PopupMenuButton<int>(
