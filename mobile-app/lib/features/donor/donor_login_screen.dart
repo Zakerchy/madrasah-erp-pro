@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../core/app_lang.dart';
+import '../../shared/constants/app_routes.dart';
 import '../../shared/services/org_settings_service.dart';
 import '../../shared/widgets/org_logo.dart';
 import 'donor_api.dart';
@@ -103,6 +104,16 @@ class _DonorLoginScreenState extends State<DonorLoginScreen> {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     return Scaffold(
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.home_outlined),
+          tooltip: AppLang.t('হোমে ফিরুন', 'Back to home'),
+          onPressed: () => Navigator.of(context)
+              .pushNamedAndRemoveUntil(AppRoutes.landing, (route) => false),
+        ),
+      ),
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(20),

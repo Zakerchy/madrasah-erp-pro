@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../core/app_lang.dart';
+import '../../shared/constants/app_routes.dart';
 import '../../shared/models/session_user.dart';
 import '../../shared/services/api_service.dart';
 import '../../shared/services/org_settings_service.dart';
@@ -184,6 +185,16 @@ class _LoginScreenState extends State<LoginScreen> {
 
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.home_outlined),
+          tooltip: AppLang.t('হোমে ফিরুন', 'Back to home'),
+          onPressed: () => Navigator.of(context)
+              .pushNamedAndRemoveUntil(AppRoutes.landing, (route) => false),
+        ),
+      ),
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(

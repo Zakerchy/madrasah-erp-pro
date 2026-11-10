@@ -1,5 +1,6 @@
 import '../../shared/widgets/app_loader.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -291,7 +292,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     await _loadMonthlyData();
   }
 
-  Future<bool> _onWillPop() async {
+  Future<void> _onWillPop() async {
     final now = DateTime.now();
     if (_lastBackPressedAt == null ||
         now.difference(_lastBackPressedAt!) > const Duration(seconds: 2)) {
@@ -299,9 +300,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(AppLang.t('বের হতে আবার চাপুন', 'Press again to exit'))),
       );
-      return false;
+      return;
     }
-    return true;
+    SystemNavigator.pop();
   }
 
   String _fmt(double n) {
@@ -571,8 +572,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
     return PopScope(
       canPop: false,
-      onPopInvokedWithResult: (didPop, _) async {
-        if (!didPop) await _onWillPop();
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) _onWillPop();
       },
       child: Scaffold(
         backgroundColor: Theme.of(context).scaffoldBackgroundColor,
