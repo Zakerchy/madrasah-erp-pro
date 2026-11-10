@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/app_lang.dart';
 import '../../core/theme.dart';
@@ -11,6 +12,7 @@ import '../../shared/widgets/org_logo.dart';
 import '../auth/login_screen.dart';
 import '../donor/donor_api.dart';
 import '../donor/donor_login_screen.dart';
+import 'pillar_icons.dart';
 
 /// Public home page — the first thing any visitor sees, no login needed.
 /// Shows the madrasah's real identity (logo, name, about/mission) and
@@ -52,6 +54,22 @@ class _LandingScreenState extends State<LandingScreen> {
     );
   }
 
+  /// "দান করুন" on a project card — no login required. Asks the amount,
+  /// then either shows payment details directly (small amounts) or routes
+  /// to a call/participation flow for large (৳10,000+) donations.
+  void _openDonateSheet(FundType fund) {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _DonateSheet(
+        fund: fund,
+        onWantAccount: () => _openDonorPortalForFund(fund.key),
+        onLargeDonation: () => _openParticipationForm(fundKey: fund.key),
+      ),
+    );
+  }
+
   void _openStaffLogin() {
     Navigator.of(context).push(MaterialPageRoute(builder: (_) => const LoginScreen()));
   }
@@ -80,6 +98,7 @@ class _LandingScreenState extends State<LandingScreen> {
   @override
   Widget build(BuildContext context) {
     final about = OrgSettings.aboutBn.trim();
+    final pillars = OrgSettings.pillars.isNotEmpty ? OrgSettings.pillars : _defaultPillars;
 
     return Scaffold(
       backgroundColor: _cream,
@@ -167,21 +186,9 @@ class _LandingScreenState extends State<LandingScreen> {
                       ),
                     ),
                     const SizedBox(height: 14),
-                    SizedBox(
-                      height: 176,
-                      child: ListView.separated(
-                        scrollDirection: Axis.horizontal,
-                        padding: const EdgeInsets.symmetric(horizontal: 20),
-                        itemCount: FundTypes.donorVisible.length,
-                        separatorBuilder: (_, __) => const SizedBox(width: 12),
-                        itemBuilder: (_, i) {
-                          final fund = FundTypes.donorVisible[i];
-                          return _ProjectCard(
-                            fund: fund,
-                            onDonate: () => _openDonorPortalForFund(fund.key),
-                          );
-                        },
-                      ),
+                    _AutoScrollProjects(
+                      funds: FundTypes.donorVisible,
+                      onDonate: _openDonateSheet,
                     ),
                     const SizedBox(height: 18),
                     Padding(
@@ -240,29 +247,19 @@ class _LandingScreenState extends State<LandingScreen> {
 
                             const SizedBox(height: 20),
 
-                            // ── Our pillars ──────────────────────────────────────
+                            // ── Our pillars (admin-editable) ──────────────────────
                             Row(
                               children: [
-                                Expanded(
-                                  child: _PillarTile(
-                                    icon: Icons.menu_book_rounded,
-                                    title: AppLang.t('কুরআন-সুন্নাহ', 'Qur\'an & Sunnah'),
+                                for (var i = 0; i < pillars.length; i++) ...[
+                                  if (i > 0) const SizedBox(width: 12),
+                                  Expanded(
+                                    child: _PillarTile(
+                                      icon: pillarIcon(pillars[i].icon),
+                                      title: AppLang.t(pillars[i].titleBn, pillars[i].titleEn),
+                                      description: AppLang.t(pillars[i].descBn, pillars[i].descEn),
+                                    ),
                                   ),
-                                ),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: _PillarTile(
-                                    icon: Icons.favorite_rounded,
-                                    title: AppLang.t('নৈতিক গঠন', 'Moral Formation'),
-                                  ),
-                                ),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: _PillarTile(
-                                    icon: Icons.volunteer_activism_rounded,
-                                    title: AppLang.t('জনসেবা', 'Community Service'),
-                                  ),
-                                ),
+                                ],
                               ],
                             ),
 
@@ -318,6 +315,24 @@ class _LandingScreenState extends State<LandingScreen> {
       'আল-মদীনাতুল মুনাওওয়ারাহ্‌ কমপ্লেক্স ২০১২ সাল থেকে পূর্ব নাসিরাবাদ, চট্টগ্রামে একটি দ্বীনি শিক্ষা প্রতিষ্ঠান হিসেবে পরিচালিত হয়ে আসছে। '
       'আমাদের লক্ষ্য কুরআন-সুন্নাহর আলোকে শিক্ষার্থীদের নৈতিক, আত্মিক ও ধর্মীয় শিক্ষায় গড়ে তোলা। আপনাদের দান ও সহযোগিতা আমাদের এই দ্বীনি খেদমত '
       'অব্যাহত রাখতে সাহায্য করে — জাযাকাল্লাহু খাইরান।';
+
+  static const _defaultPillars = [
+    OrgPillar(
+      icon: 'book', titleBn: 'কুরআন-সুন্নাহ', titleEn: "Qur'an & Sunnah",
+      descBn: 'কুরআন তিলাওয়াত, তাজবীদ ও হাদীস শিক্ষার মাধ্যমে দ্বীনি জ্ঞানের ভিত্তি গড়ে তোলা।',
+      descEn: "Building a foundation of Islamic knowledge through Qur'an recitation, tajweed and hadith study.",
+    ),
+    OrgPillar(
+      icon: 'heart', titleBn: 'নৈতিক গঠন', titleEn: 'Moral Formation',
+      descBn: 'সততা, শৃঙ্খলা ও উত্তম চরিত্র গঠনে শিক্ষার্থীদের প্রতিদিনের অনুশীলন ও তত্ত্বাবধান।',
+      descEn: 'Daily practice and mentorship that shapes honesty, discipline and good character.',
+    ),
+    OrgPillar(
+      icon: 'hands', titleBn: 'জনসেবা', titleEn: 'Community Service',
+      descBn: 'এতিম, অসহায় ও দুঃস্থ মানুষের পাশে দাঁড়ানো এবং সমাজসেবামূলক কার্যক্রম পরিচালনা।',
+      descEn: 'Standing beside orphans and the needy, and running community welfare programs.',
+    ),
+  ];
 }
 
 /// Sticky top bar: logo on the left, org name centered, a portal/login
@@ -721,27 +736,62 @@ class _GoldBorderCard extends StatelessWidget {
 class _PillarTile extends StatelessWidget {
   final IconData icon;
   final String title;
-  const _PillarTile({required this.icon, required this.title});
+  final String description;
+  const _PillarTile({required this.icon, required this.title, required this.description});
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 8),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: _LandingScreenState._gold.withValues(alpha: 0.4)),
-      ),
-      child: Column(
-        children: [
-          Icon(icon, color: _LandingScreenState._green, size: 24),
-          const SizedBox(height: 8),
-          Text(
-            title,
-            textAlign: TextAlign.center,
-            style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600, color: _LandingScreenState._greenDark),
-          ),
-        ],
+    return InkWell(
+      borderRadius: BorderRadius.circular(14),
+      onTap: description.trim().isEmpty
+          ? null
+          : () => showDialog<void>(
+                context: context,
+                builder: (_) => AlertDialog(
+                  title: Row(
+                    children: [
+                      Icon(icon, color: _LandingScreenState._green, size: 20),
+                      const SizedBox(width: 8),
+                      Expanded(child: Text(title)),
+                    ],
+                  ),
+                  content: Text(description, style: const TextStyle(height: 1.5)),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(context),
+                      child: Text(AppLang.t('বন্ধ করুন', 'Close')),
+                    ),
+                  ],
+                ),
+              ),
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 8),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: _LandingScreenState._gold.withValues(alpha: 0.4)),
+        ),
+        child: Column(
+          children: [
+            Icon(icon, color: _LandingScreenState._green, size: 24),
+            const SizedBox(height: 8),
+            Text(
+              title,
+              textAlign: TextAlign.center,
+              style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600, color: _LandingScreenState._greenDark),
+            ),
+            if (description.trim().isNotEmpty) ...[
+              const SizedBox(height: 4),
+              Text(
+                description,
+                textAlign: TextAlign.center,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(fontSize: 9.5, color: Color(0xFF6B6B6B)),
+              ),
+            ],
+          ],
+        ),
       ),
     );
   }
@@ -769,6 +819,91 @@ IconData _fundIcon(String key) {
       return Icons.water_drop_rounded;
     default:
       return Icons.mosque_rounded;
+  }
+}
+
+/// Horizontal strip of project/fund cards that auto-scrolls right-to-left
+/// so every card is visible without the visitor having to do anything,
+/// while still letting them drag to scroll manually at any time — manual
+/// drag pauses the auto-scroll, which resumes a couple seconds after they
+/// let go.
+class _AutoScrollProjects extends StatefulWidget {
+  final List<FundType> funds;
+  final void Function(FundType fund) onDonate;
+  const _AutoScrollProjects({required this.funds, required this.onDonate});
+
+  @override
+  State<_AutoScrollProjects> createState() => _AutoScrollProjectsState();
+}
+
+class _AutoScrollProjectsState extends State<_AutoScrollProjects> {
+  final _controller = ScrollController();
+  Timer? _ticker;
+  Timer? _resumeTimer;
+  bool _userScrolling = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _startAutoScroll());
+  }
+
+  void _startAutoScroll() {
+    _ticker?.cancel();
+    _ticker = Timer.periodic(const Duration(milliseconds: 40), (_) {
+      if (!mounted || _userScrolling || !_controller.hasClients) return;
+      final max = _controller.position.maxScrollExtent;
+      if (max <= 0) return;
+      final next = _controller.offset + 0.9;
+      if (next >= max) {
+        _controller.jumpTo(0);
+      } else {
+        _controller.jumpTo(next);
+      }
+    });
+  }
+
+  void _pauseForUser() {
+    _userScrolling = true;
+    _resumeTimer?.cancel();
+    _resumeTimer = Timer(const Duration(seconds: 3), () {
+      if (mounted) _userScrolling = false;
+    });
+  }
+
+  @override
+  void dispose() {
+    _ticker?.cancel();
+    _resumeTimer?.cancel();
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 176,
+      // Pause the instant a finger/pointer touches the strip (not just on a
+      // drag) — otherwise a card can still slide a few px under a tap while
+      // the next auto-scroll frame runs, making the "দান করুন" button miss.
+      child: Listener(
+        onPointerDown: (_) => _pauseForUser(),
+        child: ListView.separated(
+          controller: _controller,
+          scrollDirection: Axis.horizontal,
+          padding: const EdgeInsets.symmetric(horizontal: 20),
+          itemCount: widget.funds.length,
+          separatorBuilder: (_, __) => const SizedBox(width: 12),
+          itemBuilder: (_, i) {
+            final fund = widget.funds[i];
+            return _ProjectCard(
+              fund: fund,
+              onDonate: () => widget.onDonate(fund),
+            );
+          },
+        ),
+      ),
+    );
   }
 }
 
@@ -838,6 +973,213 @@ class _ProjectCard extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+const _largeDonationThreshold = 10000;
+
+/// Bottom sheet opened from a project card's "দান করুন" — asks the amount
+/// first, no login required:
+///  - ৳10,000 or more: routes to a call-us / apply-to-participate choice,
+///    since large donations are handled personally, not self-service.
+///  - under ৳10,000: shows the bKash/bank payment details directly so the
+///    visitor can send the money right away, with an optional path to the
+///    donor portal afterward if they want a tracked account/receipt.
+class _DonateSheet extends StatefulWidget {
+  final FundType fund;
+  final VoidCallback onWantAccount;
+  final VoidCallback onLargeDonation;
+  const _DonateSheet({
+    required this.fund,
+    required this.onWantAccount,
+    required this.onLargeDonation,
+  });
+
+  @override
+  State<_DonateSheet> createState() => _DonateSheetState();
+}
+
+class _DonateSheetState extends State<_DonateSheet> {
+  static const _green = _LandingScreenState._green;
+  static const _greenDark = _LandingScreenState._greenDark;
+  static const _gold = _LandingScreenState._gold;
+
+  final _amountCtrl = TextEditingController();
+  double? _amount;
+
+  @override
+  void dispose() {
+    _amountCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _callUs() async {
+    final phone = OrgSettings.contactPhone.trim();
+    if (phone.isEmpty) return;
+    await launchUrl(Uri.parse('tel:$phone'));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final bottomInset = MediaQuery.of(context).viewInsets.bottom;
+    final isLarge = (_amount ?? 0) >= _largeDonationThreshold;
+
+    return Padding(
+      padding: EdgeInsets.only(bottom: bottomInset),
+      child: Container(
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
+        ),
+        padding: const EdgeInsets.fromLTRB(22, 18, 22, 26),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Center(
+              child: Container(
+                width: 40, height: 4,
+                decoration: BoxDecoration(color: Colors.grey.shade300, borderRadius: BorderRadius.circular(2)),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(color: _green.withValues(alpha: 0.08), shape: BoxShape.circle),
+                  child: Icon(_fundIcon(widget.fund.key), color: _green, size: 20),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    AppLang.t(widget.fund.labelBn, widget.fund.labelEn),
+                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: _greenDark),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 18),
+
+            if (!isLarge) ...[
+              Text(AppLang.t('কত টাকা দান করতে চান? (ঐচ্ছিক)', 'How much would you like to donate? (optional)'),
+                  style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+              const SizedBox(height: 8),
+              TextField(
+                controller: _amountCtrl,
+                keyboardType: TextInputType.number,
+                onChanged: (v) => setState(() => _amount = double.tryParse(v.trim())),
+                decoration: InputDecoration(
+                  prefixText: '৳ ',
+                  hintText: AppLang.t('যেমন: ৫০০', 'e.g. 500'),
+                  border: const OutlineInputBorder(),
+                ),
+              ),
+              const SizedBox(height: 18),
+              Text(
+                AppLang.t('পেমেন্ট মাধ্যম', 'Payment Method'),
+                style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: _greenDark),
+              ),
+              const SizedBox(height: 8),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: _green.withValues(alpha: 0.06),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: _gold.withValues(alpha: 0.4)),
+                ),
+                child: Text(
+                  OrgSettings.bankDetailsBn.trim().isNotEmpty
+                      ? OrgSettings.bankDetailsBn.trim()
+                      : AppLang.t('পেমেন্ট তথ্য শীঘ্রই যুক্ত করা হবে — Admin-এর সাথে যোগাযোগ করুন।',
+                          'Payment details will be added soon — please contact the Admin.'),
+                  style: const TextStyle(fontSize: 13.5, height: 1.6, color: Color(0xFF3A3A3A)),
+                ),
+              ),
+              const SizedBox(height: 14),
+              Text(
+                AppLang.t(
+                  'দান করার পর, রসিদ ও ট্র্যাকিংয়ের জন্য দানকারী পোর্টালে রেজিস্টার করতে পারেন (ঐচ্ছিক)।',
+                  'After donating, you may register on the Donor Portal for a receipt and tracking (optional).',
+                ),
+                style: const TextStyle(fontSize: 12, color: Colors.grey),
+              ),
+              const SizedBox(height: 14),
+              OutlinedButton.icon(
+                onPressed: () {
+                  Navigator.pop(context);
+                  widget.onWantAccount();
+                },
+                icon: const Icon(Icons.account_circle_outlined, size: 18, color: _green),
+                label: Text(AppLang.t('দানকারী পোর্টালে যান', 'Go to Donor Portal'),
+                    style: const TextStyle(color: _green, fontWeight: FontWeight.w600)),
+                style: OutlinedButton.styleFrom(
+                  minimumSize: const Size.fromHeight(44),
+                  side: const BorderSide(color: _gold, width: 1.2),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+              ),
+            ] else ...[
+              Container(
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: _gold.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: _gold.withValues(alpha: 0.5)),
+                ),
+                child: Text(
+                  AppLang.t(
+                    '৳১০,০০০ বা তার বেশি অনুদানের জন্য আমরা সরাসরি কথা বলতে চাই, যাতে আপনার অনুদান সঠিকভাবে ব্যবহার হয় তা নিশ্চিত করতে পারি।',
+                    'For donations of ৳10,000 or more, we\'d like to speak with you directly so we can make sure your donation is used exactly as you intend.',
+                  ),
+                  style: const TextStyle(fontSize: 13.5, height: 1.6, color: Color(0xFF3A3A3A)),
+                ),
+              ),
+              const SizedBox(height: 16),
+              if (OrgSettings.contactPhone.trim().isNotEmpty)
+                SizedBox(
+                  height: 48,
+                  child: ElevatedButton.icon(
+                    onPressed: _callUs,
+                    icon: const Icon(Icons.call_rounded),
+                    label: Text(AppLang.t('এখনই কল করুন', 'Call Us Now')),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: _green,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                  ),
+                ),
+              const SizedBox(height: 10),
+              SizedBox(
+                height: 48,
+                child: OutlinedButton.icon(
+                  onPressed: () {
+                    Navigator.pop(context);
+                    widget.onLargeDonation();
+                  },
+                  icon: const Icon(Icons.how_to_reg_rounded, size: 18, color: _green),
+                  label: Text(AppLang.t('প্রকল্পে অংশগ্রহণের ফর্ম পূরণ করুন', 'Fill the Participation Form'),
+                      style: const TextStyle(color: _green, fontWeight: FontWeight.w600)),
+                  style: OutlinedButton.styleFrom(
+                    side: const BorderSide(color: _gold, width: 1.2),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 10),
+              Center(
+                child: TextButton(
+                  onPressed: () => setState(() { _amount = null; _amountCtrl.clear(); }),
+                  child: Text(AppLang.t('← টাকার পরিমাণ পরিবর্তন করুন', '← Change the amount')),
+                ),
+              ),
+            ],
+          ],
+        ),
       ),
     );
   }

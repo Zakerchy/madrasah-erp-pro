@@ -3269,6 +3269,18 @@ function adminUploadOrgLogo_(payload, params) {
 
 // ── Organization branding + bank details — shown on login, donor app, invoices ──
 
+const DEFAULT_PILLARS_JSON = JSON.stringify([
+  { icon: 'book', title_bn: 'কুরআন-সুন্নাহ', title_en: "Qur'an & Sunnah",
+    desc_bn: 'কুরআন তিলাওয়াত, তাজবীদ ও হাদীস শিক্ষার মাধ্যমে দ্বীনি জ্ঞানের ভিত্তি গড়ে তোলা।',
+    desc_en: 'Building a foundation of Islamic knowledge through Qur\'an recitation, tajweed and hadith study.' },
+  { icon: 'heart', title_bn: 'নৈতিক গঠন', title_en: 'Moral Formation',
+    desc_bn: 'সততা, শৃঙ্খলা ও উত্তম চরিত্র গঠনে শিক্ষার্থীদের প্রতিদিনের অনুশীলন ও তত্ত্বাবধান।',
+    desc_en: 'Daily practice and mentorship that shapes honesty, discipline and good character.' },
+  { icon: 'hands', title_bn: 'জনসেবা', title_en: 'Community Service',
+    desc_bn: 'এতিম, অসহায় ও দুঃস্থ মানুষের পাশে দাঁড়ানো এবং সমাজসেবামূলক কার্যক্রম পরিচালনা।',
+    desc_en: 'Standing beside orphans and the needy, and running community welfare programs.' },
+]);
+
 function getOrgSettings_() {
   const byKey = getSettingsMapByKey_();
   return {
@@ -3278,6 +3290,8 @@ function getOrgSettings_() {
     logo_url: String((byKey['org.logo_url'] || {}).value || ''),
     bank_details_bn: String((byKey['org.bank_details_bn'] || {}).value || ''),
     about_bn: String((byKey['org.about_bn'] || {}).value || ''),
+    contact_phone: String((byKey['org.contact_phone'] || {}).value || ''),
+    pillars_json: String((byKey['org.pillars_json'] || {}).value || DEFAULT_PILLARS_JSON),
   };
 }
 
@@ -3289,6 +3303,8 @@ function setOrgSettings_(payload, params) {
   if (payload.logo_url !== undefined) upsertSettingTextByKey_('org.logo_url', String(payload.logo_url).trim());
   if (payload.bank_details_bn !== undefined) upsertSettingTextByKey_('org.bank_details_bn', String(payload.bank_details_bn).trim());
   if (payload.about_bn !== undefined) upsertSettingTextByKey_('org.about_bn', String(payload.about_bn).trim());
+  if (payload.contact_phone !== undefined) upsertSettingTextByKey_('org.contact_phone', String(payload.contact_phone).trim());
+  if (payload.pillars_json !== undefined) upsertSettingTextByKey_('org.pillars_json', String(payload.pillars_json).trim());
   return { ok: true };
 }
 
