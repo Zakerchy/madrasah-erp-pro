@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/app_config.dart';
+import '../../core/app_lang.dart';
 import '../../shared/constants/app_permissions.dart';
 import '../../shared/constants/app_routes.dart';
 import '../../shared/models/dashboard_summary.dart';
@@ -159,8 +160,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
           ),
         ]);
       } else {
-        _error =
-            (res['message'] ?? res['error'] ?? 'তথ্য লোড ব্যর্থ').toString();
+        _error = (res['message'] ?? res['error'] ?? AppLang.t('তথ্য লোড ব্যর্থ', 'Failed to load data'))
+            .toString();
       }
     } catch (e) {
       _error = e.toString();
@@ -296,7 +297,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         now.difference(_lastBackPressedAt!) > const Duration(seconds: 2)) {
       _lastBackPressedAt = now;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('বের হতে আবার চাপুন')),
+        SnackBar(content: Text(AppLang.t('বের হতে আবার চাপুন', 'Press again to exit'))),
       );
       return false;
     }
@@ -323,7 +324,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
     if (!opened && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('APK download link খোলা যায়নি')),
+        SnackBar(content: Text(AppLang.t('APK download link খোলা যায়নি', 'Could not open the APK download link'))),
       );
     }
   }
@@ -334,7 +335,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(
-          pwaRuntimeService.installHelpMessage(isEnglish: false),
+          pwaRuntimeService.installHelpMessage(isEnglish: AppLang.isEnglish.value),
         ),
       ),
     );
@@ -364,7 +365,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setD) => AlertDialog(
-          title: Text(income ? '+ দান / আয়' : '+ ব্যয়'),
+          title: Text(income ? AppLang.t('+ দান / আয়', '+ Donation / Income') : AppLang.t('+ ব্যয়', '+ Expense')),
           content: Form(
             key: formKey,
             child: SingleChildScrollView(
@@ -375,7 +376,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     controller: dateCtrl,
                     readOnly: true,
                     decoration: InputDecoration(
-                      labelText: 'তারিখ (YYYY-MM-DD)',
+                      labelText: AppLang.t('তারিখ (YYYY-MM-DD)', 'Date (YYYY-MM-DD)'),
                       suffixIcon: IconButton(
                         icon: const Icon(Icons.calendar_month),
                         onPressed: () async {
@@ -410,10 +411,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     },
                     validator: (v) {
                       final value = (v ?? '').trim();
-                      if (value.isEmpty) return 'তারিখ দিন';
+                      if (value.isEmpty) return AppLang.t('তারিখ দিন', 'Enter a date');
                       final parsed = _parseIsoDate(value);
-                      if (parsed == null) return 'বৈধ তারিখ দিন';
-                      if (parsed.isAfter(DateTime.now())) return 'ভবিষ্যৎ তারিখ দেওয়া যাবে না';
+                      if (parsed == null) return AppLang.t('বৈধ তারিখ দিন', 'Enter a valid date');
+                      if (parsed.isAfter(DateTime.now())) {
+                        return AppLang.t('ভবিষ্যৎ তারিখ দেওয়া যাবে না', 'Future date is not allowed');
+                      }
                       return null;
                     },
                   ),
@@ -421,26 +424,28 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   FundTypeDropdown(
                     value: fundType,
                     onChanged: (v) => setD(() => fundType = v),
-                    decoration: const InputDecoration(labelText: 'ফান্ড'),
+                    decoration: InputDecoration(labelText: AppLang.t('ফান্ড', 'Fund')),
                   ),
                   const SizedBox(height: 10),
                   TextFormField(
                     controller: amountCtrl,
                     keyboardType:
                         const TextInputType.numberWithOptions(decimal: true),
-                    decoration: const InputDecoration(labelText: 'পরিমাণ (৳)'),
+                    decoration: InputDecoration(labelText: AppLang.t('পরিমাণ (৳)', 'Amount (৳)')),
                     validator: (v) {
                       final n = double.tryParse(v?.trim() ?? '') ?? 0;
-                      return n <= 0 ? 'সঠিক পরিমাণ দিন' : null;
+                      return n <= 0 ? AppLang.t('সঠিক পরিমাণ দিন', 'Enter a valid amount') : null;
                     },
                   ),
                   const SizedBox(height: 10),
                   TextFormField(
                     controller: sourceCtrl,
                     decoration: InputDecoration(
-                        labelText: income ? 'দাতার নাম' : 'কোথায় খরচ'),
+                        labelText: income
+                            ? AppLang.t('দাতার নাম', "Donor's name")
+                            : AppLang.t('কোথায় খরচ', 'Expense destination')),
                     validator: (v) =>
-                        (v?.trim().isEmpty ?? true) ? 'দিন' : null,
+                        (v?.trim().isEmpty ?? true) ? AppLang.t('দিন', 'Required') : null,
                   ),
                   const SizedBox(height: 10),
                   TextFormField(
@@ -448,7 +453,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     minLines: 1,
                     maxLines: 3,
                     decoration:
-                        const InputDecoration(labelText: 'নোট (ঐচ্ছিক)'),
+                        InputDecoration(labelText: AppLang.t('নোট (ঐচ্ছিক)', 'Note (optional)')),
                   ),
                 ],
               ),
@@ -457,12 +462,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
           actions: [
             TextButton(
                 onPressed: () => Navigator.pop(ctx, false),
-                child: const Text('বাতিল')),
+                child: Text(AppLang.t('বাতিল', 'Cancel'))),
             FilledButton(
               onPressed: () {
                 if (formKey.currentState!.validate()) Navigator.pop(ctx, true);
               },
-              child: const Text('সংরক্ষণ'),
+              child: Text(AppLang.t('সংরক্ষণ', 'Save')),
             ),
           ],
         ),
@@ -476,16 +481,17 @@ class _DashboardScreenState extends State<DashboardScreen> {
       final proceedOffline = await showDialog<bool>(
         context: context,
         builder: (ctx) => AlertDialog(
-          title: const Text('অফলাইন সতর্কতা'),
-          content: const Text(
-              'আপনি বর্তমানে অফলাইনে আছেন। লেনদেনটি স্থানীয়ভাবে সংরক্ষিত হবে এবং সংযোগ ফিরলে পাঠানো হবে। তবুও এগিয়ে যাবেন?'),
+          title: Text(AppLang.t('অফলাইন সতর্কতা', 'Offline warning')),
+          content: Text(AppLang.t(
+              'আপনি বর্তমানে অফলাইনে আছেন। লেনদেনটি স্থানীয়ভাবে সংরক্ষিত হবে এবং সংযোগ ফিরলে পাঠানো হবে। তবুও এগিয়ে যাবেন?',
+              'You are currently offline. The transaction will be saved locally and sent once the connection returns. Proceed anyway?')),
           actions: [
             TextButton(
                 onPressed: () => Navigator.pop(ctx, false),
-                child: const Text('বাতিল')),
+                child: Text(AppLang.t('বাতিল', 'Cancel'))),
             FilledButton(
                 onPressed: () => Navigator.pop(ctx, true),
-                child: const Text('হ্যাঁ, সংরক্ষণ')),
+                child: Text(AppLang.t('হ্যাঁ, সংরক্ষণ', 'Yes, save'))),
           ],
         ),
       );
@@ -509,16 +515,17 @@ class _DashboardScreenState extends State<DashboardScreen> {
       final proceedDup = await showDialog<bool>(
         context: context,
         builder: (ctx) => AlertDialog(
-          title: const Text('সম্ভাব্য ডুপ্লিকেট'),
-          content: const Text(
-              'একই পরিমাণ ও ফান্ডে গত ২৪ ঘণ্টায় লেনদেন আছে। তবুও সংরক্ষণ করবেন?'),
+          title: Text(AppLang.t('সম্ভাব্য ডুপ্লিকেট', 'Possible duplicate')),
+          content: Text(AppLang.t(
+              'একই পরিমাণ ও ফান্ডে গত ২৪ ঘণ্টায় লেনদেন আছে। তবুও সংরক্ষণ করবেন?',
+              'There is already a transaction with the same amount and fund in the last 24 hours. Save anyway?')),
           actions: [
             TextButton(
                 onPressed: () => Navigator.pop(ctx, false),
-                child: const Text('বাতিল')),
+                child: Text(AppLang.t('বাতিল', 'Cancel'))),
             FilledButton(
                 onPressed: () => Navigator.pop(ctx, true),
-                child: const Text('হ্যাঁ, সংরক্ষণ')),
+                child: Text(AppLang.t('হ্যাঁ, সংরক্ষণ', 'Yes, save'))),
           ],
         ),
       );
@@ -543,7 +550,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(res['message'] ??
-            (res['ok'] == true ? 'সংরক্ষিত হয়েছে' : 'ব্যর্থ হয়েছে')),
+            (res['ok'] == true
+                ? AppLang.t('সংরক্ষিত হয়েছে', 'Saved')
+                : AppLang.t('ব্যর্থ হয়েছে', 'Failed'))),
         backgroundColor: res['ok'] == true ? Colors.green : Colors.red,
       ),
     );
@@ -568,8 +577,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
       child: Scaffold(
         backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         appBar: AppBar(
-          title: const Text('মাদ্রাসা ERP',
-              style: TextStyle(fontWeight: FontWeight.bold)),
+          title: Text(AppLang.t('মাদ্রাসা ERP', 'Madrasah ERP'),
+              style: const TextStyle(fontWeight: FontWeight.bold)),
           actions: [
             if (_offline)
               const Padding(
@@ -585,7 +594,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       child: CircularProgressIndicator(
                           strokeWidth: 2, color: Colors.white))
                   : const Icon(Icons.refresh),
-              tooltip: 'রিফ্রেশ',
+              tooltip: AppLang.t('রিফ্রেশ', 'Refresh'),
             ),
             PopupMenuButton<String>(
               icon: const Icon(Icons.menu),
@@ -614,16 +623,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 }
               },
               itemBuilder: (_) => [
-                const PopupMenuItem(value: 'salary', child: Text('বেতন')),
-                const PopupMenuItem(
-                    value: 'scholarship', child: Text('বৃত্তি')),
-                const PopupMenuItem(
-                    value: 'beneficiaries', child: Text('উপকারভোগী')),
-                const PopupMenuItem(value: 'reports', child: Text('রিপোর্ট')),
+                PopupMenuItem(value: 'salary', child: Text(AppLang.t('বেতন', 'Salary'))),
+                PopupMenuItem(
+                    value: 'scholarship', child: Text(AppLang.t('বৃত্তি', 'Scholarship'))),
+                PopupMenuItem(
+                    value: 'beneficiaries', child: Text(AppLang.t('উপকারভোগী', 'Beneficiaries'))),
+                PopupMenuItem(value: 'reports', child: Text(AppLang.t('রিপোর্ট', 'Reports'))),
                 if (SessionService.can(AppPermissions.settingsView))
-                  const PopupMenuItem(value: 'settings', child: Text('সেটিংস')),
+                  PopupMenuItem(value: 'settings', child: Text(AppLang.t('সেটিংস', 'Settings'))),
                 const PopupMenuDivider(),
-                const PopupMenuItem(value: 'logout', child: Text('লগআউট')),
+                PopupMenuItem(value: 'logout', child: Text(AppLang.t('লগআউট', 'Logout'))),
               ],
             ),
           ],
@@ -641,7 +650,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 heroTag: 'expense',
                 onPressed: () => _quickEntry(income: false),
                 backgroundColor: Colors.red.shade600,
-                tooltip: 'ব্যয় যোগ করুন',
+                tooltip: AppLang.t('ব্যয় যোগ করুন', 'Add expense'),
                 child: const Icon(Icons.remove, color: Colors.white),
               ),
             if (SessionService.can(AppPermissions.expensesWrite) &&
@@ -651,7 +660,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               FloatingActionButton(
                 heroTag: 'income',
                 onPressed: () => _quickEntry(income: true),
-                tooltip: 'দান / আয় যোগ করুন',
+                tooltip: AppLang.t('দান / আয় যোগ করুন', 'Add donation / income'),
                 child: const Icon(Icons.add),
               ),
           ],
@@ -667,11 +676,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Text('কোনো তথ্য নেই'),
+            Text(AppLang.t('কোনো তথ্য নেই', 'No data available')),
             const SizedBox(height: 12),
             OutlinedButton(
                 onPressed: () => _load(forceRefresh: true),
-                child: const Text('পুনরায় চেষ্টা করুন')),
+                child: Text(AppLang.t('পুনরায় চেষ্টা করুন', 'Retry'))),
           ],
         ),
       );
@@ -690,7 +699,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               final legacyBal = f.legacyKey != null ? s.fund(f.legacyKey!).balance : 0.0;
               return (bal < 0 || legacyBal < 0);
             })
-            .map((f) => f.labelBn)
+            .map((f) => AppLang.t(f.labelBn, f.labelEn))
             .toList();
 
         return Center(
@@ -710,7 +719,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   Padding(
                     padding: const EdgeInsets.only(top: 6, bottom: 10),
                     child: Text(
-                      'ডিফল্ট রেঞ্জ: ${_summaryFrom.isEmpty ? 'শুরু' : _summaryFrom} থেকে ${_summaryTo.isEmpty ? 'আজ' : _summaryTo}',
+                      AppLang.t(
+                        'ডিফল্ট রেঞ্জ: ${_summaryFrom.isEmpty ? 'শুরু' : _summaryFrom} থেকে ${_summaryTo.isEmpty ? 'আজ' : _summaryTo}',
+                        'Default range: ${_summaryFrom.isEmpty ? 'start' : _summaryFrom} to ${_summaryTo.isEmpty ? 'today' : _summaryTo}',
+                      ),
                       style: TextStyle(
                         color: Theme.of(context).colorScheme.onSurfaceVariant,
                         fontSize: 12,
@@ -737,7 +749,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         const SizedBox(width: 10),
                         Expanded(
                           child: Text(
-                            'সতর্কতা: ${negFunds.join(', ')} ফান্ডের ব্যালেন্স ঋণাত্মক!',
+                            AppLang.t(
+                              'সতর্কতা: ${negFunds.join(', ')} ফান্ডের ব্যালেন্স ঋণাত্মক!',
+                              'Warning: ${negFunds.join(', ')} fund balance is negative!',
+                            ),
                             style: TextStyle(
                                 color: Colors.red.shade700,
                                 fontWeight: FontWeight.w600),
@@ -767,8 +782,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   onInstallPwa: (!_isStandalonePwa && _canInstallPwa)
                       ? _installWebApp
                       : null,
-                  installHelpText:
-                      pwaRuntimeService.installHelpMessage(isEnglish: false),
+                  installHelpText: pwaRuntimeService.installHelpMessage(
+                      isEnglish: AppLang.isEnglish.value),
                 ),
                 const SizedBox(height: 14),
                 _ControlBarCard(
@@ -784,11 +799,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 const SizedBox(height: 14),
 
                 // Fund cards
-                const Padding(
-                  padding: EdgeInsets.only(bottom: 8),
-                  child: Text('ফান্ড অনুযায়ী বিবরণ',
-                      style:
-                          TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: Text(AppLang.t('ফান্ড অনুযায়ী বিবরণ', 'Breakdown by fund'),
+                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
                 ),
                 Wrap(
                   spacing: 10,
@@ -797,34 +811,35 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     SizedBox(
                       width: fundCardWidth,
                       child: _FundCard(
-                        name: 'সাদাকাহ/দান ফান্ড',
+                        name: AppLang.t('সাদাকাহ/দান ফান্ড', 'Sadaqah/Donation Fund'),
                         icon: Icons.volunteer_activism_outlined,
                         color: const Color(0xFF1D4ED8),
                         fund: s.fund('SADAQAH'),
                         fmt: _fmt,
-                        onTap: () => _goToFund('SADAQAH', 'সাদাকাহ/দান ফান্ড'),
+                        onTap: () => _goToFund('SADAQAH', AppLang.t('সাদাকাহ/দান ফান্ড', 'Sadaqah/Donation Fund')),
                       ),
                     ),
                     SizedBox(
                       width: fundCardWidth,
                       child: _FundCard(
-                        name: 'যাকাত ফান্ড',
+                        name: AppLang.t('যাকাত ফান্ড', 'Zakat Fund'),
                         icon: Icons.volunteer_activism,
                         color: const Color(0xFF15803D),
                         fund: s.fund('ZAKAT'),
                         fmt: _fmt,
-                        onTap: () => _goToFund('ZAKAT', 'যাকাত ফান্ড'),
+                        onTap: () => _goToFund('ZAKAT', AppLang.t('যাকাত ফান্ড', 'Zakat Fund')),
                       ),
                     ),
                     SizedBox(
                       width: fundCardWidth,
                       child: _FundCard(
-                        name: 'তালেবে ইলম ফান্ড',
+                        name: AppLang.t('তালেবে ইলম ফান্ড', 'Talebe Elm Fund'),
                         icon: Icons.school,
                         color: const Color(0xFF7C3AED),
                         fund: s.fund('TALEBE_ELM'),
                         fmt: _fmt,
-                        onTap: () => _goToFund('TALEBE_ELM', 'তালেবে ইলমদের খেদমত ফান্ড'),
+                        onTap: () => _goToFund('TALEBE_ELM',
+                            AppLang.t('তালেবে ইলমদের খেদমত ফান্ড', 'Talebe Elm Service Fund')),
                       ),
                     ),
                   ],
@@ -884,9 +899,12 @@ class _GreetingCard extends StatelessWidget {
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('আস-সালামু আলাইকুম, ${SessionService.userName}',
+                Text(
+                    AppLang.t('আস-সালামু আলাইকুম, ${SessionService.userName}',
+                        'As-salamu alaikum, ${SessionService.userName}'),
                     style: const TextStyle(fontWeight: FontWeight.w600)),
-                Text('ভূমিকা: ${_roleLabel(SessionService.role)}',
+                Text(
+                    AppLang.t('ভূমিকা: ${_roleLabel()}', 'Role: ${_roleLabel()}'),
                     style: TextStyle(
                       fontSize: 12,
                       color: scheme.onSurfaceVariant,
@@ -899,8 +917,8 @@ class _GreetingCard extends StatelessWidget {
     );
   }
 
-  String _roleLabel(String role) {
-    return RoleService.roleName(role, isEnglish: false);
+  String _roleLabel() {
+    return RoleService.roleName(SessionService.role, isEnglish: AppLang.isEnglish.value);
   }
 }
 
@@ -924,8 +942,8 @@ class _TotalSummaryCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('মোট সংগ্রহ (ডিফল্ট রেঞ্জ)',
-                style: TextStyle(color: Colors.white70, fontSize: 13)),
+            Text(AppLang.t('মোট সংগ্রহ (ডিফল্ট রেঞ্জ)', 'Total Collected (default range)'),
+                style: const TextStyle(color: Colors.white70, fontSize: 13)),
             const SizedBox(height: 4),
             Text(
               fmt(summary.totalIn),
@@ -939,21 +957,21 @@ class _TotalSummaryCard extends StatelessWidget {
               children: [
                 _SummaryChip(
                   icon: Icons.arrow_upward,
-                  label: 'মোট আয়',
+                  label: AppLang.t('মোট আয়', 'Total In'),
                   value: fmt(summary.totalIn),
                   color: Colors.greenAccent,
                 ),
                 const SizedBox(width: 12),
                 _SummaryChip(
                   icon: Icons.arrow_downward,
-                  label: 'মোট ব্যয়',
+                  label: AppLang.t('মোট ব্যয়', 'Total Out'),
                   value: fmt(summary.totalOut),
                   color: Colors.redAccent.shade100,
                 ),
                 const SizedBox(width: 12),
                 _SummaryChip(
                   icon: Icons.account_balance_wallet,
-                  label: 'ব্যালেন্স',
+                  label: AppLang.t('ব্যালেন্স', 'Balance'),
                   value: fmt(summary.balance),
                   color: Colors.white,
                 ),
@@ -1050,7 +1068,7 @@ class _FundCard extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 8),
-            Text('সংগ্রহ',
+            Text(AppLang.t('সংগ্রহ', 'Collected'),
                 style: TextStyle(fontSize: 11, color: scheme.onSurfaceVariant)),
             Text(fmt(fund.incoming),
                 style:
@@ -1062,7 +1080,7 @@ class _FundCard extends StatelessWidget {
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('ব্যয়',
+                    Text(AppLang.t('ব্যয়', 'Spent'),
                         style: TextStyle(
                             fontSize: 10, color: scheme.onSurfaceVariant)),
                     Text(fmt(fund.outgoing),
@@ -1075,7 +1093,7 @@ class _FundCard extends StatelessWidget {
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
-                    Text('ব্যালেন্স',
+                    Text(AppLang.t('ব্যালেন্স', 'Balance'),
                         style: TextStyle(
                             fontSize: 10, color: scheme.onSurfaceVariant)),
                     Text(
@@ -1124,44 +1142,45 @@ class _SeparationCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Row(
+            Row(
               children: [
-                Icon(Icons.calculate_outlined,
+                const Icon(Icons.calculate_outlined,
                     size: 18, color: Color(0xFF0F766E)),
-                SizedBox(width: 8),
-                Text('ফান্ড পৃথকীকরণ হিসাব',
+                const SizedBox(width: 8),
+                Text(AppLang.t('ফান্ড পৃথকীকরণ হিসাব', 'Fund Separation Calculation'),
                     style:
-                        TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                        const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
               ],
             ),
             const Divider(height: 20),
             _SepRow(
-              label: 'মোট সংগ্রহ',
+              label: AppLang.t('মোট সংগ্রহ', 'Total Collected'),
               value: fmt(summary.totalIn),
               isTotal: true,
             ),
             _SepRow(
-              label: '(−) যাকাত',
+              label: AppLang.t('(−) যাকাত', '(−) Zakat'),
               value: '−${fmt(zakatIn)}',
-              sublabel: 'আলাদা ফান্ড',
+              sublabel: AppLang.t('আলাদা ফান্ড', 'Separate fund'),
               color: Colors.green.shade700,
-              onTap: () => onTap('JAKAT', 'যাকাত ফান্ড'),
+              onTap: () => onTap('JAKAT', AppLang.t('যাকাত ফান্ড', 'Zakat Fund')),
             ),
             _SepRow(
-              label: '(−) বৃত্তি / শিক্ষাবৃত্তি',
+              label: AppLang.t('(−) বৃত্তি / শিক্ষাবৃত্তি', '(−) Scholarship / Education'),
               value: '−${fmt(scholarshipIn)}',
-              sublabel: 'আলাদা ফান্ড',
+              sublabel: AppLang.t('আলাদা ফান্ড', 'Separate fund'),
               color: Colors.purple.shade700,
-              onTap: () => onTap('SCHOLARSHIP', 'বৃত্তি ফান্ড'),
+              onTap: () => onTap('SCHOLARSHIP', AppLang.t('বৃত্তি ফান্ড', 'Scholarship Fund')),
             ),
             _SepRow(
-              label: 'নির্মাণ ও সাদাকাহ ফান্ড',
+              label: AppLang.t('নির্মাণ ও সাদাকাহ ফান্ড', 'Construction & Sadaqah Fund'),
               value: fmt(nirmanBalance),
               isSubtotal: true,
               isLast: true,
               color: const Color(0xFF1D4ED8),
-              sublabel: 'বিস্তারিত দেখুন →',
-              onTap: () => onTap('CONSTRUCTION', 'নির্মাণ ও সাদাকাহ ফান্ড'),
+              sublabel: AppLang.t('বিস্তারিত দেখুন →', 'View details →'),
+              onTap: () => onTap('CONSTRUCTION',
+                  AppLang.t('নির্মাণ ও সাদাকাহ ফান্ড', 'Construction & Sadaqah Fund')),
             ),
           ],
         ),
@@ -1287,23 +1306,24 @@ class _PwaModeCard extends StatelessWidget {
                 Expanded(
                   child: Text(
                     isStandalonePwa
-                        ? 'Native-like mode active'
-                        : 'Browser mode detected',
+                        ? AppLang.t('নেটিভের মতো মোড সক্রিয়', 'Native-like mode active')
+                        : AppLang.t('ব্রাউজার মোড শনাক্ত', 'Browser mode detected'),
                     style: const TextStyle(fontWeight: FontWeight.bold),
                   ),
                 ),
                 _StatusDot(
                   color:
                       isOnline ? Colors.green.shade600 : Colors.orange.shade700,
-                  label: isOnline ? 'Online' : 'Offline',
+                  label: isOnline ? AppLang.t('অনলাইন', 'Online') : AppLang.t('অফলাইন', 'Offline'),
                 ),
               ],
             ),
             const SizedBox(height: 8),
             Text(
               isStandalonePwa
-                  ? 'URL bar ছাড়া app-mode এ চলছে।'
-                  : 'Real app feel পেতে Install Web App ব্যবহার করুন।',
+                  ? AppLang.t('URL bar ছাড়া app-mode এ চলছে।', 'Running in app mode, no URL bar.')
+                  : AppLang.t('Real app feel পেতে Install Web App ব্যবহার করুন।',
+                      'Use Install Web App for a real app feel.'),
               style: TextStyle(color: scheme.onSurfaceVariant),
             ),
             if (!isStandalonePwa) ...[
@@ -1377,7 +1397,7 @@ class _ErrorView extends StatelessWidget {
             FilledButton.icon(
               onPressed: onRetry,
               icon: const Icon(Icons.refresh),
-              label: const Text('পুনরায় চেষ্টা করুন'),
+              label: Text(AppLang.t('পুনরায় চেষ্টা করুন', 'Retry')),
             ),
           ],
         ),
@@ -1420,22 +1440,22 @@ class _QuickActionsRow extends StatelessWidget {
           children: [
             ActionChip(
               avatar: const Icon(Icons.add_circle_outline, size: 18),
-              label: const Text('দ্রুত আয় যোগ'),
+              label: Text(AppLang.t('দ্রুত আয় যোগ', 'Quick add income')),
               onPressed: onAddIncome,
             ),
             ActionChip(
               avatar: const Icon(Icons.remove_circle_outline, size: 18),
-              label: const Text('দ্রুত ব্যয় যোগ'),
+              label: Text(AppLang.t('দ্রুত ব্যয় যোগ', 'Quick add expense')),
               onPressed: onAddExpense,
             ),
             ActionChip(
               avatar: const Icon(Icons.analytics_outlined, size: 18),
-              label: const Text('রিপোর্ট'),
+              label: Text(AppLang.t('রিপোর্ট', 'Reports')),
               onPressed: onOpenReports,
             ),
             ActionChip(
               avatar: const Icon(Icons.download_for_offline_outlined, size: 18),
-              label: const Text('APK ডাউনলোড'),
+              label: Text(AppLang.t('APK ডাউনলোড', 'Download APK')),
               onPressed: onDownloadApk,
             ),
             if (onInstallPwa != null)
@@ -1447,7 +1467,7 @@ class _QuickActionsRow extends StatelessWidget {
             if (onOpenSettings != null)
               ActionChip(
                 avatar: const Icon(Icons.tune, size: 18),
-                label: const Text('অ্যাডমিন কন্ট্রোল'),
+                label: Text(AppLang.t('অ্যাডমিন কন্ট্রোল', 'Admin controls')),
                 onPressed: onOpenSettings,
               ),
           ],
@@ -1499,9 +1519,9 @@ class _ControlBarCard extends StatelessWidget {
                 const Icon(Icons.calendar_month,
                     color: Color(0xFF1D4ED8), size: 18),
                 const SizedBox(width: 8),
-                const Text(
-                  'মাসিক কন্ট্রোল ও সারাংশ',
-                  style: TextStyle(fontWeight: FontWeight.bold),
+                Text(
+                  AppLang.t('মাসিক কন্ট্রোল ও সারাংশ', 'Monthly Controls & Summary'),
+                  style: const TextStyle(fontWeight: FontWeight.bold),
                 ),
                 const Spacer(),
                 IconButton(
@@ -1520,7 +1540,7 @@ class _ControlBarCard extends StatelessWidget {
             ),
             const SizedBox(height: 8),
             Text(
-              'নিচের আয়/ব্যয়/ব্যালেন্স শুধু নির্বাচিত মাসের জন্য। উপরের মোট কার্ড ডিফল্ট রেঞ্জ ধরে হিসাব করে।',
+              AppLang.t('নিচের আয়/ব্যয়/ব্যালেন্স শুধু নির্বাচিত মাসের জন্য। উপরের মোট কার্ড ডিফল্ট রেঞ্জ ধরে হিসাব করে।', 'The income/expense/balance below is for the selected month only. The total card above uses the default range.'),
               style: TextStyle(
                 color: scheme.onSurfaceVariant,
                 fontSize: 12,
@@ -1535,19 +1555,19 @@ class _ControlBarCard extends StatelessWidget {
                 runSpacing: 10,
                 children: [
                   _MiniStat(
-                    title: 'মাসিক আয়',
+                    title: AppLang.t('মাসিক আয়', 'Monthly Income'),
                     value: fmt(monthlyIn),
                     icon: Icons.trending_up,
                     color: const Color(0xFF166534),
                   ),
                   _MiniStat(
-                    title: 'মাসিক ব্যয়',
+                    title: AppLang.t('মাসিক ব্যয়', 'Monthly Expense'),
                     value: fmt(monthlyOut),
                     icon: Icons.trending_down,
                     color: const Color(0xFFB91C1C),
                   ),
                   _MiniStat(
-                    title: 'মাসিক ব্যালেন্স',
+                    title: AppLang.t('মাসিক ব্যালেন্স', 'Monthly Balance'),
                     value: fmt(monthlyBalance),
                     icon: Icons.savings_outlined,
                     color: monthlyBalance >= 0
@@ -1588,14 +1608,13 @@ class _RecentTransactionsCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Row(
+            Row(
               children: [
-                Icon(Icons.receipt_long_outlined,
+                const Icon(Icons.receipt_long_outlined,
                     size: 18, color: Color(0xFF0F766E)),
-                SizedBox(width: 8),
-                Text('সাম্প্রতিক লেনদেন (মাসিক)',
-                    style:
-                        TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                const SizedBox(width: 8),
+                Text(AppLang.t('সাম্প্রতিক লেনদেন (মাসিক)', 'Recent Transactions (Monthly)'),
+                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
               ],
             ),
             const SizedBox(height: 10),
@@ -1603,7 +1622,7 @@ class _RecentTransactionsCard extends StatelessWidget {
               const Center(child: AppLoader())
             else if (rows.isEmpty)
               Text(
-                'এই মাসে কোনো transaction data পাওয়া যায়নি।',
+                AppLang.t('এই মাসে কোনো transaction data পাওয়া যায়নি।', 'No transaction data found this month.'),
                 style: TextStyle(color: scheme.onSurfaceVariant),
               )
             else
@@ -1614,12 +1633,12 @@ class _RecentTransactionsCard extends StatelessWidget {
                   headingRowHeight: 36,
                   dataRowMinHeight: 34,
                   dataRowMaxHeight: 44,
-                  columns: const [
-                    DataColumn(label: Text('তারিখ')),
-                    DataColumn(label: Text('ধরণ')),
-                    DataColumn(label: Text('ফান্ড')),
-                    DataColumn(label: Text('পরিমাণ')),
-                    DataColumn(label: Text('উৎস/ভেন্ডর')),
+                  columns: [
+                    DataColumn(label: Text(AppLang.t('তারিখ', 'Date'))),
+                    DataColumn(label: Text(AppLang.t('ধরণ', 'Type'))),
+                    DataColumn(label: Text(AppLang.t('ফান্ড', 'Fund'))),
+                    DataColumn(label: Text(AppLang.t('পরিমাণ', 'Amount'))),
+                    DataColumn(label: Text(AppLang.t('উৎস/ভেন্ডর', 'Source/Vendor'))),
                   ],
                   rows: rows.take(12).map((row) {
                     final direction = (row['direction'] ?? '').toString();
@@ -1691,14 +1710,14 @@ class _PremiumStatusCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Row(
+            Row(
               children: [
-                Icon(Icons.workspace_premium_outlined,
+                const Icon(Icons.workspace_premium_outlined,
                     size: 18, color: Color(0xFF0F766E)),
-                SizedBox(width: 8),
+                const SizedBox(width: 8),
                 Text(
-                  'প্রিমিয়াম স্ট্যাটাস',
-                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                  AppLang.t('প্রিমিয়াম স্ট্যাটাস', 'Premium Status'),
+                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
                 ),
               ],
             ),
@@ -1740,12 +1759,12 @@ class _PremiumStatusCard extends StatelessWidget {
                 ],
               ),
               const SizedBox(height: 12),
-              const Text('সাম্প্রতিক নোটিফিকেশন',
-                  style: TextStyle(fontWeight: FontWeight.w600)),
+              Text(AppLang.t('সাম্প্রতিক নোটিফিকেশন', 'Recent Notifications'),
+                  style: const TextStyle(fontWeight: FontWeight.w600)),
               const SizedBox(height: 6),
               if (recentEvents.isEmpty)
                 Text(
-                  'এখনো কোনো notification event নেই',
+                  AppLang.t('এখনো কোনো notification event নেই', 'No notification events yet'),
                   style: TextStyle(color: scheme.onSurfaceVariant, fontSize: 12),
                 )
               else

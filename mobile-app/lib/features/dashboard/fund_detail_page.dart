@@ -2,6 +2,7 @@ import '../../shared/widgets/app_loader.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
+import '../../core/app_lang.dart';
 import '../../shared/services/api_service.dart';
 
 class FundDetailPage extends StatefulWidget {
@@ -69,7 +70,7 @@ class _FundDetailPageState extends State<FundDetailPage> {
             .where((t) => t['direction'] == 'OUT')
             .fold(0.0, (sum, t) => sum + (double.tryParse(t['amount'].toString()) ?? 0));
       } else {
-        _error = (res['message'] ?? 'তথ্য লোড ব্যর্থ').toString();
+        _error = (res['message'] ?? AppLang.t('তথ্য লোড ব্যর্থ', 'Failed to load data')).toString();
       }
     } catch (e) {
       _error = e.toString();
@@ -82,7 +83,7 @@ class _FundDetailPageState extends State<FundDetailPage> {
       '৳${NumberFormat('#,##0.##', 'en_US').format(n)}';
 
   String _monthLabel(String key) {
-    if (key == 'all') return 'সকল সময়';
+    if (key == 'all') return AppLang.t('সকল সময়', 'All time');
     try {
       final d = DateFormat('yyyy-MM').parse(key);
       return DateFormat('MMMM yyyy').format(d);
@@ -108,10 +109,10 @@ class _FundDetailPageState extends State<FundDetailPage> {
       context: context,
       builder: (ctx) => ListView(
         children: [
-          const Padding(
-            padding: EdgeInsets.all(16),
-            child: Text('সময়কাল নির্বাচন করুন',
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: Text(AppLang.t('সময়কাল নির্বাচন করুন', 'Select a period'),
+                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
           ),
           ...months.map((m) => ListTile(
                 leading: m == 'all'
@@ -187,21 +188,21 @@ class _FundDetailPageState extends State<FundDetailPage> {
               children: [
                 Expanded(
                   child: _SummaryItem(
-                    label: '↑ মোট আয়',
+                    label: AppLang.t('↑ মোট আয়', '↑ Total In'),
                     value: _fmt(_totalIn),
                     color: Colors.green.shade700,
                   ),
                 ),
                 Expanded(
                   child: _SummaryItem(
-                    label: '↓ মোট ব্যয়',
+                    label: AppLang.t('↓ মোট ব্যয়', '↓ Total Out'),
                     value: _fmt(_totalOut),
                     color: Colors.red.shade700,
                   ),
                 ),
                 Expanded(
                   child: _SummaryItem(
-                    label: '= ব্যালেন্স',
+                    label: AppLang.t('= ব্যালেন্স', '= Balance'),
                     value: _fmt(_totalIn - _totalOut),
                     color: color,
                   ),
@@ -223,7 +224,7 @@ class _FundDetailPageState extends State<FundDetailPage> {
                             const SizedBox(height: 12),
                             OutlinedButton(
                                 onPressed: () => _load(forceRefresh: true),
-                                child: const Text('পুনরায় চেষ্টা করুন')),
+                                child: Text(AppLang.t('পুনরায় চেষ্টা করুন', 'Retry'))),
                           ],
                         ),
                       )
@@ -231,8 +232,11 @@ class _FundDetailPageState extends State<FundDetailPage> {
                         ? Center(
                             child: Text(
                               _selectedMonth == 'all'
-                                  ? 'কোনো লেনদেন পাওয়া যায়নি'
-                                  : '${_monthLabel(_selectedMonth)}-এ কোনো লেনদেন নেই',
+                                  ? AppLang.t('কোনো লেনদেন পাওয়া যায়নি', 'No transactions found')
+                                  : AppLang.t(
+                                      '${_monthLabel(_selectedMonth)}-এ কোনো লেনদেন নেই',
+                                      'No transactions in ${_monthLabel(_selectedMonth)}',
+                                    ),
                               style: TextStyle(color: Colors.grey.shade600),
                             ),
                           )
