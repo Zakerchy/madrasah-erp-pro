@@ -9,6 +9,7 @@ import '../../shared/services/api_service.dart';
 import '../../shared/services/session_service.dart';
 import '../../shared/widgets/base_scaffold.dart';
 import '../../shared/widgets/fund_type_dropdown.dart';
+import '../../shared/widgets/themed_month_picker.dart';
 
 class _BeneficiaryRow {
   final String id;
@@ -295,13 +296,14 @@ class _BulkScholarshipScreenState extends State<BulkScholarshipScreen> {
                         Row(
                           children: [
                             Expanded(
-                              child: TextField(
-                                controller: _monthCtrl,
-                                decoration: InputDecoration(
-                                    labelText: AppLang.t(
-                                        'মাস (YYYY-MM)', 'Month (YYYY-MM)')),
-                                onChanged: (v) =>
-                                    setState(() => _monthKey = v.trim()),
+                              child: MonthPickerField(
+                                value: _monthKey,
+                                label: AppLang.t(
+                                    'মাস (YYYY-MM)', 'Month (YYYY-MM)'),
+                                onChanged: (v) => setState(() {
+                                  _monthKey = v;
+                                  _monthCtrl.text = v;
+                                }),
                               ),
                             ),
                             const SizedBox(width: 8),

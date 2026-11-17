@@ -101,6 +101,19 @@ Admin API (staff auth required):
 
 ---
 
+### ✅ Task D — UI/UX Overhaul & Security Hardening (2026-11-17)
+- **Responsive Shell & Shared UI Kit:**
+  - `BaseScaffold` (`lib/shared/widgets/base_scaffold.dart`) এখন desktop-এ (`>= 960px`) sticky left sidebar এবং mobile-এ Drawer দেখায়, সাথে offline pending-sync banner যুক্ত হয়েছে।
+  - `AppDrawer` / `AppNavContent` (`lib/shared/widgets/app_drawer.dart`): `OrgLogo`, role badge, grouped sections ও active route highlighting।
+  - নতুন শেয়ার্ড উইজেট: `StatusBadge`, `EmptyStateView`, `MonthPickerField` (`themed_month_picker.dart`), `PrimaryAsyncButton`, `ResponsiveDataView`।
+  - `LandingScreen` (`_DonateSheet`)-এ payment info কপি বাটন; `AdminDonorScreen`, `DonorDashboardScreen`, `SalaryScreen`, `ScholarshipScreen`, `BulkScholarshipScreen`-এ নতুন শেয়ার্ড উইজেট যুক্ত।
+- **Security Hardening:**
+  - `Code.gs` (`login_`) ও `SessionService.loginFromOfflineCredential`-এ empty `pin_hash` দিয়ে PIN bypass হওয়ার বাগ ফিক্স।
+  - `Code.gs`-এ signed `staff_token` (`staffToken_`, `verifyStaffToken_`) ও `SessionUser`/`ApiService`-এ টোকেন সাপোর্ট যুক্ত।
+  - ⚠️ **Deploy-এর পর করণীয়:** Frontend (Vercel) ও Backend (`clasp push` + Manage Deployments) দুটোই deploy হয়ে গেলে Apps Script editor থেকে একবার `enableStrictStaffToken()` run করলে পুরনো token-ছাড়া staff request পুরোপুরি বন্ধ হবে।
+
+---
+
 ## এখন যা বাকি আছে (priority order)
 
 ### 1. migrateFundKeys() manual run (উপরে বলা হয়েছে)

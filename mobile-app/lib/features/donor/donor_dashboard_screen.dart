@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import '../../core/app_lang.dart';
 import '../../shared/constants/fund_types.dart';
 import '../../shared/widgets/donation_invoice_screen.dart';
+import '../../shared/widgets/empty_state_view.dart';
+import '../../shared/widgets/status_badge.dart';
 import 'donor_api.dart';
 import 'donor_session.dart';
 
@@ -224,7 +226,12 @@ class _LedgerTab extends StatelessWidget {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     if (loading) return const Center(child: AppLoader());
-    if (txns.isEmpty) return Center(child: Text(AppLang.t('কোনো দান নেই', 'No donations yet')));
+    if (txns.isEmpty) {
+      return EmptyStateView(
+        icon: Icons.volunteer_activism_outlined,
+        title: AppLang.t('কোনো দান নেই', 'No donations yet'),
+      );
+    }
 
     return RefreshIndicator(
       onRefresh: () async => onRefresh(),
@@ -261,7 +268,7 @@ class _LedgerTab extends StatelessWidget {
               '${pending && (t['currency'] as String?) != 'BDT' ? '${t['amount_foreign']} ${t['currency']}' : '৳ ${t['amount_bdt']}'}  •  ${_formatDate(t['created_at'])}',
               style: const TextStyle(fontSize: 12),
             ),
-            trailing: _StatusChip(status),
+            trailing: StatusBadge(status: status, compact: true),
             children: [
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
@@ -347,26 +354,5 @@ class _LedgerTab extends StatelessWidget {
       'MOBILE_BANKING': 'মোবাইল ব্যাংকিং', 'CHEQUE': 'চেক', 'OTHER': 'অন্যান্য',
     };
     return map[m] ?? (m ?? '');
-  }
-}
-
-class _StatusChip extends StatelessWidget {
-  final String status;
-  const _StatusChip(this.status);
-
-  @override
-  Widget build(BuildContext context) {
-    Color bg;
-    String label;
-    switch (status) {
-      case 'CONFIRMED': bg = Colors.green; label = AppLang.t('নিশ্চিত', 'Confirmed'); break;
-      case 'REJECTED': bg = Colors.red; label = AppLang.t('বাতিল', 'Rejected'); break;
-      default: bg = Colors.orange; label = AppLang.t('অপেক্ষামাণ', 'Pending');
-    }
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-      decoration: BoxDecoration(color: bg.withValues(alpha: 0.15), borderRadius: BorderRadius.circular(8)),
-      child: Text(label, style: TextStyle(fontSize: 11, color: bg, fontWeight: FontWeight.bold)),
-    );
   }
 }

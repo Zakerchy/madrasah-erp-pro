@@ -9,6 +9,7 @@ import '../../shared/services/api_service.dart';
 import '../../shared/services/session_service.dart';
 import '../../shared/widgets/base_scaffold.dart';
 import '../../shared/widgets/fund_type_dropdown.dart';
+import '../../shared/widgets/themed_month_picker.dart';
 import 'bulk_scholarship_screen.dart';
 
 class ScholarshipScreen extends StatefulWidget {
@@ -296,12 +297,15 @@ class _ScholarshipScreenState extends State<ScholarshipScreen> {
                     ],
                   ),
                   const SizedBox(height: 8),
-                  TextField(
-                    controller: _monthCtrl,
-                    decoration: InputDecoration(
-                        labelText:
-                            AppLang.t('মাস (YYYY-MM)', 'Month (YYYY-MM)')),
-                    onChanged: (v) => _monthKey = v.trim(),
+                  MonthPickerField(
+                    value: _monthKey,
+                    label: AppLang.t('মাস (YYYY-MM)', 'Month (YYYY-MM)'),
+                    onChanged: (v) {
+                      setState(() {
+                        _monthKey = v;
+                        _monthCtrl.text = v;
+                      });
+                    },
                   ),
                   const SizedBox(height: 8),
                   DropdownButtonFormField<String>(

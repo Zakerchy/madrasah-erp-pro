@@ -12,6 +12,7 @@ class SessionService {
   static String get role => user?.role ?? 'VIEWER';
   static String get userId => user?.id ?? 'unknown';
   static String get userName => user?.name ?? 'Unknown';
+  static String get staffToken => user?.staffToken ?? '';
   static List<String> get permissions {
     final current = user?.permissions ?? const [];
     if (current.isNotEmpty) return current;
@@ -34,6 +35,7 @@ class SessionService {
               email: next.email,
               approvalStatus: next.approvalStatus,
               permissions: RoleService.permissionsForRole(next.role),
+              staffToken: next.staffToken,
             );
       LocalStoreService.saveSessionUser(currentUser.value!.toMap());
     }
@@ -51,6 +53,7 @@ class SessionService {
       email: next.email,
       approvalStatus: next.approvalStatus,
       permissions: permissions,
+      staffToken: next.staffToken,
     );
     LocalStoreService.saveSessionUser(currentUser.value!.toMap());
   }
@@ -87,8 +90,8 @@ class SessionService {
     final uMap = Map<String, dynamic>.from(creds['user'] as Map? ?? {});
 
     if (cEmail != email.trim().toLowerCase() || uMap.isEmpty) return false;
-    // Allow offline login if PIN matches or no PIN was set
-    if (cPinHash.isNotEmpty && pinHash.isNotEmpty && cPinHash != pinHash) return false;
+    // Reject empty or mismatched PIN when a PIN hash is stored
+    if (cPinHash.isNotEmpty && cPinHash != pinHash) return false;
 
     setUser(SessionUser.fromMap(uMap));
     return true;

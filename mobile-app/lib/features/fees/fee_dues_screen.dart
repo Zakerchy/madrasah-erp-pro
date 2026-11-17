@@ -7,8 +7,10 @@ import '../../shared/constants/app_permissions.dart';
 import '../../shared/services/api_service.dart';
 import '../../shared/services/session_service.dart';
 import '../../shared/widgets/base_scaffold.dart';
+import '../../shared/widgets/empty_state_view.dart';
 import '../../shared/widgets/fund_type_dropdown.dart';
 import '../../shared/widgets/themed_date_picker.dart';
+import '../../shared/widgets/themed_month_picker.dart';
 
 class FeeDuesScreen extends StatefulWidget {
   const FeeDuesScreen({super.key});
@@ -403,12 +405,11 @@ class _FeeDuesScreenState extends State<FeeDuesScreen> {
   }
 
   Widget _monthField() {
-    return TextField(
-      controller: TextEditingController(text: _monthKey),
-      decoration: InputDecoration(
-          labelText: AppLang.t('মাস (YYYY-MM)', 'Month (YYYY-MM)')),
-      onSubmitted: (v) {
-        setState(() => _monthKey = v.trim());
+    return MonthPickerField(
+      value: _monthKey,
+      label: AppLang.t('মাস (YYYY-MM)', 'Month (YYYY-MM)'),
+      onChanged: (v) {
+        setState(() => _monthKey = v);
         _loadAll();
       },
     );
@@ -503,8 +504,10 @@ class _FeeDuesScreenState extends State<FeeDuesScreen> {
     return _panel(
       AppLang.t('বকেয়া তালিকা', 'Dues List'),
       _dues.isEmpty
-          ? Text(AppLang.t(
-              'এই filter-এ কোনো due data নেই।', 'No due data for this filter.'))
+          ? EmptyStateView(
+              icon: Icons.receipt_long_outlined,
+              title: AppLang.t('এই ফিল্টারে কোনো বকেয়া নেই', 'No due data for this filter'),
+            )
           : Column(
               children: _dues
                   .map((r) => Card(

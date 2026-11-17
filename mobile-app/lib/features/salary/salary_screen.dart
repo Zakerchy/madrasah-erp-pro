@@ -8,6 +8,7 @@ import '../../shared/services/access_control_service.dart';
 import '../../shared/services/api_service.dart';
 import '../../shared/services/session_service.dart';
 import '../../shared/widgets/base_scaffold.dart';
+import '../../shared/widgets/themed_month_picker.dart';
 
 class SalaryScreen extends StatefulWidget {
   const SalaryScreen({super.key});
@@ -323,15 +324,13 @@ class _SalaryScreenState extends State<SalaryScreen> {
                         InputDecoration(labelText: AppLang.t('কর্মী', 'Staff')),
                   ),
                   const SizedBox(height: 8),
-                  TextField(
-                    controller: _monthKey,
-                    decoration: InputDecoration(
-                      labelText:
-                          AppLang.t('মাস (YYYY-MM)', 'Month (YYYY-MM)'),
-                      helperText: AppLang.t(
-                          'ফিল্টার ও সংরক্ষণের মাস', 'Filter and save month'),
-                    ),
-                    onSubmitted: (_) => _reloadByMonth(),
+                  MonthPickerField(
+                    value: _monthKey.text,
+                    label: AppLang.t('মাস (YYYY-MM)', 'Month (YYYY-MM)'),
+                    onChanged: (val) {
+                      setState(() => _monthKey.text = val);
+                      _reloadByMonth();
+                    },
                   ),
                   const SizedBox(height: 8),
                   DropdownButtonFormField<String>(

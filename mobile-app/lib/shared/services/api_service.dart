@@ -302,7 +302,14 @@ class ApiService {
     }
 
     try {
-      final decoded = await _postToAppsScript({'action': action, ...body});
+      final token = SessionService.staffToken;
+      final requestPayload = <String, dynamic>{
+        'action': action,
+        ...body,
+        if (token.isNotEmpty && !body.containsKey('staff_token'))
+          'staff_token': token,
+      };
+      final decoded = await _postToAppsScript(requestPayload);
       if (decoded['ok'] == true && isReadOnly) {
         await LocalStoreService.cacheGetResponse(cacheKey, decoded);
         return _decorateReadResponse(action, body, decoded);

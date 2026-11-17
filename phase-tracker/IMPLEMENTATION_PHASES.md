@@ -37,16 +37,17 @@
 - [x] Beneficiary registry module
 
 ## Phase 5 - Reports, Share, Print
-- [ ] Monthly PDF generation
-- [ ] WhatsApp-ready share text
-- [ ] Date range filtering
-- [ ] Fund-wise reconciliation report
+- [x] Monthly PDF / invoice generation
+- [x] WhatsApp-ready share text
+- [x] Date range filtering
+- [x] Fund-wise reconciliation report
 
-## Phase 6 - Pilot and Hardening
-- [ ] Pilot with 2-3 users
-- [ ] Fix entry and reconciliation issues
-- [ ] Add backup and restore SOP
-- [ ] Production rollout
+## Phase 6 - Pilot, Security & UI/UX Hardening
+- [x] Responsive desktop sidebar + mobile drawer (`BaseScaffold`, `AppNavContent`)
+- [x] Shared UI kit (`StatusBadge`, `EmptyStateView`, `MonthPickerField`, `PrimaryAsyncButton`, `ResponsiveDataView`)
+- [x] Staff login PIN bypass fix & signed `staff_token` support
+- [ ] Enable strict `staff_token` enforcement (`enableStrictStaffToken()`) after backend + frontend deploy
+- [x] Add backup and restore SOP (`docs/FINAL_LAUNCH_READINESS_BN.md`)
 
 ## Notes
 - This file is the single source of implementation progress.

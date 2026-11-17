@@ -6,6 +6,7 @@ class SessionUser {
   final String email;
   final String approvalStatus;
   final List<String> permissions;
+  final String staffToken;
 
   const SessionUser({
     required this.id,
@@ -15,6 +16,7 @@ class SessionUser {
     required this.email,
     required this.approvalStatus,
     required this.permissions,
+    this.staffToken = '',
   });
 
   factory SessionUser.fromMap(Map<String, dynamic> map) {
@@ -29,6 +31,7 @@ class SessionUser {
           .map((e) => e.toString())
           .where((e) => e.trim().isNotEmpty)
           .toList(),
+      staffToken: (map['staff_token'] ?? '').toString(),
     );
   }
 
@@ -41,6 +44,7 @@ class SessionUser {
       'email': email,
       'approval_status': approvalStatus,
       'permissions': permissions,
+      if (staffToken.isNotEmpty) 'staff_token': staffToken,
     };
   }
 }

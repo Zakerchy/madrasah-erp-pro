@@ -424,8 +424,9 @@ function handleRequest_(params) {
     }
 
     if (action === 'importMigratedData') {
+      const expectedSecret = PropertiesService.getScriptProperties().getProperty('IMPORT_SECRET') || 'MADRASAH_IMPORT_2025';
       const secret = String(params.import_secret || '');
-      if (secret !== 'MADRASAH_IMPORT_2025') return json({ ok: false, message: 'unauthorized' });
+      if (secret !== expectedSecret) return json({ ok: false, message: 'unauthorized' });
       return json(importMigratedData_(String(params.sheet_name || ''), params.rows || []));
     }
 
@@ -491,6 +492,7 @@ function login_(payload) {
         email: boot.email,
         approval_status: 'APPROVED',
         permissions: (getRoleDefinition_(boot.role) || { permissions: [] }).permissions || [],
+        staff_token: staffToken_(boot.id, boot.role, boot.pin_hash),
       },
     };
   }
@@ -508,22 +510,24 @@ function login_(payload) {
   const active = String(anyUser.active || '').toUpperCase() === 'TRUE';
   if (!active) return { ok: false, message: 'অ্যাকাউন্ট নিষ্ক্রিয় করা হয়েছে।' };
 
-  // PIN verification: if stored pin_hash is set, client must provide matching hash
+  // PIN verification: if stored pin_hash is set, client must provide matching non-empty hash
   const storedPinHash = String(anyUser.pin_hash || '').trim();
-  if (storedPinHash && pinHash && storedPinHash !== pinHash) {
+  if (storedPinHash && storedPinHash !== pinHash) {
     return { ok: false, message: 'পিন ভুল। আবার চেষ্টা করুন।' };
   }
 
+  const userRole = anyUser.role || 'VIEWER';
   return {
     ok: true,
     data: {
       id: anyUser.id,
       name: anyUser.name,
-      role: anyUser.role || 'VIEWER',
+      role: userRole,
       phone: anyUser.phone || '',
       email: anyUser.email || '',
       approval_status: status,
-      permissions: (getRoleDefinition_(anyUser.role || 'VIEWER') || { permissions: [] }).permissions || [],
+      permissions: (getRoleDefinition_(userRole) || { permissions: [] }).permissions || [],
+      staff_token: staffToken_(anyUser.id, userRole, storedPinHash),
     },
   };
 }
@@ -2507,8 +2511,42 @@ function roleHasPermission_(roleKey, permission) {
   return (def.permissions || []).indexOf(String(permission || '').trim()) !== -1;
 }
 
+function staffTokenSalt_() {
+  return PropertiesService.getScriptProperties().getProperty('STAFF_TOKEN_SALT') || 'madrasah_staff_portal_2026';
+}
+
+function staffToken_(userId, role, pinHash) {
+  const raw = String(userId || '') + ':' + String(role || '').toUpperCase() + ':' + String(pinHash || '') + ':' + staffTokenSalt_();
+  const bytes = Utilities.computeDigest(Utilities.DigestAlgorithm.MD5, raw);
+  return bytes.map(b => ('0' + (b & 0xff).toString(16)).slice(-2)).join('');
+}
+
+function verifyStaffToken_(params) {
+  const token = String((params && params.staff_token) || '').trim();
+  const strict = PropertiesService.getScriptProperties().getProperty('REQUIRE_STAFF_TOKEN') === 'true';
+  if (!token) {
+    if (strict) throw new Error('Staff session token required — please log in again');
+    return;
+  }
+  const userId = String((params && params.user_id) || '').trim();
+  const role = String((params && params.user_role) || '').trim().toUpperCase();
+  if (!userId || !role) throw new Error('Invalid staff session');
+  const users = listSheetRows_(CONFIG.SHEETS.USERS).data || [];
+  const user = users.find(u => String(u.id || '').trim() === userId);
+  if (!user) throw new Error('Staff account not found');
+  if (String(user.role || '').trim().toUpperCase() !== role) throw new Error('Staff role mismatch');
+  const expected = staffToken_(user.id, role, String(user.pin_hash || '').trim());
+  if (token !== expected) throw new Error('Invalid staff session token');
+}
+
+function enableStrictStaffToken() {
+  PropertiesService.getScriptProperties().setProperty('REQUIRE_STAFF_TOKEN', 'true');
+  return 'Strict staff_token verification enabled';
+}
+
 function assertPermission_(params, permission) {
   const role = validateRoleKey_(params && params.user_role, 'user_role');
+  verifyStaffToken_(params);
   if (!permission) return role;
   if (!roleHasPermission_(role, permission)) {
     addAudit_(

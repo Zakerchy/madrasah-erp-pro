@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/app_lang.dart';
@@ -1078,9 +1079,35 @@ class _DonateSheetState extends State<_DonateSheet> {
                 ),
               ),
               const SizedBox(height: 18),
-              Text(
-                AppLang.t('পেমেন্ট মাধ্যম', 'Payment Method'),
-                style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: _greenDark),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    AppLang.t('পেমেন্ট মাধ্যম', 'Payment Method'),
+                    style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: _greenDark),
+                  ),
+                  if (OrgSettings.bankDetailsBn.trim().isNotEmpty)
+                    TextButton.icon(
+                      onPressed: () {
+                        Clipboard.setData(ClipboardData(text: OrgSettings.bankDetailsBn.trim()));
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(AppLang.t('পেমেন্ট তথ্য কপি হয়েছে', 'Payment details copied')),
+                          ),
+                        );
+                      },
+                      icon: const Icon(Icons.copy_rounded, size: 15, color: _green),
+                      label: Text(
+                        AppLang.t('কপি করুন', 'Copy'),
+                        style: const TextStyle(fontSize: 12, color: _green, fontWeight: FontWeight.w600),
+                      ),
+                      style: TextButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                        minimumSize: Size.zero,
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      ),
+                    ),
+                ],
               ),
               const SizedBox(height: 8),
               Container(

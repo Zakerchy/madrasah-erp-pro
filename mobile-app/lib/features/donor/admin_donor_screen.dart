@@ -10,6 +10,8 @@ import '../../shared/services/api_service.dart';
 import '../../shared/services/session_service.dart';
 import '../../shared/widgets/base_scaffold.dart';
 import '../../shared/widgets/donation_invoice_screen.dart';
+import '../../shared/widgets/empty_state_view.dart';
+import '../../shared/widgets/status_badge.dart';
 import 'donor_broadcast_screen.dart';
 
 String hashDonorPin(String pin) => sha256.convert(utf8.encode(pin.trim())).toString();
@@ -282,7 +284,16 @@ class _PendingTab extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (loading) return const Center(child: AppLoader());
-    if (donors.isEmpty) return Center(child: Text(AppLang.t('কোনো মুলতুবি নেই', 'No pending approvals')));
+    if (donors.isEmpty) {
+      return EmptyStateView(
+        icon: Icons.how_to_reg_outlined,
+        title: AppLang.t('কোনো মুলতুবি নেই', 'No pending approvals'),
+        subtitle: AppLang.t(
+          'নতুন দানকারী রেজিস্ট্রেশন করলে এখানে অনুমোদনের জন্য দেখাবে।',
+          'New donor registrations awaiting approval will appear here.',
+        ),
+      );
+    }
     return RefreshIndicator(
       onRefresh: () async => onRefresh(),
       child: ListView.builder(
@@ -387,7 +398,12 @@ class _AllDonorsTab extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (loading) return const Center(child: AppLoader());
-    if (donors.isEmpty) return Center(child: Text(AppLang.t('কোনো দানকারী নেই', 'No donors')));
+    if (donors.isEmpty) {
+      return EmptyStateView(
+        icon: Icons.people_outline,
+        title: AppLang.t('কোনো দানকারী নেই', 'No donors'),
+      );
+    }
     final active = donors.where((d) => d['status'] == 'ACTIVE').length;
     return RefreshIndicator(
       onRefresh: () async => onRefresh(),
@@ -409,7 +425,7 @@ class _AllDonorsTab extends StatelessWidget {
               trailing: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  _StatusChip(d['status'] as String? ?? ''),
+                  StatusBadge(status: d['status'] as String? ?? '', compact: true),
                   IconButton(
                     icon: const Icon(Icons.lock_reset, size: 20),
                     tooltip: AppLang.t('পিন রিসেট', 'Reset PIN'),
@@ -449,7 +465,12 @@ class _TxnsTab extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (loading) return const Center(child: AppLoader());
-    if (txns.isEmpty) return Center(child: Text(AppLang.t('কোনো লেনদেন নেই', 'No transactions')));
+    if (txns.isEmpty) {
+      return EmptyStateView(
+        icon: Icons.receipt_long_outlined,
+        title: AppLang.t('কোনো লেনদেন নেই', 'No transactions'),
+      );
+    }
     final pending = txns.where((t) => t['status'] == 'PENDING').toList();
     final rest = txns.where((t) => t['status'] != 'PENDING').toList();
     final all = [...pending, ...rest];
@@ -468,7 +489,7 @@ class _TxnsTab extends StatelessWidget {
               : '৳${t['amount_bdt']}';
           return Card(
             child: ExpansionTile(
-              leading: _StatusChip(t['status'] as String? ?? ''),
+              leading: StatusBadge(status: t['status'] as String? ?? '', compact: true),
               title: Text(
                 '${t['donor_name_bn'] ?? ''}  •  $titleAmount',
                 style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
@@ -763,27 +784,4 @@ num _toNum(dynamic v) {
   if (v == null) return 0;
   if (v is num) return v;
   return num.tryParse(v.toString()) ?? 0;
-}
-
-class _StatusChip extends StatelessWidget {
-  final String status;
-  const _StatusChip(this.status);
-
-  @override
-  Widget build(BuildContext context) {
-    Color bg;
-    String label;
-    switch (status) {
-      case 'ACTIVE':
-      case 'CONFIRMED': bg = Colors.green; label = status == 'ACTIVE' ? AppLang.t('সক্রিয়', 'Active') : AppLang.t('নিশ্চিত', 'Confirmed'); break;
-      case 'REJECTED': bg = Colors.red; label = AppLang.t('বাতিল', 'Rejected'); break;
-      case 'PENDING': bg = Colors.orange; label = AppLang.t('অপেক্ষামাণ', 'Pending'); break;
-      default: bg = Colors.grey; label = status;
-    }
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-      decoration: BoxDecoration(color: bg.withValues(alpha: 0.15), borderRadius: BorderRadius.circular(8)),
-      child: Text(label, style: TextStyle(fontSize: 11, color: bg, fontWeight: FontWeight.bold)),
-    );
-  }
 }

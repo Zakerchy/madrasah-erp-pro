@@ -68,6 +68,21 @@ check('listDonationOpportunities (public)', async () => {
 check('staff login (dev test admin)', async () => {
   const r = await callFlat('login', { email: TEST_ADMIN_EMAIL, pin_hash: TEST_ADMIN_PIN_HASH });
   if (r.ok !== true) throw new Error(JSON.stringify(r));
+  if (r.data && r.data.staff_token) {
+    globalThis.__staffToken = r.data.staff_token;
+    globalThis.__staffId = r.data.id;
+    globalThis.__staffRole = r.data.role;
+  }
+});
+
+check('staff auth rejects a bad staff_token', async () => {
+  if (!globalThis.__staffId) return;
+  const r = await callFlat('dashboardSummary', {
+    user_id: globalThis.__staffId,
+    user_role: globalThis.__staffRole || 'ADMIN',
+    staff_token: 'invalid-staff-token',
+  });
+  if (r.ok === true) throw new Error('bad staff_token was accepted');
 });
 
 check('donor login (demo donor 222)', async () => {
